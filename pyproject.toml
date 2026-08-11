@@ -20,3 +20,6 @@ avp = "avp_ref.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"avp_ref.resources" = ["*.json"]
