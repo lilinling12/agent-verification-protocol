@@ -7,13 +7,13 @@ from avp_ref.runtime import ReferenceRuntime
 from avp_ref.subject import InProcessSubjectAdapter
 
 class FakeTransport:
-    def __init__(self): self.schema_version=1; self.calls=[]
+    def __init__(self): self.schema_version=1; self.ttl_ms=1000; self.calls=[]
     def request(self,method,params=None,*,name=None,extra_headers=None):
         self.calls.append((method,dict(params or {}),name,dict(extra_headers or {})))
         if method=="server/discover": return {"supportedVersions":["2026-07-28"],"capabilities":{"tools":{}},"serverInfo":{"name":"fake","version":"1.0"}}
         if method=="tools/list":
-            if (params or {}).get("cursor") is None:return {"tools":[{"name":"order.get","title":"Get order","inputSchema":{"type":"object","properties":{"order_id":{"type":"string","x-mcp-header":"Order-Id"}},"required":["order_id"],"x-version":self.schema_version},"outputSchema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"]}}],"nextCursor":"p2","ttlMs":1000,"cacheScope":"private"}
-            return {"tools":[{"name":"refund.create","inputSchema":{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}}],"ttlMs":1000,"cacheScope":"private"}
+            if (params or {}).get("cursor") is None:return {"tools":[{"name":"order.get","title":"Get order","inputSchema":{"type":"object","properties":{"order_id":{"type":"string","x-mcp-header":"Order-Id"}},"required":["order_id"],"x-version":self.schema_version},"outputSchema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"]}}],"nextCursor":"p2","ttlMs":self.ttl_ms,"cacheScope":"private"}
+            return {"tools":[{"name":"refund.create","inputSchema":{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}}],"ttlMs":self.ttl_ms,"cacheScope":"private"}
         if method=="tools/call": return {"resultType":"complete","structuredContent":{"ok":True},"isError":False}
         raise AssertionError(method)
 
@@ -28,6 +28,11 @@ class MCPGatewayTest(unittest.TestCase):
         t=FakeTransport(); g=self.make_gateway(t); g.open(); t.schema_version=2
         with self.assertRaises(MCPSchemaDriftError): g.call_tool("order.get",{"order_id":"ord_1"})
         self.assertFalse(any(x[0]=="tools/call" for x in t.calls))
+    def test_cache_metadata_change_is_not_schema_drift(self):
+        t=FakeTransport(); g=self.make_gateway(t); baseline=g.open().baseline_catalog_digest; t.ttl_ms=250
+        result=g.call_tool("order.get",{"order_id":"ord_1"})
+        self.assertTrue(result["structuredContent"]["ok"])
+        self.assertEqual(baseline,g.call_records[-1].catalog_digest)
     def test_call_validates_schema_and_mirrors_header(self):
         t=FakeTransport(); g=self.make_gateway(t); g.open(); g.call_tool("order.get",{"order_id":"ord_1"},correlation_id="call_7")
         call=[x for x in t.calls if x[0]=="tools/call"][0]; self.assertEqual("ord_1",call[3]["Mcp-Param-Order-Id"]); self.assertEqual("call_7",g.call_records[-1].correlation_id)

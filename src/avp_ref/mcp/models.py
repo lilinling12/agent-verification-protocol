@@ -54,16 +54,24 @@ class MCPToolDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class MCPToolCatalog:
+    """Canonical tool contract plus non-identity retrieval metadata.
+
+    ``catalog_digest`` intentionally excludes TTL, pagination cursor/page shape,
+    and cache scope. Those values describe how the catalog was retrieved, not
+    the tool contract itself; including them would create false schema-drift
+    alarms when an otherwise identical server refreshes cache metadata.
+    """
     tools: tuple[MCPToolDescriptor, ...]; page_digests: tuple[str, ...]; cache_scope: str; min_ttl_ms: int
     def __post_init__(self):
         ordered=tuple(sorted(self.tools,key=lambda x:x.name))
         if len({x.name for x in ordered})!=len(ordered): raise ValueError("MCP catalog contains duplicate tool names")
         if self.cache_scope not in {"public","private"} or self.min_ttl_ms<0: raise ValueError("invalid MCP cache metadata")
-        object.__setattr__(self,"tools",ordered)
+        object.__setattr__(self,"tools",ordered); object.__setattr__(self,"page_digests",tuple(self.page_digests))
     def by_name(self): return {x.name:x for x in self.tools}
     def to_dict(self): return {"tools":[x.to_dict() for x in self.tools],"pageDigests":list(self.page_digests),"cacheScope":self.cache_scope,"minTtlMs":self.min_ttl_ms}
     @property
-    def catalog_digest(self): return digest(self.to_dict())
+    def catalog_digest(self):
+        return digest({"tools":[x.to_dict() for x in self.tools]})
 
 @dataclass(frozen=True, slots=True)
 class MCPGatewayDescription:
