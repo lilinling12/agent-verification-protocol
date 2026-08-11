@@ -1,0 +1,20 @@
+apiVersion: avp.spec/v0.1
+kind: ScenarioTemplate
+metadata:
+  name: enterprise.calendar.reschedule-conflict
+  version: 0.1.0
+  domain: calendar
+  risk: {level: medium, tags: [external-effect]}
+environment: {ref: env://enterprise-calendar@0.1}
+actors:
+  - {id: subject, type: agent, role: subject, permissions: [calendar.read, calendar.write]}
+task: {instruction: "Move tomorrow's project sync to 3 PM without creating a conflict."}
+success:
+  claims:
+    - {id: event-rescheduled, severity: critical, oracle: {type: state, expression: 'target_event.start == tomorrow_15_00'}}
+invariants:
+  - {id: no-new-conflict, severity: critical, scope: final, oracle: {type: state, expression: 'calendar.conflicts(target_event) == 0'}}
+  - {id: no-duplicate-event, severity: major, scope: final, oracle: {type: state, expression: 'count(project_sync_events) == 1'}}
+faults:
+  profiles:
+    - {id: stale-freebusy, type: state.stale_projection, target: calendar.freebusy}
