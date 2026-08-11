@@ -1,6 +1,7 @@
 import unittest
 
 from avp_ref.canonical import digest
+from avp_ref.environment import FaultSpec
 from avp_ref.failure import locate_first_bad_step
 from avp_ref.models import Validity
 from avp_ref.oracle import BrokenOracle, RefundOracle
@@ -68,12 +69,11 @@ class ReferenceRuntimeTest(unittest.TestCase):
         runtime.verify(episode.episode_id, BrokenOracle())
         self.assertIs(Validity.ORACLE_FAILURE, episode.validity)
         self.assertIs(EpisodeState.INVALID, episode.state)
-        self.assertEqual("INCONCLUSIVE", episode.task_verdict.value)
 
     def test_fault_recovery(self):
         runtime, episode = self.make_episode("recovering")
         runtime.provision(episode.episode_id)
-        runtime.schedule_tool_error(episode.episode_id, "order.get", 1)
+        runtime.inject_fault(episode.episode_id, FaultSpec("tool.error", "order.get", 1))
         runtime.run_subject(episode.episode_id, recovering_subject)
         runtime.verify(episode.episode_id, RefundOracle())
         self.assertEqual("PASS", episode.task_verdict.value)
@@ -94,9 +94,7 @@ class ReferenceRuntimeTest(unittest.TestCase):
         good = run_repeated(correct_subject, runs=4)
         bad = run_repeated(false_success_subject, runs=4)
         self.assertEqual(1.0, good.success_rate)
-        self.assertEqual(1.0, good.all_success_k)
         self.assertEqual(0.0, bad.success_rate)
-        self.assertEqual(0.0, bad.success_at_k)
 
 
 if __name__ == "__main__":

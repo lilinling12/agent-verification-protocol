@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from avp_ref.canonical import digest
+from avp_ref.environment.models import EnvironmentDescription
 from avp_ref.scenario.models import ScenarioInstance
 
 from .agent import AgentSystem
@@ -29,7 +30,8 @@ class EpisodeManifest:
     scenario_template_digest: str
     seed_bundle_digest: str
     agent_system_digest: str
-    environment_manifest_digest: str | None = None
+    environment_ref_digest: str | None
+    environment_adapter_digest: str
     oracle_bundle_digest: str | None = None
     resource_manifest_digest: str | None = None
 
@@ -38,12 +40,11 @@ class EpisodeManifest:
         cls,
         scenario: ScenarioInstance,
         agent: AgentSystem,
+        environment: EnvironmentDescription,
         runtime_version: str,
         *,
         resource_manifest_digest: str | None = None,
     ) -> "EpisodeManifest":
-        """Create a manifest without inventing unavailable artifact identities."""
-
         seed_bundle: Mapping[str, Any] = scenario.document.get("compilation", {}).get("seed_bundle", {})
         return cls(
             protocol_version=str(scenario.document.get("apiVersion", "avp.spec/v0.1")),
@@ -52,7 +53,8 @@ class EpisodeManifest:
             scenario_template_digest=scenario.template_digest,
             seed_bundle_digest=digest(dict(seed_bundle)),
             agent_system_digest=agent.identity_digest,
-            environment_manifest_digest=_resolved_reference_digest(scenario, "$.environment.ref"),
+            environment_ref_digest=_resolved_reference_digest(scenario, "$.environment.ref"),
+            environment_adapter_digest=environment.identity_digest,
             oracle_bundle_digest=_resolved_reference_digest(scenario, "$.oracle.ref"),
             resource_manifest_digest=resource_manifest_digest,
         )
@@ -65,7 +67,8 @@ class EpisodeManifest:
             "scenario_template_digest": self.scenario_template_digest,
             "seed_bundle_digest": self.seed_bundle_digest,
             "agent_system_digest": self.agent_system_digest,
-            "environment_manifest_digest": self.environment_manifest_digest,
+            "environment_ref_digest": self.environment_ref_digest,
+            "environment_adapter_digest": self.environment_adapter_digest,
             "oracle_bundle_digest": self.oracle_bundle_digest,
             "resource_manifest_digest": self.resource_manifest_digest,
         }

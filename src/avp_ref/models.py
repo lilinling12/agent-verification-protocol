@@ -60,12 +60,3 @@ class AVPEvent:
     payload: dict[str, Any] = field(default_factory=dict)
     state: dict[str, Any] = field(default_factory=dict)
     evidence: list[str] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class Snapshot:
-    snapshot_id: str
-    state: dict[str, Any]
-    state_digest: str
-    logical_time: int
-    consistency: str = "application-consistent"

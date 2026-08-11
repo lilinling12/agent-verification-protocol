@@ -1,18 +1,14 @@
-"""Executable reference fixtures used by demos, TCK smoke tests and benchmarks.
-
-Domain-specific Commerce behavior is isolated here so the runtime core remains
-usable by future HTTP, MCP, database and browser environments.
-"""
+"""Executable reference fixtures used by demos, TCK smoke tests and benchmarks."""
 
 from __future__ import annotations
 
 from typing import Any, Mapping
 
 from avp_ref.canonical import digest
+from avp_ref.environment import InMemoryCommerceAdapter
+from avp_ref.runtime import AgentSystem, SubjectSession
 from avp_ref.scenario import CompileOptions, ScenarioCompiler
 from avp_ref.scenario.models import ScenarioInstance
-from avp_ref.world import CommerceWorld
-from avp_ref.runtime import AgentSystem, SubjectSession
 
 REFERENCE_TEMPLATE: dict[str, Any] = {
     "apiVersion": "avp.spec/v0.1",
@@ -34,18 +30,11 @@ def reference_scenario(seed: int = 0) -> ScenarioInstance:
 
 
 def reference_agent_system(subject_name: str) -> AgentSystem:
-    return AgentSystem(
-        name=subject_name,
-        version="0.2.0",
-        adapter="in-process",
-        model_ref="reference://deterministic-subject",
-        config_digest=digest({"subject": subject_name, "version": "0.2.0"}),
-        metadata={"fixture": True},
-    )
+    return AgentSystem(name=subject_name, version="0.2.0", adapter="in-process", model_ref="reference://deterministic-subject", config_digest=digest({"subject": subject_name, "version": "0.2.0"}), metadata={"fixture": True})
 
 
-def reference_environment() -> CommerceWorld:
-    return CommerceWorld()
+def reference_environment() -> InMemoryCommerceAdapter:
+    return InMemoryCommerceAdapter()
 
 
 def false_success_subject(session: SubjectSession, task: Mapping[str, Any]) -> str:
@@ -75,6 +64,6 @@ def recovering_subject(session: SubjectSession, task: Mapping[str, Any]) -> str:
 
 
 def isolation_probe_subject(session: SubjectSession, task: Mapping[str, Any]) -> str:
-    forbidden = ["worlds", "_worlds", "_environments", "evaluator_projection", "snapshot", "verify", "schedule_tool_error"]
+    forbidden = ["_adapters", "_handles", "evaluator_projection", "snapshot", "verify", "inject_fault"]
     exposed = [name for name in forbidden if hasattr(session, name)]
     return "ISOLATED" if not exposed else "LEAK:" + ",".join(exposed)
