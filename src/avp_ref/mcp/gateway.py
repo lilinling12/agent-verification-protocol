@@ -1,7 +1,8 @@
 """Verification gateway in front of a real MCP server."""
 from __future__ import annotations
 import re, uuid
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 from jsonschema import Draft202012Validator, ValidationError, SchemaError
 from avp_ref.canonical import digest
 from avp_ref.scenario.models import ScenarioInstance
@@ -77,12 +78,11 @@ class MCPVerificationGateway:
         raise MCPProtocolError("tools/list exceeded page limit")
     def _parse_tool(self,raw):
         if not isinstance(raw,dict) or not isinstance(raw.get("name"),str) or not isinstance(raw.get("inputSchema"),dict): raise MCPProtocolError("malformed MCP tool descriptor")
-        self._validate_schema(raw["inputSchema"]); out=raw.get("outputSchema");
+        self._validate_schema(raw["inputSchema"]); out=raw.get("outputSchema")
         if out is not None:self._validate_schema(out)
         try:self._header_paths(raw["inputSchema"])
         except MCPProtocolError:return None
-        icons=tuple(raw.get("icons") or ())
-        return MCPToolDescriptor(raw["name"],raw.get("title"),raw.get("description"),icons,raw["inputSchema"],out,raw.get("annotations") or {})
+        return MCPToolDescriptor(raw["name"],raw.get("title"),raw.get("description"),tuple(raw.get("icons") or ()),raw["inputSchema"],out,raw.get("annotations") or {})
     def _validate_schema(self,schema):
         self._validate_schema_depth(schema); self._reject_external_refs(schema)
         try: Draft202012Validator.check_schema(schema)
@@ -92,21 +92,22 @@ class MCPVerificationGateway:
         except ValidationError as exc: raise MCPProtocolError(f"{label} does not conform to schema: {exc.message}") from exc
     def _validate_schema_depth(self,value,depth=0):
         if depth>self._policy.max_schema_depth: raise MCPProtocolError("MCP schema exceeds depth limit")
-        if isinstance(value,dict):
+        if isinstance(value,Mapping):
             for v in value.values():self._validate_schema_depth(v,depth+1)
-        elif isinstance(value,list):
+        elif isinstance(value,(list,tuple)):
             for v in value:self._validate_schema_depth(v,depth+1)
     def _reject_external_refs(self,value):
-        if isinstance(value,dict):
+        if isinstance(value,Mapping):
             ref=value.get("$ref")
             if isinstance(ref,str) and not ref.startswith("#"): raise MCPProtocolError("external JSON Schema $ref is not allowed in MCP verification gateway")
             for v in value.values():self._reject_external_refs(v)
-        elif isinstance(value,list):
+        elif isinstance(value,(list,tuple)):
             for v in value:self._reject_external_refs(v)
     def _header_paths(self,schema,path=(),seen=None):
-        seen={} if seen is None else seen; found=[]
-        for key,prop in (schema.get("properties") or {}).items():
-            if not isinstance(prop,dict):continue
+        seen={} if seen is None else seen; found=[]; properties=schema.get("properties") or {}
+        if not isinstance(properties,Mapping): return found
+        for key,prop in properties.items():
+            if not isinstance(prop,Mapping):continue
             p=path+(key,); header=prop.get("x-mcp-header")
             if header is not None:
                 if not isinstance(header,str) or not header or not _TOKEN.match(header) or prop.get("type") not in {"string","integer","boolean"} or header.lower() in seen: raise MCPProtocolError("invalid x-mcp-header annotation")
