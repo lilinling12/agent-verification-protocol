@@ -1,7 +1,7 @@
 """Protocol-driven AVP reference execution engine.
 
-The engine orchestrates lifecycle and evidence. Mutable environment operations
-are delegated to EnvironmentAdapter and Agent execution to SubjectAdapter.
+EnvironmentAdapter owns authoritative state, SubjectAdapter owns Agent
+execution, and an optional MCPVerificationGateway owns real MCP tool traffic.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from typing import Any, Mapping, Protocol
 from avp_ref.canonical import digest
 from avp_ref.environment import EnvironmentAdapter, EnvironmentHandle, EvaluatorEnvironment, FaultHandle, FaultObservation, FaultPhase, FaultSpec, ReadOnlyEvaluatorEnvironment, ResetTarget, ToolExecutionError, ToolRequest
 from avp_ref.events import EventRecorder
+from avp_ref.mcp import MCPGatewayError, MCPVerificationGateway
 from avp_ref.models import TaskVerdict, Validity, VerificationResult
 from avp_ref.scenario.models import ScenarioInstance
 from avp_ref.subject import SubjectAdapter, SubjectAdapterError, SubjectHandle, SubjectInvocation, SubjectStatus
@@ -21,7 +22,7 @@ from .episode import Episode
 from .manifest import EpisodeManifest
 from .state import EpisodeState, InvalidEpisodeTransition
 
-_RUNTIME_VERSION = "0.2.0-alpha.3"
+_RUNTIME_VERSION = "0.2.0-alpha.4"
 
 
 class EvaluationOracle(Protocol):
@@ -46,7 +47,7 @@ class SubjectSession:
 
 
 class ReferenceRuntime:
-    """Scenario-driven runtime with separate Environment and Subject adapter planes."""
+    """Scenario-driven runtime with independent subject, environment and MCP planes."""
 
     def __init__(self) -> None:
         self.episodes: dict[str, Episode] = {}
@@ -54,24 +55,27 @@ class ReferenceRuntime:
         self._handles: dict[str, EnvironmentHandle] = {}
         self._subject_adapters: dict[str, SubjectAdapter] = {}
         self._subject_handles: dict[str, SubjectHandle] = {}
+        self._mcp_gateways: dict[str, MCPVerificationGateway] = {}
         self._faults: dict[str, dict[str, FaultHandle]] = {}
 
     def capabilities(self) -> dict[str, Any]:
-        return {"protocol": "avp", "version": "avp.spec/v0.1", "implementation": {"name": "avp-reference", "version": _RUNTIME_VERSION, "language": "python"}, "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"], "features": {"scenario_instance_required": True, "environment_adapter_spi": "avp.environment/v0.1", "subject_adapter_spi": "avp.subject/v0.1", "isolation": "adapter-dependent"}}
+        return {"protocol": "avp", "version": "avp.spec/v0.1", "implementation": {"name": "avp-reference", "version": _RUNTIME_VERSION, "language": "python"}, "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-MCP-Gateway", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"], "features": {"scenario_instance_required": True, "environment_adapter_spi": "avp.environment/v0.1", "subject_adapter_spi": "avp.subject/v0.1", "mcp_protocol": "2026-07-28", "isolation": "adapter-dependent"}}
 
-    def create_episode(self, scenario: ScenarioInstance, agent_system: AgentSystem, environment_adapter: EnvironmentAdapter, subject_adapter: SubjectAdapter) -> Episode:
+    def create_episode(self, scenario: ScenarioInstance, agent_system: AgentSystem, environment_adapter: EnvironmentAdapter, subject_adapter: SubjectAdapter, mcp_gateway: MCPVerificationGateway | None = None) -> Episode:
         if scenario.document.get("kind") != "ScenarioInstance":
             raise TypeError("ReferenceRuntime requires a compiled ScenarioInstance")
         environment_description = environment_adapter.describe()
         subject_description = subject_adapter.describe()
         episode_id = "ep_" + uuid.uuid4().hex[:12]
-        manifest = EpisodeManifest.create(scenario, agent_system, environment_description, subject_description, _RUNTIME_VERSION)
+        manifest = EpisodeManifest.create(scenario, agent_system, environment_description, subject_description, _RUNTIME_VERSION, mcp_gateway_config_digest=mcp_gateway.configuration_digest if mcp_gateway else None)
         episode = Episode(episode_id, scenario, agent_system, manifest)
         self.episodes[episode_id] = episode
         self._adapters[episode_id] = environment_adapter
         self._subject_adapters[episode_id] = subject_adapter
+        if mcp_gateway is not None:
+            self._mcp_gateways[episode_id] = mcp_gateway
         self._faults[episode_id] = {}
-        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {"manifest_digest": manifest.manifest_digest, "scenario_instance_digest": scenario.instance_digest, "agent_system_digest": agent_system.identity_digest, "environment_adapter_digest": environment_description.identity_digest, "subject_adapter_digest": subject_description.identity_digest})
+        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {"manifest_digest": manifest.manifest_digest, "scenario_instance_digest": scenario.instance_digest, "agent_system_digest": agent_system.identity_digest, "environment_adapter_digest": environment_description.identity_digest, "subject_adapter_digest": subject_description.identity_digest, "mcp_gateway_config_digest": manifest.mcp_gateway_config_digest})
         return episode
 
     def provision(self, episode_id: str) -> Episode:
@@ -85,12 +89,16 @@ class ReferenceRuntime:
             self._subject_handles[episode_id] = subject_handle
             recorder.emit("environment.provisioned", "environment", environment_adapter.logical_time(environment_handle), {"handle_id": environment_handle.handle_id, "adapter": environment_adapter.describe().adapter})
             recorder.emit("subject.opened", "agent", environment_adapter.logical_time(environment_handle), {"handle_id": subject_handle.handle_id, "adapter": subject_adapter.describe().adapter})
+            gateway = self._mcp_gateways.get(episode_id)
+            if gateway is not None:
+                gateway_description = gateway.open()
+                recorder.emit("mcp.gateway.opened", "orchestrator", environment_adapter.logical_time(environment_handle), {"gateway_digest": gateway_description.identity_digest, "server_digest": gateway_description.server_digest, "catalog_digest": gateway_description.baseline_catalog_digest, "protocol_version": gateway_description.protocol_version})
             reset = environment_adapter.reset(environment_handle, ResetTarget.INITIAL)
             recorder.emit("environment.reset.completed", "environment", environment_adapter.logical_time(environment_handle), {"target": reset.target.value, "equivalent_to_initial": reset.equivalent_to_initial}, state={"before": reset.before_digest, "after": reset.after_digest})
-        except SubjectAdapterError as exc:
+        except (SubjectAdapterError, MCPGatewayError) as exc:
             episode.validity = Validity.INFRA_CONFOUND
             episode.transition(EpisodeState.INFRA_FAILED)
-            recorder.emit("subject.open.failed", "agent", 0, {"error_type": type(exc).__name__, "error": str(exc)})
+            recorder.emit("episode.provision.failed", "orchestrator", 0, {"error_type": type(exc).__name__, "error": str(exc)})
             raise
         except Exception as exc:
             episode.validity = Validity.ENVIRONMENT_FAILURE
@@ -211,17 +219,29 @@ class ReferenceRuntime:
         if episode.state is not EpisodeState.RUNNING:
             raise InvalidEpisodeTransition("Agent tool calls are only allowed while RUNNING")
         recorder = EventRecorder(episode)
-        request = ToolRequest(actor_id="subject", name=name, arguments=arguments, correlation_id=f"call_{len(episode.events) + 1}")
-        recorder.emit("tool.call", "agent", adapter.logical_time(handle), {"name": name, "arguments": arguments})
+        correlation_id = f"call_{len(episode.events) + 1}"
+        gateway = self._mcp_gateways.get(episode_id)
+        if gateway is not None and gateway.owns_tool(name):
+            recorder.emit("tool.call", "agent", adapter.logical_time(handle), {"name": name, "arguments": arguments, "protocol": "mcp", "correlation_id": correlation_id})
+            try:
+                result = gateway.call_tool(name, arguments, correlation_id=correlation_id)
+            except MCPGatewayError as exc:
+                recorder.emit("tool.error", "environment", adapter.logical_time(handle), {"name": name, "protocol": "mcp", "error_type": type(exc).__name__, "error": str(exc), "correlation_id": correlation_id})
+                raise RuntimeError(str(exc)) from exc
+            record = gateway.call_records[-1]
+            recorder.emit("tool.result", "environment", adapter.logical_time(handle), {"name": name, "protocol": "mcp", "result": result, "correlation_id": correlation_id, "schema_digest": record.schema_digest, "catalog_digest": record.catalog_digest, "result_digest": record.result_digest})
+            return result
+        request = ToolRequest(actor_id="subject", name=name, arguments=arguments, correlation_id=correlation_id)
+        recorder.emit("tool.call", "agent", adapter.logical_time(handle), {"name": name, "arguments": arguments, "protocol": "environment", "correlation_id": correlation_id})
         try:
             result = adapter.execute(handle, request)
         except ToolExecutionError as exc:
             self._emit_fault_observations(episode, adapter, handle, exc.fault_observations)
-            recorder.emit("tool.error", "environment", adapter.logical_time(handle), {"name": name, "error": str(exc)})
+            recorder.emit("tool.error", "environment", adapter.logical_time(handle), {"name": name, "protocol": "environment", "error": str(exc), "correlation_id": correlation_id})
             raise RuntimeError(str(exc)) from exc
-        recorder.emit("tool.result", "environment", adapter.logical_time(handle), {"name": name, "result": result.result})
+        recorder.emit("tool.result", "environment", adapter.logical_time(handle), {"name": name, "protocol": "environment", "result": result.result, "correlation_id": correlation_id})
         if result.diff is not None:
-            recorder.emit("environment.state.changed", "environment", adapter.logical_time(handle), {"cause_correlation_id": request.correlation_id, "changes": result.diff.to_dict()["changes"]}, state={"before": result.before_digest, "after": result.after_digest})
+            recorder.emit("environment.state.changed", "environment", adapter.logical_time(handle), {"cause_correlation_id": correlation_id, "changes": result.diff.to_dict()["changes"]}, state={"before": result.before_digest, "after": result.after_digest})
         return result.result
 
     @staticmethod

@@ -23,8 +23,6 @@ def _resolved_reference_digest(scenario: ScenarioInstance, path: str) -> str | N
 
 @dataclass(frozen=True, slots=True)
 class EpisodeManifest:
-    """Immutable identities required to explain exactly what was evaluated."""
-
     protocol_version: str
     runtime_version: str
     scenario_instance_digest: str
@@ -34,6 +32,7 @@ class EpisodeManifest:
     environment_ref_digest: str | None
     environment_adapter_digest: str
     subject_adapter_digest: str
+    mcp_gateway_config_digest: str | None = None
     oracle_bundle_digest: str | None = None
     resource_manifest_digest: str | None = None
 
@@ -46,6 +45,7 @@ class EpisodeManifest:
         subject: SubjectDescription,
         runtime_version: str,
         *,
+        mcp_gateway_config_digest: str | None = None,
         resource_manifest_digest: str | None = None,
     ) -> "EpisodeManifest":
         seed_bundle: Mapping[str, Any] = scenario.document.get("compilation", {}).get("seed_bundle", {})
@@ -59,6 +59,7 @@ class EpisodeManifest:
             environment_ref_digest=_resolved_reference_digest(scenario, "$.environment.ref"),
             environment_adapter_digest=environment.identity_digest,
             subject_adapter_digest=subject.identity_digest,
+            mcp_gateway_config_digest=mcp_gateway_config_digest,
             oracle_bundle_digest=_resolved_reference_digest(scenario, "$.oracle.ref"),
             resource_manifest_digest=resource_manifest_digest,
         )
@@ -74,6 +75,7 @@ class EpisodeManifest:
             "environment_ref_digest": self.environment_ref_digest,
             "environment_adapter_digest": self.environment_adapter_digest,
             "subject_adapter_digest": self.subject_adapter_digest,
+            "mcp_gateway_config_digest": self.mcp_gateway_config_digest,
             "oracle_bundle_digest": self.oracle_bundle_digest,
             "resource_manifest_digest": self.resource_manifest_digest,
         }
