@@ -9,6 +9,7 @@ from avp_ref.environment import InMemoryCommerceAdapter
 from avp_ref.runtime import AgentSystem, SubjectSession
 from avp_ref.scenario import CompileOptions, ScenarioCompiler
 from avp_ref.scenario.models import ScenarioInstance
+from avp_ref.subject import InProcessSubjectAdapter
 
 REFERENCE_TEMPLATE: dict[str, Any] = {
     "apiVersion": "avp.spec/v0.1",
@@ -20,7 +21,7 @@ REFERENCE_TEMPLATE: dict[str, Any] = {
     "task": {"instruction": "Refund order ord_1."},
     "success": {"claims": [{"id": "refund.completed", "severity": "critical", "oracle": {"type": "state", "expression": "target.refund.status == completed"}}]},
     "invariants": [{"id": "refund.no_collateral", "severity": "critical", "scope": "episode", "oracle": {"type": "state", "expression": "non_target_refunds == 0"}}],
-    "budgets": {"max_steps": 20, "max_tool_calls": 10},
+    "budgets": {"max_steps": 20, "max_tool_calls": 10, "timeout_seconds": 30},
     "extensions": {"avp_ref": {"target_order_id": "ord_1"}},
 }
 
@@ -29,8 +30,8 @@ def reference_scenario(seed: int = 0) -> ScenarioInstance:
     return ScenarioCompiler().compile(REFERENCE_TEMPLATE, CompileOptions(root_seed=seed))
 
 
-def reference_agent_system(subject_name: str) -> AgentSystem:
-    return AgentSystem(name=subject_name, version="0.2.0", adapter="in-process", model_ref="reference://deterministic-subject", config_digest=digest({"subject": subject_name, "version": "0.2.0"}), metadata={"fixture": True})
+def reference_agent_system(subject_name: str, *, adapter: str = "in-process") -> AgentSystem:
+    return AgentSystem(name=subject_name, version="0.2.0", adapter=adapter, model_ref="reference://deterministic-subject", config_digest=digest({"subject": subject_name, "version": "0.2.0", "adapter": adapter}), metadata={"fixture": True})
 
 
 def reference_environment() -> InMemoryCommerceAdapter:
@@ -67,3 +68,7 @@ def isolation_probe_subject(session: SubjectSession, task: Mapping[str, Any]) ->
     forbidden = ["_adapters", "_handles", "evaluator_projection", "snapshot", "verify", "inject_fault"]
     exposed = [name for name in forbidden if hasattr(session, name)]
     return "ISOLATED" if not exposed else "LEAK:" + ",".join(exposed)
+
+
+def reference_subject_adapter(subject) -> InProcessSubjectAdapter:
+    return InProcessSubjectAdapter(subject)

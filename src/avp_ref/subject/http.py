@@ -1,0 +1,140 @@
+"""Synchronous HTTP Subject Adapter for independently running Agents.
+
+Protocol ``avp.subject/v0.1`` uses an evaluator-driven step loop. The Agent
+returns either a tool call, completion report, or explicit failure. Tool calls
+are executed only by the Runtime gateway, preserving capability enforcement and
+authoritative evidence collection.
+"""
+
+from __future__ import annotations
+
+import json
+import socket
+import time
+import urllib.error
+import urllib.request
+import uuid
+from typing import Any, Mapping
+
+from avp_ref.runtime.agent import AgentSystem
+
+from .errors import SubjectBudgetExceeded, SubjectExecutionError, SubjectProtocolError, SubjectTimeoutError, SubjectTransportError
+from .models import SubjectDescription, SubjectHandle, SubjectInvocation, SubjectResult, SubjectStatus, ToolCall
+
+
+class HTTPSubjectAdapter:
+    """Execute an Agent through a deterministic request/response HTTP step protocol.
+
+    The adapter intentionally performs no automatic retry. Replaying a POST can
+    duplicate external side effects or blur Agent retry behavior with evaluator
+    retry behavior. Higher-level retry policy must be explicit and evidence-backed.
+    """
+
+    def __init__(self, base_url: str, *, endpoint: str = "/v1/avp/invoke", headers: Mapping[str, str] | None = None) -> None:
+        normalized = base_url.rstrip("/")
+        if not normalized.startswith(("http://", "https://")):
+            raise ValueError("HTTP subject base_url must use http or https")
+        self._url = normalized + endpoint
+        self._headers = {str(key): str(value) for key, value in (headers or {}).items()}
+        self._handles: dict[str, AgentSystem] = {}
+        self._description = SubjectDescription(
+            name="http-subject",
+            version="0.1.0",
+            adapter="http",
+            transport="http-json",
+            metadata={"endpoint": endpoint, "automatic_retry": False},
+        )
+
+    def describe(self) -> SubjectDescription:
+        return self._description
+
+    def open(self, agent_system: AgentSystem) -> SubjectHandle:
+        handle = SubjectHandle(
+            handle_id="subj_" + uuid.uuid4().hex[:16],
+            adapter_name=self._description.name,
+            adapter_version=self._description.version,
+            agent_system_digest=agent_system.identity_digest,
+        )
+        self._handles[handle.handle_id] = agent_system
+        return handle
+
+    def invoke(self, handle: SubjectHandle, invocation: SubjectInvocation, gateway) -> SubjectResult:
+        agent = self._agent(handle)
+        started = time.monotonic()
+        observation = gateway.observe()
+        previous_tool_result: dict[str, Any] | None = None
+        for step in range(1, invocation.max_steps + 1):
+            remaining = invocation.timeout_seconds - (time.monotonic() - started)
+            if remaining <= 0:
+                raise SubjectTimeoutError("subject invocation deadline exceeded")
+            payload = {
+                "protocol_version": "avp.subject/v0.1",
+                "episode_id": invocation.episode_id,
+                "step": step,
+                "agent_system": agent.to_dict(),
+                "task": dict(invocation.task),
+                "observation": observation,
+                "previous_tool_result": previous_tool_result,
+            }
+            frame = self._post(payload, timeout=remaining)
+            status = frame.get("status")
+            if status == "completed":
+                report = frame.get("report")
+                if report is not None and not isinstance(report, str):
+                    raise SubjectProtocolError("completed.report must be a string or null")
+                return SubjectResult(SubjectStatus.COMPLETED, report, step, {"transport": "http"})
+            if status == "failed":
+                error = frame.get("error")
+                if not isinstance(error, str) or not error:
+                    raise SubjectProtocolError("failed.error must be a non-empty string")
+                raise SubjectExecutionError(error)
+            if status != "tool_call":
+                raise SubjectProtocolError("response status must be tool_call, completed, or failed")
+            call = self._parse_tool_call(frame.get("call"))
+            result = gateway.call_tool(call.name, dict(call.arguments))
+            previous_tool_result = {"call_id": call.call_id, "name": call.name, "result": result}
+            observation = gateway.observe()
+        raise SubjectBudgetExceeded(f"subject exceeded max_steps={invocation.max_steps}")
+
+    def release(self, handle: SubjectHandle) -> None:
+        self._agent(handle)
+        del self._handles[handle.handle_id]
+
+    def _agent(self, handle: SubjectHandle) -> AgentSystem:
+        agent = self._handles.get(handle.handle_id)
+        if agent is None or agent.identity_digest != handle.agent_system_digest:
+            raise SubjectTransportError(f"unknown subject handle: {handle.handle_id}")
+        return agent
+
+    def _post(self, payload: Mapping[str, Any], *, timeout: float) -> dict[str, Any]:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "X-AVP-Subject-Version": "avp.subject/v0.1", **self._headers}
+        request = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:2048]
+            raise SubjectTransportError(f"subject endpoint returned HTTP {exc.code}: {detail}") from exc
+        except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
+            if isinstance(getattr(exc, "reason", None), socket.timeout) or isinstance(exc, (socket.timeout, TimeoutError)):
+                raise SubjectTimeoutError("subject HTTP request timed out") from exc
+            raise SubjectTransportError(f"subject endpoint unreachable: {exc}") from exc
+        try:
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SubjectProtocolError("subject response must be UTF-8 JSON") from exc
+        if not isinstance(value, dict):
+            raise SubjectProtocolError("subject response root must be an object")
+        return value
+
+    @staticmethod
+    def _parse_tool_call(value: Any) -> ToolCall:
+        if not isinstance(value, dict):
+            raise SubjectProtocolError("tool_call.call must be an object")
+        call_id = value.get("call_id")
+        name = value.get("name")
+        arguments = value.get("arguments", {})
+        if not isinstance(call_id, str) or not call_id or not isinstance(name, str) or not name or not isinstance(arguments, dict):
+            raise SubjectProtocolError("tool_call requires string call_id/name and object arguments")
+        return ToolCall(call_id, name, arguments)

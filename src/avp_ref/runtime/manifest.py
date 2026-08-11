@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from avp_ref.canonical import digest
 from avp_ref.environment.models import EnvironmentDescription
 from avp_ref.scenario.models import ScenarioInstance
+from avp_ref.subject.models import SubjectDescription
 
 from .agent import AgentSystem
 
@@ -32,6 +33,7 @@ class EpisodeManifest:
     agent_system_digest: str
     environment_ref_digest: str | None
     environment_adapter_digest: str
+    subject_adapter_digest: str
     oracle_bundle_digest: str | None = None
     resource_manifest_digest: str | None = None
 
@@ -41,6 +43,7 @@ class EpisodeManifest:
         scenario: ScenarioInstance,
         agent: AgentSystem,
         environment: EnvironmentDescription,
+        subject: SubjectDescription,
         runtime_version: str,
         *,
         resource_manifest_digest: str | None = None,
@@ -55,6 +58,7 @@ class EpisodeManifest:
             agent_system_digest=agent.identity_digest,
             environment_ref_digest=_resolved_reference_digest(scenario, "$.environment.ref"),
             environment_adapter_digest=environment.identity_digest,
+            subject_adapter_digest=subject.identity_digest,
             oracle_bundle_digest=_resolved_reference_digest(scenario, "$.oracle.ref"),
             resource_manifest_digest=resource_manifest_digest,
         )
@@ -69,6 +73,7 @@ class EpisodeManifest:
             "agent_system_digest": self.agent_system_digest,
             "environment_ref_digest": self.environment_ref_digest,
             "environment_adapter_digest": self.environment_adapter_digest,
+            "subject_adapter_digest": self.subject_adapter_digest,
             "oracle_bundle_digest": self.oracle_bundle_digest,
             "resource_manifest_digest": self.resource_manifest_digest,
         }
