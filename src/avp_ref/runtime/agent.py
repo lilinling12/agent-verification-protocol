@@ -1,29 +1,50 @@
-"""Agent system identity models used by AVP runtime."""
+"""Immutable identity of the complete Agent System under verification."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Mapping, Any
+from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+from avp_ref.canonical import digest
 
 
 @dataclass(frozen=True, slots=True)
 class AgentSystem:
-    """Identity of the Agent under verification.
+    """Versioned identity for the whole Agent, not just its foundation model.
 
-    AVP evaluates a complete Agent System, not only a language model. The
-    identity therefore includes the deployed version and configuration digest
-    so results remain comparable across releases.
+    AVP comparisons are only meaningful when changes to prompts, tools, memory,
+    policy and runtime configuration can be attributed. Optional component
+    digests therefore remain explicit instead of being hidden in one opaque
+    application version.
     """
 
     name: str
     version: str
-    protocol: str = "in-process"
-    config_digest: str | None = None
+    adapter: str
+    config_digest: str
+    model_ref: str | None = None
+    prompt_digest: str | None = None
+    toolset_digest: str | None = None
+    memory_digest: str | None = None
+    policy_digest: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "version": self.version,
-            "protocol": self.protocol,
+            "adapter": self.adapter,
             "config_digest": self.config_digest,
+            "model_ref": self.model_ref,
+            "prompt_digest": self.prompt_digest,
+            "toolset_digest": self.toolset_digest,
+            "memory_digest": self.memory_digest,
+            "policy_digest": self.policy_digest,
+            "metadata": dict(self.metadata),
         }
+
+    @property
+    def identity_digest(self) -> str:
+        """Canonical identity used by EpisodeManifest and experiment pairing."""
+
+        return digest(self.to_dict())

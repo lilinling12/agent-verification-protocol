@@ -5,24 +5,28 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .benchmark import run_reference_benchmark
-from .conformance import run_suite
-from .runtime import ReferenceRuntime, correct_subject, false_success_subject
-from .scenario import CompileOptions, ScenarioCompileError, ScenarioCompiler, StaticReferenceResolver, load_scenario, validate_template
+from avp_ref.benchmark import run_reference_benchmark
+from avp_ref.conformance import run_suite
+from avp_ref.oracle import RefundOracle
+from avp_ref.reference import correct_subject, false_success_subject, reference_agent_system, reference_environment, reference_scenario
+from avp_ref.runtime import ReferenceRuntime
+from avp_ref.scenario import CompileOptions, ScenarioCompileError, ScenarioCompiler, StaticReferenceResolver, load_scenario, validate_template
+
+
+def _run_demo_subject(subject):
+    runtime = ReferenceRuntime()
+    episode = runtime.create_episode(reference_scenario(), reference_agent_system(subject.__name__), reference_environment())
+    runtime.provision(episode.episode_id)
+    runtime.run_subject(episode.episode_id, subject)
+    runtime.verify(episode.episode_id, RefundOracle())
+    return episode
 
 
 def cmd_demo() -> None:
-    rt = ReferenceRuntime()
-    print("== False-success subject ==")
-    ep = rt.create_episode("Refund ord_1")
-    rt.run_subject(ep.episode_id, false_success_subject)
-    rt.verify(ep.episode_id, "ord_1")
-    print(json.dumps({"agent_report": ep.agent_report, "task_verdict": ep.task_verdict.value, "validity": ep.validity.value, "claims": [{"id": r.claim_id, "verdict": r.verdict} for r in ep.verification]}, indent=2))
-    print("\n== Correct deterministic subject ==")
-    ep2 = rt.create_episode("Refund ord_1")
-    rt.run_subject(ep2.episode_id, correct_subject)
-    rt.verify(ep2.episode_id, "ord_1")
-    print(json.dumps({"agent_report": ep2.agent_report, "task_verdict": ep2.task_verdict.value, "validity": ep2.validity.value}, indent=2))
+    for title, subject in (("False-success subject", false_success_subject), ("Correct deterministic subject", correct_subject)):
+        episode = _run_demo_subject(subject)
+        print(f"== {title} ==")
+        print(json.dumps({"episode_id": episode.episode_id, "manifest_digest": episode.manifest.manifest_digest, "agent_report": episode.agent_report, "task_verdict": episode.task_verdict.value, "validity": episode.validity.value, "claims": [{"id": result.claim_id, "verdict": result.verdict} for result in episode.verification]}, indent=2))
 
 
 def cmd_conformance() -> None:
@@ -89,7 +93,7 @@ def cmd_serve(port: int) -> None:
 
 
 def _print_compile_error(exc: ScenarioCompileError) -> None:
-    print(json.dumps({"error": type(exc).__name__, "message": str(exc), "diagnostics": [{"code": d.code, "message": d.message, "path": d.path, "severity": d.severity.value} for d in exc.diagnostics]}, ensure_ascii=False, indent=2, sort_keys=True))
+    print(json.dumps({"error": type(exc).__name__, "message": str(exc), "diagnostics": [{"code": item.code, "message": item.message, "path": item.path, "severity": item.severity.value} for item in exc.diagnostics]}, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 def main() -> None:
@@ -97,17 +101,17 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
     sub.add_parser("conformance")
-    bench = sub.add_parser("benchmark")
-    bench.add_argument("--runs", type=int, default=4)
+    benchmark = sub.add_parser("benchmark")
+    benchmark.add_argument("--runs", type=int, default=4)
     validate = sub.add_parser("validate", help="validate an AVS ScenarioTemplate")
     validate.add_argument("scenario")
     compile_parser = sub.add_parser("compile", help="compile AVS to an immutable ScenarioInstance")
     compile_parser.add_argument("scenario")
-    compile_parser.add_argument("--seed", type=int, default=0, help="root deterministic seed")
+    compile_parser.add_argument("--seed", type=int, default=0)
     compile_parser.add_argument("--set", dest="overrides", action="append", type=_parse_override, default=[], metavar="NAME=VALUE")
     compile_parser.add_argument("--out", dest="output")
-    compile_parser.add_argument("--strict-refs", action="store_true", help="require content-backed reference digests")
-    compile_parser.add_argument("--lock", dest="lock_file", help="JSON URI-to-digest reference lock file")
+    compile_parser.add_argument("--strict-refs", action="store_true")
+    compile_parser.add_argument("--lock", dest="lock_file")
     serve = sub.add_parser("serve")
     serve.add_argument("--port", type=int, default=8790)
     args = parser.parse_args()
