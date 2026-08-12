@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import errno
 import importlib
+import json
 import os
 import sys
 
@@ -11,8 +13,10 @@ from avp_ref.oracle_runner.models import OracleEvaluationOutput
 from avp_ref.oracle_runner.package import module_code_digest, parse_entrypoint
 from avp_ref.oracle_runner.protocol import decode_request, encode_success
 
-_SECURITY_EXIT = 77
+_PROTOCOL_EXIT = 65
 _ORACLE_CRASH_EXIT = 70
+_SECURITY_EXIT = 77
+_RESOURCE_ERRNOS = {errno.EFBIG, errno.EMFILE, errno.ENFILE, errno.ENOMEM}
 
 
 def _apply_resource_limits() -> None:
@@ -34,9 +38,23 @@ def _apply_resource_limits() -> None:
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
+def _allowed_module(module_name: str) -> bool:
+    try:
+        raw = json.loads(os.environ["AVP_ORACLE_ALLOWED_MODULE_PREFIXES"])
+    except (KeyError, json.JSONDecodeError, TypeError) as exc:
+        raise OracleSecurityError("Oracle module allowlist is missing or malformed") from exc
+    if not isinstance(raw, list) or not raw or not all(isinstance(item, str) and item for item in raw):
+        raise OracleSecurityError("Oracle module allowlist is invalid")
+    return any(module_name == prefix.rstrip(".") or module_name.startswith(prefix) for prefix in raw)
+
+
 def _safe_error(exc: BaseException) -> bytes:
     text = f"{type(exc).__name__}: {exc}".replace("\n", " ")[:512]
     return (text + "\n").encode("utf-8", errors="replace")
+
+
+def _is_resource_error(exc: OSError) -> bool:
+    return exc.errno in _RESOURCE_ERRNOS
 
 
 def main() -> int:
@@ -48,9 +66,11 @@ def main() -> int:
         if len(frame) > max_request or not frame.endswith(b"\n") or sys.stdin.buffer.read(1):
             raise OracleProtocolError("Oracle worker accepts exactly one bounded request frame")
         request = decode_request(frame, max_bytes=max_request)
+        module_name, callable_name = parse_entrypoint(request.package.entrypoint)
+        if not _allowed_module(module_name):
+            raise OracleSecurityError(f"Oracle module is outside worker allowlist: {module_name}")
         if module_code_digest(request.package.entrypoint) != request.package.code_digest:
             raise OracleSecurityError("Oracle package code digest changed before execution")
-        module_name, callable_name = parse_entrypoint(request.package.entrypoint)
         oracle_module = importlib.import_module(module_name)
         oracle_callable = getattr(oracle_module, callable_name, None)
         if not callable(oracle_callable):
@@ -64,6 +84,15 @@ def main() -> int:
     except OracleSecurityError as exc:
         sys.stderr.buffer.write(_safe_error(exc))
         return _SECURITY_EXIT
+    except OracleProtocolError as exc:
+        sys.stderr.buffer.write(_safe_error(exc))
+        return _PROTOCOL_EXIT
+    except MemoryError as exc:
+        sys.stderr.buffer.write(_safe_error(exc))
+        return _SECURITY_EXIT
+    except OSError as exc:
+        sys.stderr.buffer.write(_safe_error(exc))
+        return _SECURITY_EXIT if _is_resource_error(exc) else _ORACLE_CRASH_EXIT
     except BaseException as exc:
         sys.stderr.buffer.write(_safe_error(exc))
         return _ORACLE_CRASH_EXIT
