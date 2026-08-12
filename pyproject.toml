@@ -4,10 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "avp-reference"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Reference implementation for the proposed Agent Verification Protocol"
+readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
   "PyYAML>=6.0,<7",
   "jsonschema>=4.22,<5",
@@ -28,6 +30,11 @@ otel = [
   "opentelemetry-sdk>=1.30,<2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/lilinling12/agent-verification-protocol"
+Repository = "https://github.com/lilinling12/agent-verification-protocol"
+Issues = "https://github.com/lilinling12/agent-verification-protocol/issues"
+
 [project.scripts]
 avp = "avp_ref.cli:main"
 
@@ -36,3 +43,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "avp_ref.resources" = ["*.json"]
+
+[tool.setuptools.dynamic]
+version = {attr = "avp_ref._version.__version__"}

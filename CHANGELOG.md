@@ -1,20 +1,21 @@
 # Changelog
 
-## 0.1.0-alpha.1 — 2026-08-11
+All notable changes to AVP protocol candidates, conformance assets, and the reference implementation are recorded here. Release entries are created from `main` during the release process; development work remains under **Unreleased** until a tag is published.
 
-### Added
-- AVP/AVS protocol and architecture specifications.
-- Reference commerce world and State Oracle.
-- SubjectSession capability boundary.
-- State digest/diff and logical snapshot/restore.
-- False-success and wrong-target detection.
-- First-bad-step localization baseline.
-- Deterministic tool-fault lifecycle and recovery subject.
-- Repeated-run reliability report baseline.
-- Initial TCK/conformance runner.
-- MCP and OpenTelemetry adapter design.
-- Enterprise Action Benchmark v0.1 scenario pack.
+## Unreleased
+
+### Protocol and conformance
+- Established repository authority boundaries between specifications, schemas, TCK assets, and the non-normative reference implementation.
+- Added the Episode lifecycle normative candidate and language-independent, registry-backed TCK architecture.
+- Added the Evidence/Artifact identity candidate and the `avp-evidence-v0.1` conformance profile.
+
+### Reference implementation
+- Added Environment and Subject adapter boundaries, MCP verification, OpenTelemetry correlation, and subprocess-isolated Oracle execution.
+- Aligned lifecycle transition records and replay source identity with the current Core candidate.
+- Added content-addressed ArtifactStore implementations and migrated Runtime Evidence onto immutable Artifact references.
+
+### Repository engineering
+- Added machine-enforced governance, pinned GitHub Actions, package verification, and reproducible CI dependency resolution with an unconstrained downstream wheel check.
 
 ### Security
-- Subject Agents no longer receive the full ReferenceRuntime object.
-- Added AVP-ENV-ISOLATION-001 conformance smoke test.
+- Preserved the Subject/Evaluator authority boundary and fail-closed evaluator validity semantics across Oracle, telemetry, and Evidence integrity failures.
