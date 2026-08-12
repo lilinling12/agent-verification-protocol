@@ -1,0 +1,37 @@
+{
+  "manifest_version": "1.0",
+  "baseline_id": "avp-design-alpha-v0.1",
+  "status": "historical-non-normative",
+  "source_archive": {
+    "name": "agent-verification-protocol-alpha-v0.1.0(1).zip",
+    "sha256": "6a2ac285501b986b9cba1116b49c50c4605c51c5f70732714c8b9f4bfaf7d7bb",
+    "bytes": 115153
+  },
+  "preservation_policy": {
+    "content_mutation": "forbidden",
+    "promotion_requires_reconciliation": true,
+    "normative_authority": "none"
+  },
+  "files": [
+    {"source_path":"docs/alpha/21-alpha-implementation-plan.md","target_path":"docs/design/alpha-v0.1/21-alpha-implementation-plan.md","sha256":"09755fd5e797cf04c58810bb8e71c216b3a4383973b293b0a577a37196ff52c8","git_blob_sha1":"0bfe26ac5b2365ddf4a436b0dea469ba484d2c01","bytes":1138,"lines":48,"encoding":"utf-8"},
+    {"source_path":"docs/spec/03-agent-verification-protocol.md","target_path":"docs/design/alpha-v0.1/03-agent-verification-protocol.md","sha256":"73a9c43c91a54f23d7b5cdb0772ca497130ee5293979b7b66047f204313bc92f","git_blob_sha1":"414e5c32c255bcb9d0bb283b5b4b6d295c47762f","bytes":23653,"lines":1177,"encoding":"utf-8"},
+    {"source_path":"docs/spec/04-scenario-benchmark-dsl.md","target_path":"docs/design/alpha-v0.1/04-scenario-benchmark-dsl.md","sha256":"c147785db438ada225216acc216a8ed8984df5425bc7805eec0003051903639c","git_blob_sha1":"e27a2a216e2d673a828611481be6752964908a5c","bytes":18322,"lines":1137,"encoding":"utf-8"},
+    {"source_path":"docs/spec/05-unified-trace-schema.md","target_path":"docs/design/alpha-v0.1/05-unified-trace-schema.md","sha256":"087ea29785728e9560819b191494783c36514da56a6f86a5daf4f9ff5b085f17","git_blob_sha1":"7d47e5fe020fe7077ad58be2b3d653a7a67dd085","bytes":15180,"lines":905,"encoding":"utf-8"},
+    {"source_path":"docs/spec/06-system-architecture.md","target_path":"docs/design/alpha-v0.1/06-system-architecture.md","sha256":"b6e0c99c15e21ca2d8fdaf9226b8e8c48374ab1e944bd184846fd5e123725e5d","git_blob_sha1":"5e31b2d8df43211cdcb8c701fa4efffd862bbe94","bytes":26078,"lines":1345,"encoding":"utf-8"},
+    {"source_path":"docs/spec/07-environment-fabric.md","target_path":"docs/design/alpha-v0.1/07-environment-fabric.md","sha256":"8de29d25da98e6bf6a88bc6c6ca6c80edcbbc5341534c01d12bfc7d7ed10f358","git_blob_sha1":"3c18d8ab3834c3417ac5e3d6f61ba1607b7aa01d","bytes":14860,"lines":849,"encoding":"utf-8"},
+    {"source_path":"docs/spec/08-verification-engine.md","target_path":"docs/design/alpha-v0.1/08-verification-engine.md","sha256":"eefa92d802b151f6f5302092d604ae9d588ad668f0a778193de183ca4c0aeee6","git_blob_sha1":"c2375f953234ebc6e32eaad732cc160511d0b740","bytes":11759,"lines":742,"encoding":"utf-8"},
+    {"source_path":"docs/spec/09-failure-intelligence.md","target_path":"docs/design/alpha-v0.1/09-failure-intelligence.md","sha256":"e9dcf6e9a4c3ff321d74a8d81c5df9a1d865e1641b4671c9b051746e7febb576","git_blob_sha1":"0655650a949907a610ae80c4a26bdaebc174e4a4","bytes":11811,"lines":743,"encoding":"utf-8"},
+    {"source_path":"docs/spec/10-reliability-statistics.md","target_path":"docs/design/alpha-v0.1/10-reliability-statistics.md","sha256":"70b9ab1224e65c5fc2a54ed898127007acb0ed6c0f63adbfea720fd8e5243473","git_blob_sha1":"c533caefdcba1c16227dca740283127e1accb955","bytes":10632,"lines":671,"encoding":"utf-8"},
+    {"source_path":"docs/spec/11-conformance-test-spec.md","target_path":"docs/design/alpha-v0.1/11-conformance-test-spec.md","sha256":"0c453b3076e835da877f0727f479420e70beb932155b00544058aa307d4a39c3","git_blob_sha1":"25d4f931829366ce08487ab2234596127eef7135","bytes":10270,"lines":653,"encoding":"utf-8"},
+    {"source_path":"docs/spec/12-open-source-governance.md","target_path":"docs/design/alpha-v0.1/12-open-source-governance.md","sha256":"81b9c66f90a34ce2dffd14009d28edeea5f9a8e9b0a3a0f0f4ccf30d3b8824b8","git_blob_sha1":"6205440974893e62e79903fdfd2e9248af1f1c10","bytes":10646,"lines":640,"encoding":"utf-8"},
+    {"source_path":"docs/spec/13-reference-runtime-design.md","target_path":"docs/design/alpha-v0.1/13-reference-runtime-design.md","sha256":"b0f8c04a3496d774e8b8149fb6121a80c72fcb09109dbc7b2c15422207d594e2","git_blob_sha1":"02613e681af8e093c138dc1ca404d6293e7402ef","bytes":4851,"lines":299,"encoding":"utf-8"},
+    {"source_path":"docs/spec/14-avp-sdk-contract.md","target_path":"docs/design/alpha-v0.1/14-avp-sdk-contract.md","sha256":"2d84c8d2c9ed60361b29dad88a6f1fe5b6149602637973b0d5c8a8916a493876","git_blob_sha1":"523423e75bab2e664520fb139531242d62d419a8","bytes":4691,"lines":298,"encoding":"utf-8"},
+    {"source_path":"docs/spec/15-package-registry-spec.md","target_path":"docs/design/alpha-v0.1/15-package-registry-spec.md","sha256":"5961d438211e9f9de97e2f5449ab53a5ac9df96c043b4d69a9da3276c6fd6209","git_blob_sha1":"1a038d532d73728f1704e43dc09a0a12b4ac86d4","bytes":3300,"lines":219,"encoding":"utf-8"},
+    {"source_path":"docs/spec/16-security-threat-model.md","target_path":"docs/design/alpha-v0.1/16-security-threat-model.md","sha256":"11be27f77bfe3b0929ef3ea442d85fc01a292af620f4de0637e27eb7c365a2f3","git_blob_sha1":"27bf32f752760d7af909bc1fcfcf6d6a2502ba5c","bytes":4673,"lines":268,"encoding":"utf-8"},
+    {"source_path":"docs/spec/17-oracle-sdk.md","target_path":"docs/design/alpha-v0.1/17-oracle-sdk.md","sha256":"a2e099eed1967733092ee0fa2763faf684d88ce19f3596710bbe3727e95b1e73","git_blob_sha1":"ba9777119132c12684128db11f300fd4cf9dbb81","bytes":3131,"lines":225,"encoding":"utf-8"},
+    {"source_path":"docs/spec/18-local-runner-cli.md","target_path":"docs/design/alpha-v0.1/18-local-runner-cli.md","sha256":"d78e7dc642a721ddc8a02f0aa25bac88725df25d3a23aa0798d96c3c0182efb7","git_blob_sha1":"131b4aa011809cab9961d8a4ad913e5482085368","bytes":2486,"lines":200,"encoding":"utf-8"},
+    {"source_path":"docs/spec/19-mcp-adapter.md","target_path":"docs/design/alpha-v0.1/19-mcp-adapter.md","sha256":"12df694a81abd79164e8f4d24e4f39313a7f618c4ee1b4a9ca17c47e99722b88","git_blob_sha1":"83d38f3b15f3a8a13b45aca6c4198cc5ed5fdbc0","bytes":3562,"lines":215,"encoding":"utf-8"},
+    {"source_path":"docs/spec/20-opentelemetry-mapping.md","target_path":"docs/design/alpha-v0.1/20-opentelemetry-mapping.md","sha256":"fa7fc05063029fb44e90e3c1454ec09efa88d5982ba3792620d860cef452ad7c","git_blob_sha1":"0d3a1991709aecd53eb83f13461eccb3362117bf","bytes":4158,"lines":252,"encoding":"utf-8"},
+    {"source_path":"docs/spec/ADR-001-scope-and-boundaries.md","target_path":"docs/design/alpha-v0.1/ADR-001-scope-and-boundaries.md","sha256":"57cde8dc200cb789d4948f6f7a8488d248340ccfc4cb74bc2f89a90b8e3195e1","git_blob_sha1":"1418c79f5520dbf0770274378ee654498f32a85e","bytes":1721,"lines":65,"encoding":"utf-8"}
+  ]
+}
