@@ -6,6 +6,8 @@ from typing import Any, Mapping
 
 from avp_ref.canonical import digest
 from avp_ref.environment import InMemoryCommerceAdapter
+from avp_ref.oracle import refund_oracle_package
+from avp_ref.oracle_runner import OraclePackage
 from avp_ref.runtime import AgentSystem, SubjectSession
 from avp_ref.scenario import CompileOptions, ScenarioCompiler
 from avp_ref.scenario.models import ScenarioInstance
@@ -36,6 +38,10 @@ def reference_agent_system(subject_name: str, *, adapter: str = "in-process") ->
 
 def reference_environment() -> InMemoryCommerceAdapter:
     return InMemoryCommerceAdapter()
+
+
+def reference_oracle_package() -> OraclePackage:
+    return refund_oracle_package()
 
 
 def false_success_subject(session: SubjectSession, task: Mapping[str, Any]) -> str:

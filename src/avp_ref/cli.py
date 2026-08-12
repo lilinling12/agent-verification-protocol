@@ -7,16 +7,15 @@ from typing import Any
 
 from avp_ref.benchmark import run_reference_benchmark
 from avp_ref.conformance import run_suite
-from avp_ref.oracle import RefundOracle
-from avp_ref.reference import correct_subject, false_success_subject, reference_agent_system, reference_environment, reference_scenario, reference_subject_adapter
+from avp_ref.reference import correct_subject, false_success_subject, reference_agent_system, reference_environment, reference_oracle_package, reference_scenario, reference_subject_adapter
 from avp_ref.runtime import ReferenceRuntime
 from avp_ref.scenario import CompileOptions, ScenarioCompileError, ScenarioCompiler, StaticReferenceResolver, load_scenario, validate_template
 
 
 def _run_demo_subject(subject):
     runtime = ReferenceRuntime()
-    episode = runtime.create_episode(reference_scenario(), reference_agent_system(subject.__name__), reference_environment(), reference_subject_adapter(subject))
-    runtime.provision(episode.episode_id); runtime.run_subject(episode.episode_id); runtime.verify(episode.episode_id, RefundOracle())
+    episode = runtime.create_episode(reference_scenario(), reference_agent_system(subject.__name__), reference_environment(), reference_subject_adapter(subject), reference_oracle_package())
+    runtime.provision(episode.episode_id); runtime.run_subject(episode.episode_id); runtime.verify(episode.episode_id)
     return episode
 
 

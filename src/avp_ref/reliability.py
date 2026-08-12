@@ -4,8 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from avp_ref.models import Validity
-from avp_ref.oracle import RefundOracle
-from avp_ref.reference import reference_agent_system, reference_environment, reference_scenario, reference_subject_adapter
+from avp_ref.reference import reference_agent_system, reference_environment, reference_oracle_package, reference_scenario, reference_subject_adapter
 from avp_ref.runtime import ReferenceRuntime
 
 
@@ -28,13 +27,13 @@ def run_repeated(subject, runs: int = 8) -> ReliabilityReport:
     invalid = 0
     for _ in range(runs):
         runtime = ReferenceRuntime()
-        episode = runtime.create_episode(reference_scenario(), reference_agent_system(subject.__name__), reference_environment(), reference_subject_adapter(subject))
+        episode = runtime.create_episode(reference_scenario(), reference_agent_system(subject.__name__), reference_environment(), reference_subject_adapter(subject), reference_oracle_package())
         runtime.provision(episode.episode_id)
         runtime.run_subject(episode.episode_id)
         if episode.validity is not Validity.VALID:
             invalid += 1
             continue
-        runtime.verify(episode.episode_id, RefundOracle())
+        runtime.verify(episode.episode_id)
         if episode.validity is not Validity.VALID:
             invalid += 1
             continue

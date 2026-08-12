@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from avp_ref.oracle import RefundOracle
-from avp_ref.reference import correct_subject, false_success_subject, recovering_subject, reference_environment, wrong_target_subject
+from avp_ref.reference import correct_subject, false_success_subject, recovering_subject, reference_environment, reference_oracle_package, wrong_target_subject
 from avp_ref.runtime import AgentSystem, InvalidEpisodeTransition, ReferenceRuntime
 from avp_ref.scenario import CompileOptions, ScenarioCompiler
 from avp_ref.subject import HTTPSubjectAdapter, InProcessSubjectAdapter
@@ -18,7 +17,7 @@ def create_app():
     except ImportError as exc:
         raise RuntimeError("Install avp-reference[http] to use the HTTP binding") from exc
 
-    app = FastAPI(title="AVP Reference Runtime", version="0.2.0-alpha.3")
+    app = FastAPI(title="AVP Reference Runtime", version="0.2.0-alpha.6")
 
     @app.get("/.well-known/avp")
     def capabilities(): return runtime.capabilities()
@@ -38,7 +37,7 @@ def create_app():
                 subject_adapter = InProcessSubjectAdapter(fixture)
             else:
                 raise ValueError("subject.type must be 'http' or 'reference'")
-            episode = runtime.create_episode(scenario, agent, reference_environment(), subject_adapter)
+            episode = runtime.create_episode(scenario, agent, reference_environment(), subject_adapter, reference_oracle_package())
             return {"episode_id": episode.episode_id, "state": episode.state.value, "manifest_digest": episode.manifest.manifest_digest}
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(422, detail=str(exc)) from exc
@@ -66,7 +65,8 @@ def create_app():
     @app.post("/v1/episodes/{episode_id}:verify")
     def verify(episode_id: str):
         try:
-            episode = runtime.verify(episode_id, RefundOracle()); return {"task": episode.task_verdict.value, "validity": episode.validity.value, "state": episode.state.value, "claims": [asdict(result) for result in episode.verification]}
+            episode = runtime.verify(episode_id); return {"task": episode.task_verdict.value, "validity": episode.validity.value, "state": episode.state.value, "claims": [asdict(result) for result in episode.verification]}
+        except KeyError as exc: raise HTTPException(404, detail=str(exc)) from exc
         except InvalidEpisodeTransition as exc: raise HTTPException(409, detail=str(exc)) from exc
 
     return app

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
-from .models import OracleExecutionResult, OracleRequest
+from .models import OracleExecutionResult, OracleRequest, OracleRunnerDescription
 
 
+@runtime_checkable
 class OracleRunner(Protocol):
-    """Executes Oracle evaluation behind an explicit trust boundary."""
+    """Execute Oracle code behind an explicit evaluator trust boundary."""
 
-    def evaluate(self, request: OracleRequest) -> OracleExecutionResult:
-        ...
+    def describe(self) -> OracleRunnerDescription: ...
+
+    def evaluate(self, request: OracleRequest) -> OracleExecutionResult: ...

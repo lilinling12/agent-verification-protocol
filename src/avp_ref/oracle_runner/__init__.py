@@ -1,6 +1,14 @@
 """Isolated Oracle execution primitives for AVP."""
 
-from .models import OracleExecutionStatus
+from .errors import OracleConfigurationError, OracleProtocolError, OracleRunnerError, OracleSecurityError
+from .models import OracleEvaluationContext, OracleEvaluationOutput, OracleExecutionArtifact, OracleExecutionResult, OracleExecutionStatus, OraclePackage, OracleRequest, OracleRunnerDescription, OracleSandboxPolicy, ProjectionSnapshot
+from .package import build_oracle_package, module_code_digest, resolve_json_pointer
 from .runner import OracleRunner
+from .subprocess import SubprocessOracleRunner
 
-__all__ = ["OracleExecutionStatus", "OracleRunner"]
+__all__ = [
+    "OracleConfigurationError", "OracleEvaluationContext", "OracleEvaluationOutput", "OracleExecutionArtifact",
+    "OracleExecutionResult", "OracleExecutionStatus", "OraclePackage", "OracleProtocolError", "OracleRequest",
+    "OracleRunner", "OracleRunnerDescription", "OracleRunnerError", "OracleSandboxPolicy", "OracleSecurityError",
+    "ProjectionSnapshot", "SubprocessOracleRunner", "build_oracle_package", "module_code_digest", "resolve_json_pointer",
+]

@@ -1,35 +1,32 @@
 """Protocol-driven AVP reference execution engine.
 
 EnvironmentAdapter owns authoritative state, SubjectAdapter owns Agent
-execution, MCPVerificationGateway owns real MCP traffic, and TelemetryBridge
-provides non-authoritative distributed trace evidence.
+execution, MCPVerificationGateway owns real MCP traffic, TelemetryBridge owns
+non-authoritative trace evidence, and OracleRunner owns evaluator code execution.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Any, Mapping, Protocol
+from dataclasses import replace
+from typing import Any, Mapping
 
 from avp_ref.canonical import digest
-from avp_ref.environment import EnvironmentAdapter, EnvironmentHandle, EvaluatorEnvironment, FaultHandle, FaultObservation, FaultPhase, FaultSpec, ReadOnlyEvaluatorEnvironment, ResetTarget, ToolExecutionError, ToolRequest
+from avp_ref.environment import EnvironmentAdapter, EnvironmentHandle, FaultHandle, FaultObservation, FaultPhase, FaultSpec, ReadOnlyEvaluatorEnvironment, ResetTarget, ToolExecutionError, ToolRequest
 from avp_ref.events import EventRecorder
 from avp_ref.mcp import MCPGatewayError, MCPVerificationGateway
-from avp_ref.models import TaskVerdict, Validity, VerificationResult
+from avp_ref.models import Evidence, TaskVerdict, Validity
+from avp_ref.oracle_runner import OracleExecutionStatus, OraclePackage, OracleRequest, OracleRunner, OracleRunnerError, OracleSecurityError, OracleEvaluationContext, ProjectionSnapshot, SubprocessOracleRunner, resolve_json_pointer
 from avp_ref.scenario.models import ScenarioInstance
 from avp_ref.subject import SubjectAdapter, SubjectAdapterError, SubjectHandle, SubjectInvocation, SubjectStatus
-from avp_ref.telemetry import TelemetryBridge, TelemetryCompleteness
+from avp_ref.telemetry import TelemetryBridge
 
 from .agent import AgentSystem
 from .episode import Episode
 from .manifest import EpisodeManifest
 from .state import EpisodeState, InvalidEpisodeTransition
 
-_RUNTIME_VERSION = "0.2.0-alpha.5"
-
-
-class EvaluationOracle(Protocol):
-    version: str
-    def evaluate(self, episode: Episode, environment: EvaluatorEnvironment) -> list[VerificationResult]: ...
+_RUNTIME_VERSION = "0.2.0-alpha.6"
 
 
 class SubjectSession:
@@ -52,32 +49,51 @@ class SubjectSession:
 
 
 class ReferenceRuntime:
-    """Scenario-driven runtime with independent execution and telemetry planes."""
+    """Scenario runtime with explicit Agent, environment, telemetry and Oracle planes."""
 
-    def __init__(self, telemetry_bridge: TelemetryBridge | None = None) -> None:
+    def __init__(self, telemetry_bridge: TelemetryBridge | None = None, oracle_runner: OracleRunner | None = None) -> None:
         self.episodes: dict[str, Episode] = {}
         self._adapters: dict[str, EnvironmentAdapter] = {}
         self._handles: dict[str, EnvironmentHandle] = {}
         self._subject_adapters: dict[str, SubjectAdapter] = {}
         self._subject_handles: dict[str, SubjectHandle] = {}
+        self._oracle_packages: dict[str, OraclePackage] = {}
         self._mcp_gateways: dict[str, MCPVerificationGateway] = {}
         self._faults: dict[str, dict[str, FaultHandle]] = {}
         self._telemetry_bridge = telemetry_bridge
+        self._oracle_runner = oracle_runner or SubprocessOracleRunner()
 
     def capabilities(self) -> dict[str, Any]:
         return {
             "protocol": "avp",
             "version": "avp.spec/v0.1",
             "implementation": {"name": "avp-reference", "version": _RUNTIME_VERSION, "language": "python"},
-            "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-MCP-Gateway", "AVP-Telemetry", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"],
-            "features": {"scenario_instance_required": True, "environment_adapter_spi": "avp.environment/v0.1", "subject_adapter_spi": "avp.subject/v0.1", "mcp_protocol": "2026-07-28", "telemetry_bridge": "avp.telemetry/v0.1", "isolation": "adapter-dependent"},
+            "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-MCP-Gateway", "AVP-Telemetry", "AVP-Oracle-Isolation", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"],
+            "features": {
+                "scenario_instance_required": True,
+                "environment_adapter_spi": "avp.environment/v0.1",
+                "subject_adapter_spi": "avp.subject/v0.1",
+                "oracle_runner_spi": "avp.oracle/v1",
+                "mcp_protocol": "2026-07-28",
+                "telemetry_bridge": "avp.telemetry/v0.1",
+                "isolation": "adapter-dependent",
+            },
         }
 
-    def create_episode(self, scenario: ScenarioInstance, agent_system: AgentSystem, environment_adapter: EnvironmentAdapter, subject_adapter: SubjectAdapter, mcp_gateway: MCPVerificationGateway | None = None) -> Episode:
+    def create_episode(
+        self,
+        scenario: ScenarioInstance,
+        agent_system: AgentSystem,
+        environment_adapter: EnvironmentAdapter,
+        subject_adapter: SubjectAdapter,
+        oracle_package: OraclePackage,
+        mcp_gateway: MCPVerificationGateway | None = None,
+    ) -> Episode:
         if scenario.document.get("kind") != "ScenarioInstance":
             raise TypeError("ReferenceRuntime requires a compiled ScenarioInstance")
         environment_description = environment_adapter.describe()
         subject_description = subject_adapter.describe()
+        oracle_runner_description = self._oracle_runner.describe()
         telemetry_description = self._telemetry_bridge.describe() if self._telemetry_bridge else None
         episode_id = "ep_" + uuid.uuid4().hex[:12]
         manifest = EpisodeManifest.create(
@@ -86,6 +102,8 @@ class ReferenceRuntime:
             environment_description,
             subject_description,
             _RUNTIME_VERSION,
+            oracle_package_digest=oracle_package.identity_digest,
+            oracle_runner_config_digest=oracle_runner_description.identity_digest,
             mcp_gateway_config_digest=mcp_gateway.configuration_digest if mcp_gateway else None,
             telemetry_config_digest=telemetry_description.identity_digest if telemetry_description else None,
         )
@@ -95,10 +113,21 @@ class ReferenceRuntime:
         self.episodes[episode_id] = episode
         self._adapters[episode_id] = environment_adapter
         self._subject_adapters[episode_id] = subject_adapter
+        self._oracle_packages[episode_id] = oracle_package
         if mcp_gateway is not None:
             self._mcp_gateways[episode_id] = mcp_gateway
         self._faults[episode_id] = {}
-        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {"manifest_digest": manifest.manifest_digest, "scenario_instance_digest": scenario.instance_digest, "agent_system_digest": agent_system.identity_digest, "environment_adapter_digest": environment_description.identity_digest, "subject_adapter_digest": subject_description.identity_digest, "mcp_gateway_config_digest": manifest.mcp_gateway_config_digest, "telemetry_config_digest": manifest.telemetry_config_digest})
+        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {
+            "manifest_digest": manifest.manifest_digest,
+            "scenario_instance_digest": scenario.instance_digest,
+            "agent_system_digest": agent_system.identity_digest,
+            "environment_adapter_digest": environment_description.identity_digest,
+            "subject_adapter_digest": subject_description.identity_digest,
+            "oracle_package_digest": manifest.oracle_package_digest,
+            "oracle_runner_config_digest": manifest.oracle_runner_config_digest,
+            "mcp_gateway_config_digest": manifest.mcp_gateway_config_digest,
+            "telemetry_config_digest": manifest.telemetry_config_digest,
+        })
         return episode
 
     def provision(self, episode_id: str) -> Episode:
@@ -160,26 +189,60 @@ class ReferenceRuntime:
         episode.transition(EpisodeState.QUIESCING)
         return episode.agent_report or ""
 
-    def verify(self, episode_id: str, oracle: EvaluationOracle) -> Episode:
+    def verify(self, episode_id: str) -> Episode:
         episode, environment_adapter, environment_handle, _, _ = self._bound(episode_id)
         if episode.state is not EpisodeState.QUIESCING:
             raise InvalidEpisodeTransition(f"verification requires QUIESCING, got {episode.state.value}")
         episode.transition(EpisodeState.VERIFYING)
         recorder = EventRecorder(episode)
-        recorder.emit("episode.verification.started", "evaluator", environment_adapter.logical_time(environment_handle), {"oracle_version": oracle.version})
+        oracle_package = self._oracle_packages[episode_id]
+        runner_description = self._oracle_runner.describe()
+        recorder.emit("episode.verification.started", "evaluator", environment_adapter.logical_time(environment_handle), {
+            "oracle_id": oracle_package.oracle_id,
+            "oracle_version": oracle_package.version,
+            "oracle_package_digest": oracle_package.identity_digest,
+            "oracle_runner_config_digest": runner_description.identity_digest,
+        })
         try:
-            results = oracle.evaluate(episode, ReadOnlyEvaluatorEnvironment(environment_adapter, environment_handle))
+            request = self._build_oracle_request(episode, environment_adapter, environment_handle, oracle_package)
+            recorder.emit("oracle.execution.started", "evaluator", environment_adapter.logical_time(environment_handle), {
+                "request_id": request.request_id,
+                "oracle_package_digest": oracle_package.identity_digest,
+                "input_digest": request.context.input_digest,
+            })
+            execution = self._oracle_runner.evaluate(request)
+        except OracleRunnerError as exc:
+            validity = Validity.ORACLE_SECURITY_VIOLATION if isinstance(exc, OracleSecurityError) else Validity.ORACLE_PROTOCOL_ERROR
+            return self._invalidate_oracle(episode, recorder, environment_adapter, environment_handle, validity, str(exc))
         except Exception as exc:
-            episode.validity = Validity.ORACLE_FAILURE
-            episode.task_verdict = TaskVerdict.INCONCLUSIVE
-            recorder.emit("evaluation.validity.changed", "evaluator", environment_adapter.logical_time(environment_handle), {"to": "ORACLE_FAILURE", "reason": str(exc)})
-            episode.transition(EpisodeState.INVALID)
-            recorder.emit("episode.invalid", "orchestrator", environment_adapter.logical_time(environment_handle), {"validity": episode.validity.value})
-            return episode
-        episode.verification = results
-        for result in results:
+            return self._invalidate_oracle(episode, recorder, environment_adapter, environment_handle, Validity.ORACLE_FAILURE, str(exc))
+
+        execution_evidence = Evidence(
+            f"ev_{episode.episode_id}_oracle_execution",
+            "oracle_execution",
+            execution.artifact.to_dict(),
+            execution.artifact.artifact_digest,
+        )
+        episode.evidence[execution_evidence.evidence_id] = execution_evidence
+        event_type = "oracle.execution.completed" if execution.status is OracleExecutionStatus.SUCCESS else "oracle.execution.failed"
+        recorder.emit(event_type, "evaluator", environment_adapter.logical_time(environment_handle), {
+            "request_id": execution.request_id,
+            "status": execution.status.value,
+            "duration_ms": execution.artifact.duration_ms,
+            "exit_code": execution.artifact.exit_code,
+            "artifact_digest": execution.artifact.artifact_digest,
+        }, evidence=[execution_evidence.evidence_id])
+        if execution.status is not OracleExecutionStatus.SUCCESS:
+            return self._invalidate_oracle(episode, recorder, environment_adapter, environment_handle, self._oracle_validity(execution.status), execution.status.value)
+
+        for item in execution.evidence:
+            if item.evidence_id in episode.evidence:
+                return self._invalidate_oracle(episode, recorder, environment_adapter, environment_handle, Validity.ORACLE_PROTOCOL_ERROR, f"duplicate evidence id: {item.evidence_id}")
+            episode.evidence[item.evidence_id] = item
+        episode.verification = [replace(item, evidence_ids=tuple(dict.fromkeys((*item.evidence_ids, execution_evidence.evidence_id)))) for item in execution.results]
+        for result in episode.verification:
             recorder.emit("verification.claim.evaluated", "evaluator", environment_adapter.logical_time(environment_handle), {"claim_id": result.claim_id, "dimension": result.dimension, "verdict": result.verdict, "severity": result.severity, "method": result.method, "evaluator_version": result.evaluator_version}, evidence=list(result.evidence_ids))
-        episode.task_verdict = TaskVerdict.FAIL if any(item.verdict == "FAIL" and item.severity == "critical" for item in results) else TaskVerdict.PASS
+        episode.task_verdict = TaskVerdict.FAIL if any(item.verdict == "FAIL" and item.severity == "critical" for item in episode.verification) else TaskVerdict.PASS
         episode.validity = Validity.VALID
         if self._telemetry_bridge is not None:
             description = self._telemetry_bridge.describe()
@@ -225,6 +288,7 @@ class ReferenceRuntime:
         environment_adapter.release(environment_handle)
         self._subject_handles.pop(episode_id, None)
         self._handles.pop(episode_id, None)
+        self._oracle_packages.pop(episode_id, None)
         self._faults.pop(episode_id, None)
         EventRecorder(episode).emit("episode.resources.released", "orchestrator", 0, {"environment_handle_id": environment_handle.handle_id, "subject_handle_id": subject_handle.handle_id})
 
@@ -240,6 +304,41 @@ class ReferenceRuntime:
             return episode, environment_adapter, self._handles[episode_id], subject_adapter, self._subject_handles[episode_id]
         except KeyError as exc:
             raise InvalidEpisodeTransition("episode resources have not been provisioned") from exc
+
+    def _build_oracle_request(self, episode: Episode, adapter: EnvironmentAdapter, handle: EnvironmentHandle, package: OraclePackage) -> OracleRequest:
+        inputs = {name: resolve_json_pointer(episode.scenario.document, pointer) for name, pointer in package.input_pointers.items()}
+        evaluator = ReadOnlyEvaluatorEnvironment(adapter, handle)
+        projections: dict[str, ProjectionSnapshot] = {}
+        for projection_id in package.projections:
+            state = evaluator.project(projection_id)
+            projections[projection_id] = ProjectionSnapshot(projection_id, state.to_dict()["data"], state.digest)
+        context = OracleEvaluationContext(
+            episode_id=episode.episode_id,
+            scenario_instance_digest=episode.scenario.instance_digest,
+            manifest_digest=episode.manifest.manifest_digest,
+            inputs=inputs,
+            projections=projections,
+        )
+        return OracleRequest("oracle_req_" + uuid.uuid4().hex, package, context)
+
+    @staticmethod
+    def _oracle_validity(status: OracleExecutionStatus) -> Validity:
+        return {
+            OracleExecutionStatus.TIMEOUT: Validity.ORACLE_TIMEOUT,
+            OracleExecutionStatus.CRASHED: Validity.ORACLE_CRASH,
+            OracleExecutionStatus.PROTOCOL_ERROR: Validity.ORACLE_PROTOCOL_ERROR,
+            OracleExecutionStatus.SECURITY_VIOLATION: Validity.ORACLE_SECURITY_VIOLATION,
+            OracleExecutionStatus.SUCCESS: Validity.VALID,
+        }[status]
+
+    @staticmethod
+    def _invalidate_oracle(episode: Episode, recorder: EventRecorder, adapter: EnvironmentAdapter, handle: EnvironmentHandle, validity: Validity, reason: str) -> Episode:
+        episode.validity = validity
+        episode.task_verdict = TaskVerdict.INCONCLUSIVE
+        recorder.emit("evaluation.validity.changed", "evaluator", adapter.logical_time(handle), {"to": validity.value, "reason": reason[:512]})
+        episode.transition(EpisodeState.INVALID)
+        recorder.emit("episode.invalid", "orchestrator", adapter.logical_time(handle), {"validity": episode.validity.value})
+        return episode
 
     def _trace_headers(self, episode_id: str) -> Mapping[str, str]:
         episode = self.episodes[episode_id]
