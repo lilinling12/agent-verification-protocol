@@ -9,7 +9,7 @@ from avp_ref.runtime import ReferenceRuntime
 
 from .loader import TCKRepository
 from .models import TCKAdapterError, TCKCaseResult
-from .reference_aligned import AlignedReferenceTCKAdapter
+from .reference_composite import ReferenceConformanceAdapter
 from .report import build_report
 from .schema import validate_report
 
@@ -55,7 +55,9 @@ class TCKRunner:
         self._capabilities = frozenset(capability_values)
         for field in ("name", "version"):
             if not isinstance(self._implementation.get(field), str) or not self._implementation[field]:
-                raise TCKAdapterError(f"implementation.{field} must be a non-empty string")
+                raise TCKAdapterError(
+                    f"implementation.{field} must be a non-empty string"
+                )
 
     @classmethod
     def for_reference(
@@ -70,10 +72,12 @@ class TCKRunner:
         runtime_capabilities = ReferenceRuntime().capabilities()
         implementation = runtime_capabilities.get("implementation")
         if not isinstance(implementation, Mapping):
-            raise TCKAdapterError("reference runtime does not expose implementation identity")
+            raise TCKAdapterError(
+                "reference runtime does not expose implementation identity"
+            )
         return cls(
             repository,
-            adapter=AlignedReferenceTCKAdapter(capabilities=capability_set),
+            adapter=ReferenceConformanceAdapter(capabilities=capability_set),
             implementation=implementation,
             capabilities=capability_set,
         )
@@ -88,13 +92,23 @@ class TCKRunner:
 
         profile_document = self._repository.load_profile(profile)
         metadata = profile_document.get("metadata")
-        if not isinstance(metadata, Mapping) or not isinstance(metadata.get("version"), str):
-            raise TCKAdapterError(f"profile {profile!r} is missing metadata.version")
-        cases = self._repository.load_cases(profile, selected_case_ids=selected_case_ids)
-        unsupported = {item.case_id for item in cases} - self._adapter.supported_case_ids
+        if not isinstance(metadata, Mapping) or not isinstance(
+            metadata.get("version"), str
+        ):
+            raise TCKAdapterError(
+                f"profile {profile!r} is missing metadata.version"
+            )
+        cases = self._repository.load_cases(
+            profile,
+            selected_case_ids=selected_case_ids,
+        )
+        unsupported = {
+            item.case_id for item in cases
+        } - self._adapter.supported_case_ids
         if unsupported:
             raise TCKAdapterError(
-                f"implementation adapter does not support registered TCK cases: {sorted(unsupported)}"
+                "implementation adapter does not support registered TCK cases: "
+                f"{sorted(unsupported)}"
             )
 
         results: list[TCKCaseResult] = []
@@ -102,7 +116,8 @@ class TCKRunner:
             result = self._adapter.evaluate(loaded.document)
             if result.case_id != loaded.case_id:
                 raise TCKAdapterError(
-                    f"adapter result identity mismatch: expected {loaded.case_id}, got {result.case_id}"
+                    "adapter result identity mismatch: "
+                    f"expected {loaded.case_id}, got {result.case_id}"
                 )
             results.append(result)
 
@@ -115,4 +130,7 @@ class TCKRunner:
             results=results,
         )
         validate_report(report, self._repository, expected_profile=profile)
-        return TCKRunResult(report=report, case_results=tuple(results))
+        return TCKRunResult(
+            report=report,
+            case_results=tuple(results),
+        )
