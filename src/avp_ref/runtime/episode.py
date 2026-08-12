@@ -10,9 +10,10 @@ from avp_ref.models import AVPEvent, Evidence, TaskVerdict, Validity, Verificati
 from avp_ref.scenario.models import ScenarioInstance
 
 from .agent import AgentSystem
+from .identity import ReplaySourceIdentity
 from .lifecycle import EpisodeTransition, TransitionCause, default_transition_cause
 from .manifest import EpisodeManifest
-from .state import EpisodeState, assert_transition
+from .state import EpisodeState, InvalidEpisodeTransition, assert_transition
 
 
 @dataclass(slots=True)
@@ -44,12 +45,41 @@ class Episode:
         init=False,
         repr=False,
     )
+    _replay_source: ReplaySourceIdentity | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
 
     @property
     def transition_records(self) -> tuple[EpisodeTransition, ...]:
         """Return an immutable view of canonical lifecycle transition records."""
 
         return tuple(self._transition_records)
+
+    @property
+    def replay_source(self) -> ReplaySourceIdentity | None:
+        """Return the immutable source relationship when this Episode is a replay."""
+
+        return self._replay_source
+
+    def bind_replay_source(self, source: ReplaySourceIdentity) -> None:
+        """Bind replay identity exactly once before execution begins.
+
+        Replay ancestry is identity metadata, not mutable runtime state. Binding
+        after a lifecycle transition would make the observable Episode identity
+        history ambiguous and is therefore rejected.
+        """
+
+        if self.state is not EpisodeState.CREATED or self._transition_records:
+            raise InvalidEpisodeTransition(
+                "replay source must be bound while the Episode is CREATED"
+            )
+        if self._replay_source is not None:
+            raise InvalidEpisodeTransition("replay source is already bound")
+        if source.episode_id == self.episode_id:
+            raise ValueError("a replay Episode cannot reference itself as its source")
+        self._replay_source = source
 
     def transition(
         self,
@@ -78,8 +108,6 @@ class Episode:
         self.state = target
         self._transition_records.append(record)
 
-        # Local import avoids making the lifecycle value model depend on event
-        # transport while still projecting every observable transition.
         from avp_ref.events import EventRecorder
 
         EventRecorder(self).emit(

@@ -61,6 +61,25 @@ class TCKRunnerTest(unittest.TestCase):
         self.assertEqual("condition-not-declared:pause-capability-advertised", pause_result.skip_reason)
         validate_report(run.report, self.repository, expected_profile="avp-core-v0.1")
 
+    def test_reference_runtime_passes_core_profile(self) -> None:
+        run = TCKRunner.for_reference(self.repository).run()
+        self.assertTrue(run.conformant)
+        self.assertEqual(
+            {"total": 9, "passed": 8, "failed": 0, "skipped": 1},
+            run.report["summary"],
+        )
+
+    def test_reference_runtime_passes_pause_capable_core_profile(self) -> None:
+        run = TCKRunner.for_reference(
+            self.repository,
+            capabilities=("pause-capability-advertised",),
+        ).run()
+        self.assertTrue(run.conformant)
+        self.assertEqual(
+            {"total": 9, "passed": 9, "failed": 0, "skipped": 0},
+            run.report["summary"],
+        )
+
     def test_reference_runtime_matches_core_transition_matrix(self) -> None:
         run = TCKRunner.for_reference(self.repository).run(selected_case_ids=(MATRIX,))
         self.assertTrue(run.conformant)

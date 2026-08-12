@@ -9,7 +9,7 @@ from avp_ref.runtime import ReferenceRuntime
 
 from .loader import TCKRepository
 from .models import TCKAdapterError, TCKCaseResult
-from .reference import ReferenceTCKAdapter
+from .reference_aligned import AlignedReferenceTCKAdapter
 from .report import build_report
 from .schema import validate_report
 
@@ -73,7 +73,7 @@ class TCKRunner:
             raise TCKAdapterError("reference runtime does not expose implementation identity")
         return cls(
             repository,
-            adapter=ReferenceTCKAdapter(capabilities=capability_set),
+            adapter=AlignedReferenceTCKAdapter(capabilities=capability_set),
             implementation=implementation,
             capabilities=capability_set,
         )
