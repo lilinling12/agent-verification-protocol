@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 import uuid
-from collections.abc import BinaryIO
+from typing import BinaryIO
 
 from avp_ref.canonical import digest
 
