@@ -23,7 +23,10 @@ class _NoopSession:
     def __init__(self,episode_id,required): self._episode_id=episode_id; self._required=required; self._events=0; self._artifact=None
     @property
     def artifact(self): return self._artifact
-    def record_event(self,event): self._events+=1
+    def record_event(self,event):
+        if self._artifact is not None:return
+        self._events+=1
+        if event.event_type in _TERMINAL_EVENTS:self.finalize(complete=True)
     def inject_headers(self): return {}
     def finalize(self,*,complete=True):
         if self._artifact is None:
