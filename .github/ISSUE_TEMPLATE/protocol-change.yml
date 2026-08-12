@@ -1,0 +1,73 @@
+name: Protocol change proposal
+description: Propose a new or changed interoperable AVP semantic before drafting an AEP
+title: "[Protocol] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for protocol-level semantics. Product-specific features and implementation conveniences should not become AVP Core without an interoperability requirement.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Interoperability problem
+      description: What independent implementations cannot express or verify consistently today?
+    validations:
+      required: true
+  - type: textarea
+    id: cases
+    attributes:
+      label: Motivating cases
+      description: Provide at least one concrete multi-implementation or deployment scenario.
+    validations:
+      required: true
+  - type: textarea
+    id: ownership
+    attributes:
+      label: Standards boundary
+      description: Why is this owned by AVP rather than MCP, A2A, OpenTelemetry, JSON Schema, OCI, or another standard?
+    validations:
+      required: true
+  - type: textarea
+    id: semantics
+    attributes:
+      label: Proposed observable semantics
+      description: Define inputs, outputs, state/evidence behavior, failure semantics, and invariants without relying on one implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and versioning
+      description: How do existing implementations behave? Is migration or a new protocol version required?
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and trust-boundary impact
+      description: Analyze authority, evaluator leakage, sandboxing, secrets, privacy, integrity, and abuse cases.
+    validations:
+      required: true
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Conformance strategy
+      description: How could an implementation-independent TCK prove this behavior, including negative cases?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include simpler approaches and reasons not to use them.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Proposal checks
+      options:
+        - label: I am proposing interoperable semantics, not only a reference-runtime convenience.
+          required: true
+        - label: I am prepared to draft an AEP if maintainers classify this as normative.
+          required: true
