@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from avp_ref.environment.models import SnapshotRef
-from avp_ref.models import AVPEvent, Evidence, TaskVerdict, Validity, VerificationResult
+from avp_ref.models import AVPEvent, Evidence, TaskVerdict, Validity, ValidityDetail, VerificationResult
 from avp_ref.scenario.models import ScenarioInstance
 
 from .agent import AgentSystem
@@ -33,6 +33,7 @@ class Episode:
     manifest: EpisodeManifest
     state: EpisodeState = EpisodeState.CREATED
     validity: Validity = Validity.VALID
+    validity_detail: ValidityDetail | None = None
     task_verdict: TaskVerdict = TaskVerdict.INCONCLUSIVE
     agent_report: str | None = None
     events: list[AVPEvent] = field(default_factory=list)
