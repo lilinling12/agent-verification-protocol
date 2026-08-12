@@ -1,0 +1,38 @@
+version: "0.1"
+status: draft-normative-candidate
+requirements:
+  - id: AVP-CORE-001
+    area: episode.lifecycle
+    statement: An Episode MUST have exactly one lifecycle state at any point in time.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-001
+  - id: AVP-CORE-002
+    area: episode.lifecycle
+    statement: Lifecycle transitions MUST be deterministic and observable.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-002
+  - id: AVP-CORE-003
+    area: episode.identity
+    statement: An Episode MUST have a stable identifier within its verification scope.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-003
+  - id: AVP-CORE-004
+    area: episode.transition
+    statement: A lifecycle transition MUST record the previous state and resulting state.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-004
+  - id: AVP-CORE-005
+    area: episode.termination
+    statement: A terminal Episode MUST NOT transition back into an executable lifecycle state.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-005
+  - id: AVP-CORE-006
+    area: episode.failure
+    statement: Implementations MUST distinguish execution outcome from verification validity.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-006
+  - id: AVP-CORE-007
+    area: episode.reproducibility
+    statement: Replayed Episodes MUST preserve reference identity metadata.
+    spec: spec/core/episode-lifecycle.md
+    conformance: TCK-LIFECYCLE-007

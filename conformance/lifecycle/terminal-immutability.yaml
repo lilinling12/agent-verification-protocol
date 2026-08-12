@@ -1,0 +1,10 @@
+id: AVP-TCK-LIFECYCLE-TERMINAL-001
+status: draft
+profile: avp-core-v0.1
+requirements:
+  - AVP-CORE-006
+  - AVP-CORE-009
+  - AVP-CORE-014
+type: negative
+terminal_states: [COMPLETED, ABORTED, INVALID, INFRA_FAILED]
+assertion: "Every attempted transition from a terminal state is rejected."

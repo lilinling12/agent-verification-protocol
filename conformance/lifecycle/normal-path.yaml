@@ -1,0 +1,22 @@
+id: AVP-TCK-LIFECYCLE-NORMAL-001
+status: draft
+profile: avp-core-v0.1
+requirements:
+  - AVP-CORE-001
+  - AVP-CORE-002
+  - AVP-CORE-003
+  - AVP-CORE-004
+  - AVP-CORE-005
+  - AVP-CORE-009
+type: positive
+input:
+  transitions:
+    - [CREATED, PROVISIONING]
+    - [PROVISIONING, READY]
+    - [READY, RUNNING]
+    - [RUNNING, QUIESCING]
+    - [QUIESCING, VERIFYING]
+    - [VERIFYING, COMPLETED]
+expected:
+  accepted: true
+  terminal_state: COMPLETED

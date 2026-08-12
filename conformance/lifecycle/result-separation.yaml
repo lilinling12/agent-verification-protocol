@@ -1,0 +1,13 @@
+id: AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001
+status: draft
+profile: avp-core-v0.1
+requirements:
+  - AVP-CORE-010
+  - AVP-CORE-011
+  - AVP-CORE-012
+  - AVP-CORE-015
+type: semantic
+assertions:
+  - "COMPLETED does not imply TaskVerdict=PASS."
+  - "INVALID alone does not imply TaskVerdict=FAIL."
+  - "INFRA_FAILED alone does not imply TaskVerdict=FAIL."
