@@ -50,3 +50,38 @@ cases:
     requirements: [AVP-CORE-012]
     applicability: conditional
     when: pause-capability-advertised
+  - id: AVP-TCK-EVIDENCE-DIGEST-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-DIGEST-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-001]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-LOCATOR-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-LOCATOR-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-002]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-REPRESENTATION-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-REPRESENTATION-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-003]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-IDENTITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-IDENTITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-004]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-METADATA-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-METADATA-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-005]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-INTEGRITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-INTEGRITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-006]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-IMMUTABILITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-IMMUTABILITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-007]
+    applicability: mandatory

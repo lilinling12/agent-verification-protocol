@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-EVIDENCE-IMMUTABILITY-001
+  domain: evidence
+  status: draft
+profile: avp-evidence-v0.1
+requirements: [AVP-EVIDENCE-007]
+applicability: mandatory
+type: negative
+vector:
+  publishedDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  originalBytesHex: "415650"
+  replacementBytesHex: "415651"
+expect:
+  replacementUnderSameDigestRejected: true
+  originalBytesRemainReadable: true

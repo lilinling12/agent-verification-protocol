@@ -63,4 +63,5 @@ requirements:
     spec: spec/evidence/evidence-artifact-identity.md
     anchor: avp-evidence-008
     schema: schemas/evidence.schema.json
-    conformance: [AVP-TCK-EVIDENCE-REFERENCE-001]
+    conformance: []
+    conformance_rationale: Non-blocking transport recommendation; profile conformance is not failed solely for choosing another permitted representation.
