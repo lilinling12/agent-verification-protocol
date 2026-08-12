@@ -23,6 +23,7 @@ from avp_ref.tck_adapter import (
 ROOT = Path(__file__).resolve().parents[1]
 NORMAL = "AVP-TCK-LIFECYCLE-NORMAL-001"
 MATRIX = "AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001"
+TRANSITION_RECORD = "AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001"
 PAUSE = "AVP-TCK-LIFECYCLE-PAUSE-001"
 
 
@@ -60,12 +61,19 @@ class TCKRunnerTest(unittest.TestCase):
         self.assertEqual("condition-not-declared:pause-capability-advertised", pause_result.skip_reason)
         validate_report(run.report, self.repository, expected_profile="avp-core-v0.1")
 
-    def test_reference_runtime_drift_is_reported_as_fail(self) -> None:
-        runner = TCKRunner.for_reference(self.repository)
-        run = runner.run(selected_case_ids=(MATRIX,))
-        self.assertFalse(run.conformant)
-        self.assertEqual(1, run.report["summary"]["failed"])
-        self.assertIs(TCKStatus.FAIL, run.case_results[0].status)
+    def test_reference_runtime_matches_core_transition_matrix(self) -> None:
+        run = TCKRunner.for_reference(self.repository).run(selected_case_ids=(MATRIX,))
+        self.assertTrue(run.conformant)
+        self.assertEqual(1, run.report["summary"]["passed"])
+        self.assertIs(TCKStatus.PASS, run.case_results[0].status)
+
+    def test_reference_runtime_emits_transition_records(self) -> None:
+        run = TCKRunner.for_reference(self.repository).run(
+            selected_case_ids=(TRANSITION_RECORD,)
+        )
+        self.assertTrue(run.conformant)
+        self.assertEqual(1, run.report["summary"]["passed"])
+        self.assertIs(TCKStatus.PASS, run.case_results[0].status)
 
     def test_declared_pause_capability_executes_instead_of_skipping(self) -> None:
         runner = TCKRunner.for_reference(
@@ -137,7 +145,10 @@ class TCKRunnerTest(unittest.TestCase):
             with patch.object(sys, "argv", argv), redirect_stdout(output):
                 cli.main()
             report = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual({"total": 1, "passed": 1, "failed": 0, "skipped": 0}, report["summary"])
+            self.assertEqual(
+                {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+                report["summary"],
+            )
             acknowledgement = json.loads(output.getvalue())
             self.assertEqual(str(target), acknowledgement["output"])
 
