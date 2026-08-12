@@ -1,11 +1,39 @@
 {
   "apiVersion": "avp.tck/v0.1",
   "kind": "ConformanceReport",
-  "generatedAt": "2026-08-12T00:00:00Z",
-  "profile": "avp-core-v0.1",
-  "tckRevision": "example-only",
-  "runner": {"name": "example-runner", "version": "0.1.0"},
-  "implementation": {"name": "example-implementation", "version": "0.1.0"},
-  "cases": [{"id": "AVP-TCK-LIFECYCLE-NORMAL-001", "status": "PASS", "requirements": ["AVP-CORE-001", "AVP-CORE-008", "AVP-CORE-009"]}],
-  "summary": {"total": 1, "passed": 1, "failed": 0, "skipped": 0}
+  "profile": {
+    "name": "avp-core-v0.1",
+    "version": "0.1.0"
+  },
+  "implementation": {
+    "name": "example-implementation",
+    "version": "0.1.0",
+    "identityDigest": "sha256:e6b20b290219ed6d42b4b9ca4e7c90254a0121eeeae9e3d207dcd1519f6416cd"
+  },
+  "tck": {
+    "version": "0.1.0",
+    "registryDigest": "sha256:58c807c0fcf678bc64f608f694db3179a38024be481377c317b4661ed174e1d0"
+  },
+  "declaredCapabilities": [],
+  "cases": [
+    {
+      "id": "AVP-TCK-LIFECYCLE-NORMAL-001",
+      "status": "PASS",
+      "detail": "Illustrative passing result for the normal lifecycle path.",
+      "evidence": []
+    },
+    {
+      "id": "AVP-TCK-LIFECYCLE-PAUSE-001",
+      "status": "SKIP",
+      "detail": "Pause capability is not declared by the illustrative implementation.",
+      "evidence": [],
+      "skipReason": "condition-not-declared:pause-capability-advertised"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 1
+  }
 }
