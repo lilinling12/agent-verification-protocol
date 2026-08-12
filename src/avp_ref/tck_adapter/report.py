@@ -7,7 +7,7 @@ from typing import Iterable, Mapping
 from avp_ref.canonical import digest
 
 from .loader import TCKRepository
-from .reference import TCKCaseResult, TCKStatus
+from .models import TCKCaseResult, TCKStatus
 
 
 def build_report(
@@ -19,20 +19,23 @@ def build_report(
     capabilities: Iterable[str],
     results: Iterable[TCKCaseResult],
 ) -> dict[str, object]:
-    """Build the JSON-schema-compatible conformance report.
-
-    Report construction is deterministic except for caller-provided identity
-    metadata. Signing, persistence and transport remain outside this layer.
-    """
+    """Build a deterministic JSON-schema-compatible conformance report."""
 
     result_list = list(results)
-    implementation_identity = dict(implementation)
+    name = implementation.get("name")
+    version = implementation.get("version")
+    if not isinstance(name, str) or not name:
+        raise ValueError("implementation.name must be a non-empty string")
+    if not isinstance(version, str) or not version:
+        raise ValueError("implementation.version must be a non-empty string")
+    implementation_identity = {"name": name, "version": version}
     capability_list = sorted(set(capabilities))
     cases: list[dict[str, object]] = []
     for result in result_list:
         item: dict[str, object] = {
             "id": result.case_id,
             "status": result.status.value,
+            "detail": result.detail,
             "evidence": list(result.evidence),
         }
         if result.status is TCKStatus.SKIP:
@@ -42,13 +45,9 @@ def build_report(
     return {
         "apiVersion": "avp.tck/v0.1",
         "kind": "ConformanceReport",
-        "profile": {
-            "name": profile,
-            "version": profile_version,
-        },
+        "profile": {"name": profile, "version": profile_version},
         "implementation": {
-            "name": str(implementation_identity.get("name", "unknown")),
-            "version": str(implementation_identity.get("version", "unknown")),
+            **implementation_identity,
             "identityDigest": digest(implementation_identity),
         },
         "tck": {

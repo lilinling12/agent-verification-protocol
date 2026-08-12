@@ -10,8 +10,6 @@ The adapter is deliberately thin:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable, Mapping
 
 from avp_ref.models import TaskVerdict, Validity
@@ -32,44 +30,14 @@ from avp_ref.runtime import (
 )
 from avp_ref.runtime.state import assert_transition, is_terminal
 
-
-class TCKAdapterError(RuntimeError):
-    """Raised when a TCK case cannot be evaluated safely or deterministically."""
-
-
-class TCKStatus(str, Enum):
-    """Portable TCK case result values."""
-
-    PASS = "PASS"
-    FAIL = "FAIL"
-    SKIP = "SKIP"
-
-
-@dataclass(frozen=True, slots=True)
-class TCKCaseResult:
-    """Internal case result before serialization to a ConformanceReport."""
-
-    case_id: str
-    status: TCKStatus
-    detail: str
-    evidence: tuple[str, ...] = ()
-    skip_reason: str | None = None
-
-    def __post_init__(self) -> None:
-        if not self.case_id:
-            raise ValueError("case_id cannot be empty")
-        if self.status is TCKStatus.SKIP and not self.skip_reason:
-            raise ValueError("SKIP results require skip_reason")
-        if self.status is not TCKStatus.SKIP and self.skip_reason is not None:
-            raise ValueError("skip_reason is only valid for SKIP results")
+from .models import TCKAdapterError, TCKCaseResult, TCKStatus
 
 
 class ReferenceTCKAdapter:
     """Evaluate AVP lifecycle TCK vectors against the Python reference runtime.
 
-    This adapter intentionally reads TCK expectations and probes implementation
-    behavior. It never mutates a vector to make the reference implementation
-    pass. Runtime drift therefore appears as a normal FAIL result.
+    TCK expectations are never weakened to accommodate implementation drift.
+    Runtime differences therefore remain observable as ordinary FAIL results.
     """
 
     _SUPPORTED_CASES = frozenset(
@@ -140,7 +108,7 @@ class ReferenceTCKAdapter:
         rejected = [pair for pair in transitions if not self._transition_allowed(*pair)]
         if rejected:
             return self._fail(case_id, f"normal path rejects required transitions: {rejected}")
-        if not transitions or transitions[0][0] != "CREATED" or transitions[-1][1] != "COMPLETED":
+        if transitions[0][0] != "CREATED" or transitions[-1][1] != "COMPLETED":
             raise TCKAdapterError(f"{case_id} normal path must run CREATED -> COMPLETED")
         return self._pass(case_id, "normal lifecycle path is accepted")
 
@@ -202,18 +170,16 @@ class ReferenceTCKAdapter:
             if self._transition_allowed(source.value, target.value)
         }
 
-        # PAUSED is optional. When pause was not declared, its transitions are
-        # outside the applicable profile surface and must not affect the result.
         if "pause-capability-advertised" not in self._capabilities:
             expected_pairs = {pair for pair in expected_pairs if "PAUSED" not in pair}
             actual_pairs = {pair for pair in actual_pairs if "PAUSED" not in pair}
 
         if actual_pairs != expected_pairs:
-            missing_pairs = sorted(expected_pairs - actual_pairs)
-            extra_pairs = sorted(actual_pairs - expected_pairs)
             return self._fail(
                 case_id,
-                f"transition relation drift missing={missing_pairs} extra={extra_pairs}",
+                "transition relation drift "
+                f"missing={sorted(expected_pairs - actual_pairs)} "
+                f"extra={sorted(actual_pairs - expected_pairs)}",
             )
         return self._pass(case_id, "runtime transition relation matches applicable TCK matrix")
 
@@ -251,16 +217,17 @@ class ReferenceTCKAdapter:
 
     def _evaluate_result_separation(self, case: Mapping[str, Any]) -> TCKCaseResult:
         case_id = self._case_id(case)
-        fields = Episode.__dataclass_fields__
         required_fields = {"state", "task_verdict", "validity"}
-        if not required_fields <= fields.keys():
+        if not required_fields <= Episode.__dataclass_fields__.keys():
             return self._fail(case_id, "Episode does not represent lifecycle/verdict/validity separately")
         terminal_values = {state.value for state in EpisodeState if is_terminal(state)}
         verdict_values = {item.value for item in TaskVerdict}
         validity_values = {item.value for item in Validity}
-        overlap = terminal_values & verdict_values
-        if overlap:
-            return self._fail(case_id, f"terminal states overlap TaskVerdict values: {sorted(overlap)}")
+        if terminal_values & verdict_values:
+            return self._fail(
+                case_id,
+                f"terminal states overlap TaskVerdict values: {sorted(terminal_values & verdict_values)}",
+            )
         if EpisodeState is TaskVerdict or EpisodeState is Validity or TaskVerdict is Validity:
             return self._fail(case_id, "result dimensions share one enum type")
         return self._pass(
@@ -301,8 +268,6 @@ class ReferenceTCKAdapter:
                 case_id,
                 "reference runtime has no replay API carrying a new episode id and source episode reference",
             )
-        # A future replay API needs an explicit adapter implementation so its
-        # invocation contract is reviewed instead of guessed by reflection.
         raise TCKAdapterError(
             f"{case_id} detected a replay API but the reference adapter has not reviewed its contract"
         )
@@ -378,7 +343,8 @@ class ReferenceTCKAdapter:
     @staticmethod
     def _string_set(value: Any, context: str, *, allow_empty: bool = False) -> set[str]:
         if not isinstance(value, list) or (not value and not allow_empty):
-            raise TCKAdapterError(f"{context} must be a {'non-empty ' if not allow_empty else ''}list")
+            qualifier = "non-empty " if not allow_empty else ""
+            raise TCKAdapterError(f"{context} must be a {qualifier}list")
         if not all(isinstance(item, str) and item for item in value):
             raise TCKAdapterError(f"{context} must contain non-empty strings")
         if len(value) != len(set(value)):

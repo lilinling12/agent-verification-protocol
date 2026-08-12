@@ -10,7 +10,7 @@ import yaml
 
 from avp_ref.canonical import digest
 
-from .reference import TCKAdapterError
+from .models import TCKAdapterError
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,9 +29,9 @@ class LoadedTCKCase:
 class TCKRepository:
     """Load TCK resources from a checked-out AVP repository.
 
-    Registry paths are repository-relative and are constrained to the
-    ``conformance/tck/cases`` subtree to prevent path traversal or accidental
-    execution of unrelated YAML files.
+    Registry paths are repository-relative and constrained to the
+    ``conformance/tck/cases`` subtree. The loader never follows a registry
+    entry outside that boundary.
     """
 
     def __init__(self, repository_root: Path) -> None:
@@ -47,8 +47,7 @@ class TCKRepository:
         """Find the nearest checkout containing the TCK registry."""
 
         current = (start or Path.cwd()).resolve()
-        candidates = (current, *current.parents)
-        for candidate in candidates:
+        for candidate in (current, *current.parents):
             if (candidate / "conformance" / "tck" / "registry.yaml").is_file():
                 return cls(candidate)
         raise TCKAdapterError(
@@ -87,7 +86,10 @@ class TCKRepository:
     ) -> tuple[LoadedTCKCase, ...]:
         """Load registry cases for a profile in deterministic registry order."""
 
-        requested = set(selected_case_ids or ())
+        requested_values = tuple(selected_case_ids or ())
+        if len(requested_values) != len(set(requested_values)):
+            raise TCKAdapterError("selected TCK case ids contain duplicates")
+        requested = set(requested_values)
         seen: set[str] = set()
         loaded: list[LoadedTCKCase] = []
         entries = self._registry.get("cases")
