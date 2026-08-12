@@ -1,24 +1,26 @@
-"""Validate AVP normative requirement and conformance traceability."""
+"""Validate AVP normative requirement-to-TCK traceability."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "spec/core/requirement-index.yaml"
-SPEC = ROOT / "spec/core/episode-lifecycle.md"
 TCK_DIR = ROOT / "conformance/lifecycle"
-REQUIREMENT = re.compile(r"\bAVP-[A-Z][A-Z0-9-]*-\d{3}\b")
+REQUIREMENT_ID = re.compile(r"AVP-[A-Z][A-Z0-9-]*-\d{3}")
+ALLOWED_LEVELS = {"MUST", "MUST_NOT", "SHOULD", "SHOULD_NOT", "MAY"}
+MANDATORY_LEVELS = {"MUST", "MUST_NOT"}
 
 
 def fail(message: str) -> None:
     raise SystemExit(f"spec traceability FAIL: {message}")
 
 
-def load_yaml(path: Path) -> dict:
+def load_yaml(path: Path) -> dict[str, Any]:
     try:
         value = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
@@ -34,47 +36,75 @@ def main() -> None:
     if not isinstance(records, list) or not records:
         fail("requirement index must contain a non-empty requirements list")
 
-    ids = []
+    by_id: dict[str, dict[str, Any]] = {}
     for record in records:
-        if not isinstance(record, dict) or not isinstance(record.get("id"), str):
-            fail("each requirement record must contain a string id")
-        requirement_id = record["id"]
-        if not REQUIREMENT.fullmatch(requirement_id):
-            fail(f"invalid requirement id: {requirement_id}")
-        ids.append(requirement_id)
-    if len(ids) != len(set(ids)):
-        fail("requirement IDs must be unique")
+        if not isinstance(record, dict):
+            fail("each requirement must be a mapping")
+        requirement_id = record.get("id")
+        level = record.get("level")
+        if not isinstance(requirement_id, str) or not REQUIREMENT_ID.fullmatch(requirement_id):
+            fail(f"invalid requirement id: {requirement_id!r}")
+        if requirement_id in by_id:
+            fail(f"duplicate requirement id: {requirement_id}")
+        if level not in ALLOWED_LEVELS:
+            fail(f"invalid requirement level for {requirement_id}: {level!r}")
+        for field in ("area", "statement", "spec", "anchor"):
+            if not isinstance(record.get(field), str) or not record[field]:
+                fail(f"{requirement_id} missing non-empty {field}")
+        spec_path = ROOT / record["spec"]
+        if not spec_path.is_file():
+            fail(f"{requirement_id} references missing spec {record['spec']}")
+        spec_text = spec_path.read_text(encoding="utf-8")
+        if f"### {requirement_id} " not in spec_text:
+            fail(f"{requirement_id} has no normative heading in {record['spec']}")
+        if f"#{record['anchor']}" not in spec_text.lower().replace("—", "-"):
+            # Markdown generates the anchor from the requirement heading; requiring the ID
+            # in the heading is authoritative, while this check only catches bad index anchors.
+            if record["anchor"] != requirement_id.lower():
+                fail(f"{requirement_id} anchor must be {requirement_id.lower()!r}")
+        schema = record.get("schema")
+        if schema is not None and (not isinstance(schema, str) or not (ROOT / schema).is_file()):
+            fail(f"{requirement_id} references missing schema {schema!r}")
+        conformance = record.get("conformance")
+        if not isinstance(conformance, list) or not conformance or not all(isinstance(item, str) for item in conformance):
+            fail(f"{requirement_id} must declare one or more conformance case IDs")
+        by_id[requirement_id] = record
 
-    spec_text = SPEC.read_text(encoding="utf-8")
-    spec_ids = set(REQUIREMENT.findall(spec_text))
-    indexed = set(ids)
-    if spec_ids != indexed:
-        fail(f"spec/index requirement mismatch; spec-only={sorted(spec_ids-indexed)}, index-only={sorted(indexed-spec_ids)}")
-
+    cases: dict[str, dict[str, Any]] = {}
     covered: set[str] = set()
-    case_ids: set[str] = set()
     for path in sorted(TCK_DIR.glob("*.yaml")):
         case = load_yaml(path)
         case_id = case.get("id")
-        if not isinstance(case_id, str) or not case_id.startswith("AVP-TCK-"):
-            fail(f"invalid TCK case id in {path.relative_to(ROOT)}")
-        if case_id in case_ids:
-            fail(f"duplicate TCK case id: {case_id}")
-        case_ids.add(case_id)
         requirements = case.get("requirements")
+        if not isinstance(case_id, str) or not case_id.startswith("AVP-TCK-"):
+            fail(f"invalid TCK id in {path.relative_to(ROOT)}")
+        if case_id in cases:
+            fail(f"duplicate TCK id: {case_id}")
         if not isinstance(requirements, list) or not requirements:
             fail(f"{case_id} must map at least one requirement")
         for requirement_id in requirements:
-            if requirement_id not in indexed:
+            if requirement_id not in by_id:
                 fail(f"{case_id} references unknown requirement {requirement_id}")
             covered.add(requirement_id)
+        cases[case_id] = case
 
-    required_for_tck = {r["id"] for r in records if r.get("level") in {"MUST", "MUST_NOT"}}
-    missing = sorted(required_for_tck - covered)
+    for requirement_id, record in by_id.items():
+        for case_id in record["conformance"]:
+            case = cases.get(case_id)
+            if case is None:
+                fail(f"{requirement_id} references missing TCK case {case_id}")
+            if requirement_id not in case["requirements"]:
+                fail(f"{case_id} does not map back to {requirement_id}")
+
+    missing = sorted(
+        requirement_id
+        for requirement_id, record in by_id.items()
+        if record["level"] in MANDATORY_LEVELS and requirement_id not in covered
+    )
     if missing:
-        fail(f"mandatory requirements without TCK mapping: {missing}")
+        fail(f"mandatory requirements without TCK coverage: {missing}")
 
-    print(f"spec traceability OK: {len(indexed)} requirements, {len(case_ids)} TCK cases")
+    print(f"spec traceability OK: {len(by_id)} requirements, {len(cases)} lifecycle TCK cases")
 
 
 if __name__ == "__main__":

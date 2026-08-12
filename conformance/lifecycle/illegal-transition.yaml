@@ -1,16 +1,14 @@
 id: AVP-TCK-LIFECYCLE-ILLEGAL-001
 status: draft
 profile: avp-core-v0.1
-requirements:
-  - AVP-CORE-003
-  - AVP-CORE-004
-  - AVP-CORE-005
-  - AVP-CORE-014
+requirements: [AVP-CORE-009]
 type: negative
 cases:
-  - transitions: [[CREATED, RUNNING]]
+  - transition: [CREATED, RUNNING]
     expected: {accepted: false}
-  - transitions: [[READY, VERIFYING]]
+  - transition: [READY, VERIFYING]
     expected: {accepted: false}
-  - transitions: [[RUNNING, COMPLETED]]
+  - transition: [RUNNING, COMPLETED]
+    expected: {accepted: false}
+  - transition: [COMPLETED, RUNNING]
     expected: {accepted: false}

@@ -1,0 +1,10 @@
+id: AVP-TCK-LIFECYCLE-REPLAY-001
+status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-007]
+type: semantic
+source_episode: episode-source-001
+replay_episode: episode-replay-001
+assertions:
+  - replay_episode_id_differs_from_source: true
+  - source_episode_reference_preserved: true

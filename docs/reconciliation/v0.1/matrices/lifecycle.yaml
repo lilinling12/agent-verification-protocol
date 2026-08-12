@@ -1,4 +1,4 @@
-matrix_version: "1.0"
+matrix_version: "1.1"
 domain: lifecycle
 status: promoted-draft
 historical_sources:
@@ -12,33 +12,24 @@ normative_target:
   - spec/core/episode-lifecycle.md
   - spec/core/terminology.md
 requirement_index: spec/core/requirement-index.yaml
-reconciliation:
-  decisions:
-    - id: LC-001
-      subject: lifecycle-authority
-      resolution: "Promote observable Episode phase ordering to AVP Core; keep scheduler/worker states non-normative."
-      rationale: "Independent implementations need comparable evidence ordering without sharing orchestration internals."
-    - id: LC-002
-      subject: paused-state
-      resolution: "PAUSED is an optional Core state, not a required state."
-      rationale: "Pause/resume is useful but not required to verify bounded Agent execution."
-    - id: LC-003
-      subject: completed-semantics
-      resolution: "COMPLETED means lifecycle completion only and never implies PASS."
-      rationale: "Lifecycle, task verdict, and validity are independent protocol dimensions."
-    - id: LC-004
-      subject: invalid-vs-infra-failed
-      resolution: "Retain distinct terminal states INVALID and INFRA_FAILED while keeping detailed causes in Validity/failure taxonomy."
-      rationale: "Evaluation invalidity and infrastructure inability are materially different and neither alone proves Agent task failure."
+schema_artifacts:
+  - schemas/episode-lifecycle.schema.json
+decision_records:
+  - docs/reconciliation/v0.1/decisions/episode-lifecycle-001.md
 semantic_drift:
   - source: src/avp_ref/runtime/state.py
-    observation: "Reference implementation currently calls its state-machine module 'Normative' in the module docstring."
-    action: "Reference code remains non-normative; remove/adjust this wording in a later implementation-alignment PR after spec promotion."
+    observation: The reference implementation currently labels its Python state-machine module as normative.
+    resolution: Reference code is implementation evidence only; wording will be corrected in the later implementation-alignment PR.
   - source: historical-design
-    observation: "Historical documents mix product execution phases with protocol concepts in places."
-    action: "Only observable verification phase semantics are promoted to Core."
+    observation: Historical documents mix product execution phases with protocol concepts in places.
+    resolution: Core promotes only observable verification semantics and explicitly excludes scheduler topology.
 conformance_required:
   - AVP-TCK-LIFECYCLE-NORMAL-001
+  - AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001
+  - AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001
   - AVP-TCK-LIFECYCLE-ILLEGAL-001
   - AVP-TCK-LIFECYCLE-TERMINAL-001
   - AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001
+  - AVP-TCK-LIFECYCLE-QUIESCING-001
+  - AVP-TCK-LIFECYCLE-REPLAY-001
+  - AVP-TCK-LIFECYCLE-PAUSE-001
