@@ -1,0 +1,15 @@
+apiVersion: avp.spec/v0.1
+kind: ConformanceReport
+required:
+  - implementation
+  - profile
+  - cases
+  - summary
+summary:
+  passed: integer
+  failed: integer
+  skipped: integer
+cases:
+  id: string
+  status: PASS|FAIL|SKIP
+  evidence: optional reference list
