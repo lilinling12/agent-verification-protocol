@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools==80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,16 +8,25 @@ version = "0.1.0"
 description = "Reference implementation for the proposed Agent Verification Protocol"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
-dependencies = ["PyYAML>=6.0", "jsonschema>=4.22"]
+dependencies = [
+  "PyYAML>=6.0,<7",
+  "jsonschema>=4.22,<5",
+]
 
 [project.optional-dependencies]
 dev = [
   "build>=1.2,<2",
-  "opentelemetry-api>=1.30",
-  "opentelemetry-sdk>=1.30",
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
 ]
-http = ["fastapi>=0.115", "uvicorn>=0.32"]
-otel = ["opentelemetry-api>=1.30", "opentelemetry-sdk>=1.30"]
+http = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.32,<1",
+]
+otel = [
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
+]
 
 [project.scripts]
 avp = "avp_ref.cli:main"
