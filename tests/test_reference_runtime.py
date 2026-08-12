@@ -70,6 +70,8 @@ class ReferenceRuntimeTest(unittest.TestCase):
         runtime.run_subject(episode.episode_id)
         runtime.verify(episode.episode_id)
         self.assertEqual("PASS", episode.task_verdict.value)
+        self.assertIs(Validity.VALID, episode.validity)
+        self.assertIsNone(episode.validity_detail)
         self.assertIs(EpisodeState.COMPLETED, episode.state)
 
     def test_snapshot_restore(self):
@@ -84,7 +86,9 @@ class ReferenceRuntimeTest(unittest.TestCase):
         runtime.provision(episode.episode_id)
         runtime.run_subject(episode.episode_id)
         runtime.verify(episode.episode_id)
-        self.assertIs(Validity.ORACLE_CRASH, episode.validity)
+        self.assertIs(Validity.ORACLE_FAILURE, episode.validity)
+        self.assertIsNotNone(episode.validity_detail)
+        self.assertEqual("ORACLE_CRASH", episode.validity_detail.code)
         self.assertIs(EpisodeState.INVALID, episode.state)
         self.assertEqual("INCONCLUSIVE", episode.task_verdict.value)
 
