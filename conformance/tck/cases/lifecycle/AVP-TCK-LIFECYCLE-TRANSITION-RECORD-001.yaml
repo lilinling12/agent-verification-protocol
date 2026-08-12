@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-002, AVP-CORE-003, AVP-CORE-004]
+applicability: mandatory
+type: schema-and-semantic
+schema: schemas/episode-lifecycle.schema.json
+vector:
+  validExample:
+    episodeId: episode-001
+    sequence: 3
+    previousState: READY
+    resultingState: RUNNING
+    cause: {code: subject.invoke}
+  invalidExamples:
+    - {sequence: 3, previousState: READY, resultingState: RUNNING, cause: {code: subject.invoke}}
+    - {episodeId: episode-001, sequence: 3, previousState: READY, resultingState: RUNNING}
+expect:
+  validExampleAccepted: true
+  invalidExamplesRejected: true
+  sequenceNumbersStrictlyIncreasePerEpisode: true

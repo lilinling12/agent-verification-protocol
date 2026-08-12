@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-ILLEGAL-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-009]
+applicability: mandatory
+type: negative
+vector:
+  transitions:
+    - [CREATED, RUNNING]
+    - [READY, VERIFYING]
+    - [RUNNING, COMPLETED]
+    - [COMPLETED, RUNNING]
+expect:
+  allRejectedOrProtocolInvalid: true

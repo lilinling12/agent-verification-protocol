@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-PAUSE-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-012]
+applicability: conditional
+when: pause-capability-advertised
+type: conditional
+vector:
+  allowed:
+    - [RUNNING, PAUSED]
+    - [PAUSED, RUNNING]
+    - [PAUSED, ABORTED]
+    - [PAUSED, INVALID]
+    - [PAUSED, INFRA_FAILED]
+  forbidden:
+    - [READY, PAUSED]
+    - [PAUSED, QUIESCING]
+    - [PAUSED, COMPLETED]
+expect:
+  allowedAccepted: true
+  forbiddenRejected: true

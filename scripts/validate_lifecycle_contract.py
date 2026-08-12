@@ -1,4 +1,4 @@
-"""Cross-check AVP lifecycle schema and conformance state-machine vectors."""
+"""Cross-check AVP lifecycle schema and language-independent TCK vectors."""
 
 from __future__ import annotations
 
@@ -11,10 +11,11 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas/episode-lifecycle.schema.json"
-MATRIX_PATH = ROOT / "conformance/lifecycle/transition-matrix.yaml"
-NORMAL_PATH = ROOT / "conformance/lifecycle/normal-path.yaml"
-ILLEGAL_PATH = ROOT / "conformance/lifecycle/illegal-transition.yaml"
-RECORD_PATH = ROOT / "conformance/lifecycle/transition-record.yaml"
+CASE_DIR = ROOT / "conformance/tck/cases/lifecycle"
+MATRIX_PATH = CASE_DIR / "AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001.yaml"
+NORMAL_PATH = CASE_DIR / "AVP-TCK-LIFECYCLE-NORMAL-001.yaml"
+ILLEGAL_PATH = CASE_DIR / "AVP-TCK-LIFECYCLE-ILLEGAL-001.yaml"
+RECORD_PATH = CASE_DIR / "AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001.yaml"
 
 
 def fail(message: str) -> None:
@@ -54,9 +55,9 @@ def main() -> None:
 
     matrix = load_yaml(MATRIX_PATH)
     states = matrix.get("states")
-    transitions = matrix.get("allowed_transitions")
+    transitions = matrix.get("allowedTransitions")
     if not isinstance(states, dict) or not isinstance(transitions, dict):
-        fail("transition matrix requires states and allowed_transitions mappings")
+        fail("transition matrix requires states and allowedTransitions mappings")
     required = states.get("required")
     optional = states.get("optional")
     terminal = states.get("terminal")
@@ -70,7 +71,7 @@ def main() -> None:
     if not terminal_set <= required_set:
         fail("all terminal states must be required Core states")
     if set(transitions) != schema_state_set:
-        fail("allowed_transitions must declare every lifecycle state exactly once")
+        fail("allowedTransitions must declare every lifecycle state exactly once")
 
     allowed_pairs: set[tuple[str, str]] = set()
     for source, targets in transitions.items():
@@ -80,8 +81,7 @@ def main() -> None:
             fail(f"transition targets for {source} contain unknown state")
         if source in terminal_set and targets:
             fail(f"terminal state {source} must not have outbound transitions")
-        for target in targets:
-            allowed_pairs.add((source, target))
+        allowed_pairs.update((source, target) for target in targets)
 
     if "PAUSED" not in optional_set:
         fail("PAUSED must remain an optional Core state in v0.1")
@@ -92,9 +92,9 @@ def main() -> None:
     if set(transitions["PAUSED"]) != expected_pause_outbound:
         fail("PAUSED outbound transitions differ from Core pause semantics")
 
-    normal = load_yaml(NORMAL_PATH).get("input", {}).get("transitions")
+    normal = load_yaml(NORMAL_PATH).get("vector", {}).get("transitions")
     if not isinstance(normal, list) or not normal:
-        fail("normal-path must provide transitions")
+        fail("normal path must provide transitions")
     normal_pairs = [pair(item, "normal-path transition") for item in normal]
     if normal_pairs[0][0] != "CREATED" or normal_pairs[-1][1] != "COMPLETED":
         fail("normal path must run from CREATED to COMPLETED")
@@ -102,27 +102,28 @@ def main() -> None:
         if transition not in allowed_pairs:
             fail(f"normal path contains illegal transition {transition}")
 
-    illegal_cases = load_yaml(ILLEGAL_PATH).get("cases")
-    if not isinstance(illegal_cases, list) or not illegal_cases:
-        fail("illegal-transition must contain cases")
-    for index, case in enumerate(illegal_cases):
-        if not isinstance(case, dict):
-            fail(f"illegal case {index} must be a mapping")
-        transition = pair(case.get("transition"), f"illegal case {index}")
+    illegal = load_yaml(ILLEGAL_PATH).get("vector", {}).get("transitions")
+    if not isinstance(illegal, list) or not illegal:
+        fail("illegal-transition case must contain transitions")
+    for index, item in enumerate(illegal):
+        transition = pair(item, f"illegal transition {index}")
         if transition in allowed_pairs:
             fail(f"illegal vector is actually allowed: {transition}")
 
     record_case = load_yaml(RECORD_PATH)
     validator = Draft202012Validator(schema)
-    valid_example = record_case.get("valid_example")
+    vector = record_case.get("vector")
+    if not isinstance(vector, dict):
+        fail("transition-record vector must be a mapping")
+    valid_example = vector.get("validExample")
     if not isinstance(valid_example, dict):
-        fail("transition-record valid_example must be a mapping")
+        fail("transition-record validExample must be a mapping")
     errors = list(validator.iter_errors(valid_example))
     if errors:
         fail(f"valid transition record fails schema: {errors[0].message}")
-    invalid_examples = record_case.get("invalid_examples")
+    invalid_examples = vector.get("invalidExamples")
     if not isinstance(invalid_examples, list) or not invalid_examples:
-        fail("transition-record must define invalid_examples")
+        fail("transition-record must define invalidExamples")
     for index, example in enumerate(invalid_examples):
         if not isinstance(example, dict) or validator.is_valid(example):
             fail(f"invalid transition record example {index} was accepted")

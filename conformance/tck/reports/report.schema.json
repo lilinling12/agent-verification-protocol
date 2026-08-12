@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:tck:conformance-report:0.1",
+  "title": "AVP TCK Conformance Report",
+  "type": "object",
+  "required": ["apiVersion", "kind", "profile", "implementation", "tck", "declaredCapabilities", "cases", "summary"],
+  "properties": {
+    "apiVersion": {"const": "avp.tck/v0.1"},
+    "kind": {"const": "ConformanceReport"},
+    "profile": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      },
+      "additionalProperties": false
+    },
+    "implementation": {
+      "type": "object",
+      "required": ["name", "version", "identityDigest"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "identityDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "tck": {
+      "type": "object",
+      "required": ["version", "registryDigest"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "maxLength": 64},
+        "registryDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "declaredCapabilities": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 128},
+      "uniqueItems": true
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^AVP-TCK-[A-Z0-9-]+-[0-9]{3}$"},
+          "status": {"enum": ["PASS", "FAIL", "SKIP"]},
+          "evidence": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "uniqueItems": true
+          },
+          "skipReason": {"type": "string", "minLength": 1, "maxLength": 1024}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"status": {"const": "SKIP"}}, "required": ["status"]},
+            "then": {"required": ["skipReason"]}
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "skipped"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "skipped": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

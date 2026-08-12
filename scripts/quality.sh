@@ -9,7 +9,7 @@ python -m compileall -q src tests scripts
 echo "== Unit tests =="
 python -m unittest discover -s tests -v
 
-echo "== AVP conformance =="
+echo "== Reference implementation smoke suite =="
 python -m avp_ref.cli conformance
 
 echo "== Schema / YAML assets =="
@@ -23,6 +23,9 @@ python scripts/validate_boundaries.py
 
 echo "== Spec traceability =="
 python scripts/validate_spec_traceability.py
+
+echo "== TCK registry =="
+python scripts/validate_tck_registry.py
 
 echo "== Lifecycle contract =="
 python scripts/validate_lifecycle_contract.py

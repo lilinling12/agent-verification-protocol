@@ -1,10 +1,10 @@
 apiVersion: avp.tck/v0.1
 kind: ConformanceProfile
 metadata:
-  id: avp-core-v0.1
+  name: avp-core-v0.1
   version: 0.1.0
   status: draft
-specVersion: avp.spec/v0.1
+specVersion: "0.1"
 requirements:
   mandatory:
     - AVP-CORE-001
@@ -21,7 +21,3 @@ requirements:
   conditional:
     - id: AVP-CORE-012
       when: pause-capability-advertised
-resultPolicy:
-  mandatorySuccess: PASS
-  conditionalNotApplicable: SKIP
-  failOnMandatorySkip: true

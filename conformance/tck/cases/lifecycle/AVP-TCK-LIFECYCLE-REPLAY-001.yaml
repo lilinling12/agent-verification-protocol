@@ -1,0 +1,16 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-REPLAY-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-007]
+applicability: mandatory
+type: semantic
+vector:
+  sourceEpisodeId: episode-source-001
+  replayEpisodeId: episode-replay-001
+expect:
+  replayEpisodeIdDiffersFromSource: true
+  sourceEpisodeReferencePreserved: true

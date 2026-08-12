@@ -10,7 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "spec/core/requirement-index.yaml"
-TCK_DIR = ROOT / "conformance/lifecycle"
+TCK_DIR = ROOT / "conformance/tck/cases/lifecycle"
 REQUIREMENT_ID = re.compile(r"AVP-[A-Z][A-Z0-9-]*-\d{3}")
 ALLOWED_LEVELS = {"MUST", "MUST_NOT", "SHOULD", "SHOULD_NOT", "MAY"}
 MANDATORY_LEVELS = {"MUST", "MUST_NOT"}
@@ -57,11 +57,8 @@ def main() -> None:
         spec_text = spec_path.read_text(encoding="utf-8")
         if f"### {requirement_id} " not in spec_text:
             fail(f"{requirement_id} has no normative heading in {record['spec']}")
-        if f"#{record['anchor']}" not in spec_text.lower().replace("—", "-"):
-            # Markdown generates the anchor from the requirement heading; requiring the ID
-            # in the heading is authoritative, while this check only catches bad index anchors.
-            if record["anchor"] != requirement_id.lower():
-                fail(f"{requirement_id} anchor must be {requirement_id.lower()!r}")
+        if record["anchor"] != requirement_id.lower():
+            fail(f"{requirement_id} anchor must be {requirement_id.lower()!r}")
         schema = record.get("schema")
         if schema is not None and (not isinstance(schema, str) or not (ROOT / schema).is_file()):
             fail(f"{requirement_id} references missing schema {schema!r}")
@@ -74,10 +71,15 @@ def main() -> None:
     covered: set[str] = set()
     for path in sorted(TCK_DIR.glob("*.yaml")):
         case = load_yaml(path)
-        case_id = case.get("id")
+        metadata = case.get("metadata")
+        case_id = metadata.get("id") if isinstance(metadata, dict) else None
         requirements = case.get("requirements")
+        if case.get("apiVersion") != "avp.tck/v0.1" or case.get("kind") != "ConformanceCase":
+            fail(f"invalid TCK resource identity in {path.relative_to(ROOT)}")
         if not isinstance(case_id, str) or not case_id.startswith("AVP-TCK-"):
             fail(f"invalid TCK id in {path.relative_to(ROOT)}")
+        if path.name != f"{case_id}.yaml":
+            fail(f"TCK filename must match case id: {path.relative_to(ROOT)}")
         if case_id in cases:
             fail(f"duplicate TCK id: {case_id}")
         if not isinstance(requirements, list) or not requirements:
