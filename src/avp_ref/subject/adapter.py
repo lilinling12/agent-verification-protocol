@@ -10,21 +10,16 @@ from .models import SubjectDescription, SubjectHandle, SubjectInvocation, Subjec
 
 
 class SubjectToolGateway(Protocol):
-    """Minimal Agent-facing environment gateway exposed by the Runtime."""
+    """Minimal Agent-facing gateway exposed by the Runtime."""
 
     def observe(self) -> Mapping[str, Any]: ...
-
     def call_tool(self, name: str, arguments: Mapping[str, Any]) -> Any: ...
+    def trace_headers(self) -> Mapping[str, str]: ...
 
 
 @runtime_checkable
 class SubjectAdapter(Protocol):
-    """Open, invoke and release one Agent System implementation."""
-
     def describe(self) -> SubjectDescription: ...
-
     def open(self, agent_system: AgentSystem) -> SubjectHandle: ...
-
     def invoke(self, handle: SubjectHandle, invocation: SubjectInvocation, gateway: SubjectToolGateway) -> SubjectResult: ...
-
     def release(self, handle: SubjectHandle) -> None: ...

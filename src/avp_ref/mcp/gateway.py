@@ -9,7 +9,7 @@ from avp_ref.scenario.models import ScenarioInstance
 from .errors import MCPPermissionDenied, MCPProtocolError, MCPSchemaDriftError, MCPUpstreamError
 from .models import MCP_PROTOCOL_VERSION,MCPCallRecord,MCPGatewayDescription,MCPGatewayPolicy,MCPServerDescription,MCPToolCatalog,MCPToolDescriptor
 from .transport import MCPTransport
-_GATEWAY_VERSION="0.2.0-alpha.4"; _TOKEN=re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+_GATEWAY_VERSION="0.2.0-alpha.5"; _TOKEN=re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 
 class MCPVerificationGateway:
     def __init__(self,transport:MCPTransport,policy:MCPGatewayPolicy,*,endpoint_identity:str):
@@ -34,14 +34,18 @@ class MCPVerificationGateway:
     @property
     def call_records(self): return tuple(self._records)
     def owns_tool(self,name): return name in self._policy.allowed_tools
-    def call_tool(self,name,arguments,*,correlation_id=None):
+    def call_tool(self,name,arguments,*,correlation_id=None,trace_headers=None):
         if self._catalog is None: raise MCPProtocolError("MCP gateway is not open")
         if name not in self._policy.allowed_tools: raise MCPPermissionDenied(f"MCP tool is not permitted by compiled AVS policy: {name}")
         baseline=self._catalog.by_name().get(name)
         if baseline is None: raise MCPProtocolError(f"baseline MCP catalog has no tool: {name}")
         active=self._list_tools() if self._policy.detect_schema_drift else self._catalog; current=active.by_name().get(name)
         if current is None or current.schema_digest!=baseline.schema_digest or active.catalog_digest!=self._catalog.catalog_digest: raise MCPSchemaDriftError(f"MCP tool catalog/schema drift detected before call: {name}")
-        args=dict(arguments); self._validate_instance(args,baseline.input_schema,"tool arguments"); headers=self._extract_mcp_headers(baseline.input_schema,args); cid=correlation_id or "mcp_"+uuid.uuid4().hex[:16]
+        args=dict(arguments); self._validate_instance(args,baseline.input_schema,"tool arguments"); headers=self._extract_mcp_headers(baseline.input_schema,args)
+        for key,value in (trace_headers or {}).items():
+            if key.lower() in {item.lower() for item in headers}: raise MCPProtocolError(f"trace header collides with MCP parameter header: {key}")
+            headers[str(key)]=str(value)
+        cid=correlation_id or "mcp_"+uuid.uuid4().hex[:16]
         try: result=self._transport.request("tools/call",{"name":name,"arguments":args},name=name,extra_headers=headers)
         except MCPUpstreamError:
             self._records.append(MCPCallRecord(cid,name,digest(args),None,baseline.schema_digest,self._catalog.catalog_digest,True)); raise

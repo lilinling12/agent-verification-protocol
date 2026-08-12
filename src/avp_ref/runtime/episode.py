@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from avp_ref.environment.models import SnapshotRef
 from avp_ref.models import AVPEvent, Evidence, TaskVerdict, Validity, VerificationResult
@@ -29,6 +30,7 @@ class Episode:
     evidence: dict[str, Evidence] = field(default_factory=dict)
     snapshots: dict[str, SnapshotRef] = field(default_factory=dict)
     verification: list[VerificationResult] = field(default_factory=list)
+    telemetry: Any = field(default=None, repr=False)
 
     def transition(self, target: EpisodeState) -> None:
         assert_transition(self.state, target)

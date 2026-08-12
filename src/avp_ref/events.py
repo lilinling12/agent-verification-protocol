@@ -1,5 +1,7 @@
 from __future__ import annotations
-from .models import AVPEvent
+
+from .models import AVPEvent, Evidence
+
 
 class EventRecorder:
     def __init__(self, episode):
@@ -19,4 +21,18 @@ class EventRecorder:
             evidence=evidence or [],
         )
         self.episode.events.append(event)
+        telemetry = self.episode.telemetry
+        if telemetry is not None:
+            telemetry.record_event(event)
+            artifact = telemetry.artifact
+            if artifact is not None:
+                evidence_id = f"ev_{self.episode.episode_id}_telemetry"
+                if evidence_id not in self.episode.evidence:
+                    self.episode.evidence[evidence_id] = Evidence(
+                        evidence_id,
+                        "telemetry_artifact",
+                        artifact.to_dict(),
+                        artifact.artifact_digest,
+                        classification="evaluator-confidential",
+                    )
         return event

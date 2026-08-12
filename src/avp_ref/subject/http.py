@@ -1,10 +1,4 @@
-"""Synchronous HTTP Subject Adapter for independently running Agents.
-
-Protocol ``avp.subject/v0.1`` uses an evaluator-driven step loop. The Agent
-returns either a tool call, completion report, or explicit failure. Tool calls
-are executed only by the Runtime gateway, preserving capability enforcement and
-authoritative evidence collection.
-"""
+"""Synchronous HTTP Subject Adapter for independently running Agents."""
 
 from __future__ import annotations
 
@@ -21,40 +15,28 @@ from avp_ref.runtime.agent import AgentSystem
 from .errors import SubjectBudgetExceeded, SubjectExecutionError, SubjectProtocolError, SubjectTimeoutError, SubjectTransportError
 from .models import SubjectDescription, SubjectHandle, SubjectInvocation, SubjectResult, SubjectStatus, ToolCall
 
+_RESERVED_TRACE_HEADERS = frozenset({"traceparent", "tracestate", "baggage"})
+
 
 class HTTPSubjectAdapter:
-    """Execute an Agent through a deterministic request/response HTTP step protocol.
-
-    The adapter intentionally performs no automatic retry. Replaying a POST can
-    duplicate external side effects or blur Agent retry behavior with evaluator
-    retry behavior. Higher-level retry policy must be explicit and evidence-backed.
-    """
-
     def __init__(self, base_url: str, *, endpoint: str = "/v1/avp/invoke", headers: Mapping[str, str] | None = None) -> None:
         normalized = base_url.rstrip("/")
         if not normalized.startswith(("http://", "https://")):
             raise ValueError("HTTP subject base_url must use http or https")
+        configured = {str(key): str(value) for key, value in (headers or {}).items()}
+        forbidden = sorted(key for key in configured if key.lower() in _RESERVED_TRACE_HEADERS)
+        if forbidden:
+            raise ValueError(f"HTTP subject trace propagation headers are Runtime-owned: {forbidden}")
         self._url = normalized + endpoint
-        self._headers = {str(key): str(value) for key, value in (headers or {}).items()}
+        self._headers = configured
         self._handles: dict[str, AgentSystem] = {}
-        self._description = SubjectDescription(
-            name="http-subject",
-            version="0.1.0",
-            adapter="http",
-            transport="http-json",
-            metadata={"endpoint": endpoint, "automatic_retry": False},
-        )
+        self._description = SubjectDescription(name="http-subject", version="0.1.0", adapter="http", transport="http-json", metadata={"endpoint": endpoint, "automatic_retry": False})
 
     def describe(self) -> SubjectDescription:
         return self._description
 
     def open(self, agent_system: AgentSystem) -> SubjectHandle:
-        handle = SubjectHandle(
-            handle_id="subj_" + uuid.uuid4().hex[:16],
-            adapter_name=self._description.name,
-            adapter_version=self._description.version,
-            agent_system_digest=agent_system.identity_digest,
-        )
+        handle = SubjectHandle("subj_" + uuid.uuid4().hex[:16], self._description.name, self._description.version, agent_system.identity_digest)
         self._handles[handle.handle_id] = agent_system
         return handle
 
@@ -67,16 +49,8 @@ class HTTPSubjectAdapter:
             remaining = invocation.timeout_seconds - (time.monotonic() - started)
             if remaining <= 0:
                 raise SubjectTimeoutError("subject invocation deadline exceeded")
-            payload = {
-                "protocol_version": "avp.subject/v0.1",
-                "episode_id": invocation.episode_id,
-                "step": step,
-                "agent_system": agent.to_dict(),
-                "task": dict(invocation.task),
-                "observation": observation,
-                "previous_tool_result": previous_tool_result,
-            }
-            frame = self._post(payload, timeout=remaining)
+            payload = {"protocol_version": "avp.subject/v0.1", "episode_id": invocation.episode_id, "step": step, "agent_system": agent.to_dict(), "task": dict(invocation.task), "observation": observation, "previous_tool_result": previous_tool_result}
+            frame = self._post(payload, timeout=remaining, trace_headers=gateway.trace_headers())
             status = frame.get("status")
             if status == "completed":
                 report = frame.get("report")
@@ -106,9 +80,15 @@ class HTTPSubjectAdapter:
             raise SubjectTransportError(f"unknown subject handle: {handle.handle_id}")
         return agent
 
-    def _post(self, payload: Mapping[str, Any], *, timeout: float) -> dict[str, Any]:
+    def _post(self, payload: Mapping[str, Any], *, timeout: float, trace_headers: Mapping[str, str] | None = None) -> dict[str, Any]:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json", "X-AVP-Subject-Version": "avp.subject/v0.1", **self._headers}
+        existing = {item.lower() for item in headers}
+        for key, value in (trace_headers or {}).items():
+            if key.lower() in existing:
+                raise SubjectProtocolError(f"trace propagation header collides with configured HTTP subject header: {key}")
+            headers[str(key)] = str(value)
+            existing.add(key.lower())
         request = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:

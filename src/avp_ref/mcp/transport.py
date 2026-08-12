@@ -10,17 +10,20 @@ class MCPTransport(Protocol):
     def request(self, method:str, params:Mapping[str,Any]|None=None, *, name:str|None=None, extra_headers:Mapping[str,str]|None=None)->Mapping[str,Any]: ...
 
 class HTTPMCPTransport:
-    def __init__(self, endpoint:str, *, timeout_seconds:float=10.0, client_name:str="avp-reference", client_version:str="0.2.0-alpha.4"):
+    def __init__(self, endpoint:str, *, timeout_seconds:float=10.0, client_name:str="avp-reference", client_version:str="0.2.0-alpha.5", trace_headers_provider=None):
         if not endpoint.startswith(("http://","https://")): raise ValueError("MCP endpoint must use http or https")
         if timeout_seconds<=0: raise ValueError("timeout_seconds must be > 0")
-        self.endpoint=endpoint; self.timeout_seconds=float(timeout_seconds); self.client_name=client_name; self.client_version=client_version; self._request_id=0
+        self.endpoint=endpoint; self.timeout_seconds=float(timeout_seconds); self.client_name=client_name; self.client_version=client_version; self._request_id=0; self._trace_headers_provider=trace_headers_provider
     def request(self, method, params=None, *, name=None, extra_headers=None):
         self._request_id+=1; request_id=f"avp-mcp-{self._request_id}"; merged=dict(params or {}); meta=dict(merged.get("_meta") or {})
         meta.setdefault("io.modelcontextprotocol/protocolVersion",MCP_PROTOCOL_VERSION); meta.setdefault("io.modelcontextprotocol/clientInfo",{"name":self.client_name,"version":self.client_version}); meta.setdefault("io.modelcontextprotocol/clientCapabilities",{}); merged["_meta"]=meta
         payload={"jsonrpc":"2.0","id":request_id,"method":method,"params":merged}; headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream","MCP-Protocol-Version":MCP_PROTOCOL_VERSION,"Mcp-Method":method}
         if name: headers["Mcp-Name"]=name
+        if self._trace_headers_provider is not None:
+            for k,v in self._trace_headers_provider().items():
+                if k.lower() not in {item.lower() for item in headers}: headers[str(k)]=str(v)
         for k,v in (extra_headers or {}).items():
-            if k in headers: raise MCPProtocolError(f"extra MCP header collides with reserved header: {k}")
+            if k.lower() in {item.lower() for item in headers}: raise MCPProtocolError(f"extra MCP header collides with reserved header: {k}")
             headers[k]=v
         req=urllib.request.Request(self.endpoint,data=json.dumps(payload,separators=(",", ":")).encode(),headers=headers,method="POST")
         try:

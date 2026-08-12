@@ -1,7 +1,8 @@
 """Protocol-driven AVP reference execution engine.
 
 EnvironmentAdapter owns authoritative state, SubjectAdapter owns Agent
-execution, and an optional MCPVerificationGateway owns real MCP tool traffic.
+execution, MCPVerificationGateway owns real MCP traffic, and TelemetryBridge
+provides non-authoritative distributed trace evidence.
 """
 
 from __future__ import annotations
@@ -16,13 +17,14 @@ from avp_ref.mcp import MCPGatewayError, MCPVerificationGateway
 from avp_ref.models import TaskVerdict, Validity, VerificationResult
 from avp_ref.scenario.models import ScenarioInstance
 from avp_ref.subject import SubjectAdapter, SubjectAdapterError, SubjectHandle, SubjectInvocation, SubjectStatus
+from avp_ref.telemetry import TelemetryBridge, TelemetryCompleteness
 
 from .agent import AgentSystem
 from .episode import Episode
 from .manifest import EpisodeManifest
 from .state import EpisodeState, InvalidEpisodeTransition
 
-_RUNTIME_VERSION = "0.2.0-alpha.4"
+_RUNTIME_VERSION = "0.2.0-alpha.5"
 
 
 class EvaluationOracle(Protocol):
@@ -45,11 +47,14 @@ class SubjectSession:
     def call_tool(self, name: str, arguments: Mapping[str, Any]) -> Any:
         return self.__runtime._subject_call_tool(self.__episode_id, name, dict(arguments))
 
+    def trace_headers(self) -> Mapping[str, str]:
+        return self.__runtime._trace_headers(self.__episode_id)
+
 
 class ReferenceRuntime:
-    """Scenario-driven runtime with independent subject, environment and MCP planes."""
+    """Scenario-driven runtime with independent execution and telemetry planes."""
 
-    def __init__(self) -> None:
+    def __init__(self, telemetry_bridge: TelemetryBridge | None = None) -> None:
         self.episodes: dict[str, Episode] = {}
         self._adapters: dict[str, EnvironmentAdapter] = {}
         self._handles: dict[str, EnvironmentHandle] = {}
@@ -57,25 +62,43 @@ class ReferenceRuntime:
         self._subject_handles: dict[str, SubjectHandle] = {}
         self._mcp_gateways: dict[str, MCPVerificationGateway] = {}
         self._faults: dict[str, dict[str, FaultHandle]] = {}
+        self._telemetry_bridge = telemetry_bridge
 
     def capabilities(self) -> dict[str, Any]:
-        return {"protocol": "avp", "version": "avp.spec/v0.1", "implementation": {"name": "avp-reference", "version": _RUNTIME_VERSION, "language": "python"}, "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-MCP-Gateway", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"], "features": {"scenario_instance_required": True, "environment_adapter_spi": "avp.environment/v0.1", "subject_adapter_spi": "avp.subject/v0.1", "mcp_protocol": "2026-07-28", "isolation": "adapter-dependent"}}
+        return {
+            "protocol": "avp",
+            "version": "avp.spec/v0.1",
+            "implementation": {"name": "avp-reference", "version": _RUNTIME_VERSION, "language": "python"},
+            "profiles": ["AVP-Core", "AVP-Environment", "AVP-Subject", "AVP-MCP-Gateway", "AVP-Telemetry", "AVP-Snapshot", "AVP-Verification", "AVP-Replay", "AVP-Chaos"],
+            "features": {"scenario_instance_required": True, "environment_adapter_spi": "avp.environment/v0.1", "subject_adapter_spi": "avp.subject/v0.1", "mcp_protocol": "2026-07-28", "telemetry_bridge": "avp.telemetry/v0.1", "isolation": "adapter-dependent"},
+        }
 
     def create_episode(self, scenario: ScenarioInstance, agent_system: AgentSystem, environment_adapter: EnvironmentAdapter, subject_adapter: SubjectAdapter, mcp_gateway: MCPVerificationGateway | None = None) -> Episode:
         if scenario.document.get("kind") != "ScenarioInstance":
             raise TypeError("ReferenceRuntime requires a compiled ScenarioInstance")
         environment_description = environment_adapter.describe()
         subject_description = subject_adapter.describe()
+        telemetry_description = self._telemetry_bridge.describe() if self._telemetry_bridge else None
         episode_id = "ep_" + uuid.uuid4().hex[:12]
-        manifest = EpisodeManifest.create(scenario, agent_system, environment_description, subject_description, _RUNTIME_VERSION, mcp_gateway_config_digest=mcp_gateway.configuration_digest if mcp_gateway else None)
+        manifest = EpisodeManifest.create(
+            scenario,
+            agent_system,
+            environment_description,
+            subject_description,
+            _RUNTIME_VERSION,
+            mcp_gateway_config_digest=mcp_gateway.configuration_digest if mcp_gateway else None,
+            telemetry_config_digest=telemetry_description.identity_digest if telemetry_description else None,
+        )
         episode = Episode(episode_id, scenario, agent_system, manifest)
+        if self._telemetry_bridge is not None:
+            episode.telemetry = self._telemetry_bridge.start_episode(episode_id, manifest.manifest_digest)
         self.episodes[episode_id] = episode
         self._adapters[episode_id] = environment_adapter
         self._subject_adapters[episode_id] = subject_adapter
         if mcp_gateway is not None:
             self._mcp_gateways[episode_id] = mcp_gateway
         self._faults[episode_id] = {}
-        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {"manifest_digest": manifest.manifest_digest, "scenario_instance_digest": scenario.instance_digest, "agent_system_digest": agent_system.identity_digest, "environment_adapter_digest": environment_description.identity_digest, "subject_adapter_digest": subject_description.identity_digest, "mcp_gateway_config_digest": manifest.mcp_gateway_config_digest})
+        EventRecorder(episode).emit("episode.created", "orchestrator", 0, {"manifest_digest": manifest.manifest_digest, "scenario_instance_digest": scenario.instance_digest, "agent_system_digest": agent_system.identity_digest, "environment_adapter_digest": environment_description.identity_digest, "subject_adapter_digest": subject_description.identity_digest, "mcp_gateway_config_digest": manifest.mcp_gateway_config_digest, "telemetry_config_digest": manifest.telemetry_config_digest})
         return episode
 
     def provision(self, episode_id: str) -> Episode:
@@ -99,11 +122,13 @@ class ReferenceRuntime:
             episode.validity = Validity.INFRA_CONFOUND
             episode.transition(EpisodeState.INFRA_FAILED)
             recorder.emit("episode.provision.failed", "orchestrator", 0, {"error_type": type(exc).__name__, "error": str(exc)})
+            self._finalize_telemetry(episode, complete=False)
             raise
         except Exception as exc:
             episode.validity = Validity.ENVIRONMENT_FAILURE
             episode.transition(EpisodeState.INFRA_FAILED)
             recorder.emit("environment.provision.failed", "environment", 0, {"error_type": type(exc).__name__, "error": str(exc)})
+            self._finalize_telemetry(episode, complete=False)
             raise
         episode.transition(EpisodeState.READY)
         return episode
@@ -129,6 +154,7 @@ class ReferenceRuntime:
             episode.validity = Validity.INFRA_CONFOUND
             recorder.emit("agent.invocation.completed", "agent", environment_adapter.logical_time(environment_handle), {"status": "infra_error", "error_type": type(exc).__name__, "error": str(exc)})
             episode.transition(EpisodeState.INFRA_FAILED)
+            self._finalize_telemetry(episode, complete=False)
             return episode.agent_report
         recorder.emit("agent.stop", "agent", environment_adapter.logical_time(environment_handle), {"report": episode.agent_report})
         episode.transition(EpisodeState.QUIESCING)
@@ -148,12 +174,21 @@ class ReferenceRuntime:
             episode.task_verdict = TaskVerdict.INCONCLUSIVE
             recorder.emit("evaluation.validity.changed", "evaluator", environment_adapter.logical_time(environment_handle), {"to": "ORACLE_FAILURE", "reason": str(exc)})
             episode.transition(EpisodeState.INVALID)
+            recorder.emit("episode.invalid", "orchestrator", environment_adapter.logical_time(environment_handle), {"validity": episode.validity.value})
             return episode
         episode.verification = results
         for result in results:
             recorder.emit("verification.claim.evaluated", "evaluator", environment_adapter.logical_time(environment_handle), {"claim_id": result.claim_id, "dimension": result.dimension, "verdict": result.verdict, "severity": result.severity, "method": result.method, "evaluator_version": result.evaluator_version}, evidence=list(result.evidence_ids))
         episode.task_verdict = TaskVerdict.FAIL if any(item.verdict == "FAIL" and item.severity == "critical" for item in results) else TaskVerdict.PASS
         episode.validity = Validity.VALID
+        if self._telemetry_bridge is not None:
+            description = self._telemetry_bridge.describe()
+            if description.policy.required and description.implementation == "none":
+                episode.task_verdict = TaskVerdict.INCONCLUSIVE
+                episode.validity = Validity.TRACE_INCOMPLETE
+                episode.transition(EpisodeState.INVALID)
+                recorder.emit("episode.invalid", "orchestrator", environment_adapter.logical_time(environment_handle), {"validity": episode.validity.value, "reason": "required telemetry unavailable"})
+                return episode
         episode.transition(EpisodeState.COMPLETED)
         recorder.emit("episode.completed", "orchestrator", environment_adapter.logical_time(environment_handle), {"task_verdict": episode.task_verdict.value, "validity": episode.validity.value})
         return episode
@@ -206,6 +241,10 @@ class ReferenceRuntime:
         except KeyError as exc:
             raise InvalidEpisodeTransition("episode resources have not been provisioned") from exc
 
+    def _trace_headers(self, episode_id: str) -> Mapping[str, str]:
+        episode = self.episodes[episode_id]
+        return episode.telemetry.inject_headers() if episode.telemetry is not None else {}
+
     def _subject_observation(self, episode_id: str) -> Mapping[str, Any]:
         episode, adapter, handle, _, _ = self._bound(episode_id)
         if episode.state is not EpisodeState.RUNNING:
@@ -224,7 +263,7 @@ class ReferenceRuntime:
         if gateway is not None and gateway.owns_tool(name):
             recorder.emit("tool.call", "agent", adapter.logical_time(handle), {"name": name, "arguments": arguments, "protocol": "mcp", "correlation_id": correlation_id})
             try:
-                result = gateway.call_tool(name, arguments, correlation_id=correlation_id)
+                result = gateway.call_tool(name, arguments, correlation_id=correlation_id, trace_headers=self._trace_headers(episode_id))
             except MCPGatewayError as exc:
                 recorder.emit("tool.error", "environment", adapter.logical_time(handle), {"name": name, "protocol": "mcp", "error_type": type(exc).__name__, "error": str(exc), "correlation_id": correlation_id})
                 raise RuntimeError(str(exc)) from exc
@@ -243,6 +282,10 @@ class ReferenceRuntime:
         if result.diff is not None:
             recorder.emit("environment.state.changed", "environment", adapter.logical_time(handle), {"cause_correlation_id": correlation_id, "changes": result.diff.to_dict()["changes"]}, state={"before": result.before_digest, "after": result.after_digest})
         return result.result
+
+    def _finalize_telemetry(self, episode: Episode, *, complete: bool) -> None:
+        if episode.telemetry is not None and episode.telemetry.artifact is None:
+            episode.telemetry.finalize(complete=complete)
 
     @staticmethod
     def _emit_fault_observations(episode: Episode, adapter: EnvironmentAdapter, handle: EnvironmentHandle, observations: tuple[FaultObservation, ...]) -> None:
