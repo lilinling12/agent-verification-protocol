@@ -30,6 +30,13 @@ def _requirement_name(requirement: str) -> str:
     return _canonical_name(match.group(1))
 
 
+def _exact_pin(requirement: str, context: str) -> tuple[str, str]:
+    match = _EXACT_PIN.fullmatch(requirement)
+    if match is None:
+        _fail(f"{context} must be an exact NAME==VERSION pin: {requirement}")
+    return _canonical_name(match.group(1)), match.group(2)
+
+
 def _require_compatibility_window(requirement: str, context: str) -> None:
     if ">=" not in requirement:
         _fail(f"{context} dependency needs an explicit tested lower bound: {requirement}")
@@ -66,8 +73,13 @@ def _load_constraints() -> dict[str, str]:
 def main() -> None:
     document = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
     build_requires = document.get("build-system", {}).get("requires", [])
-    if build_requires != ["setuptools==80.9.0"]:
-        _fail("build-system.requires must pin the reviewed setuptools build backend exactly")
+    if not isinstance(build_requires, list) or len(build_requires) != 1:
+        _fail("build-system.requires must contain exactly one reviewed build backend pin")
+    build_backend_name, build_backend_version = _exact_pin(
+        build_requires[0], "build-system.requires build backend"
+    )
+    if build_backend_name != "setuptools":
+        _fail("build-system.requires must pin setuptools as the reviewed build backend")
 
     project = document.get("project", {})
     runtime = project.get("dependencies", [])
@@ -92,7 +104,7 @@ def main() -> None:
     )
     if missing:
         _fail(f"CI constraints do not pin direct runtime/dev dependencies: {missing}")
-    if pins.get("setuptools") != "80.9.0":
+    if pins.get(build_backend_name) != build_backend_version:
         _fail("CI constraints must pin the same setuptools version as build-system.requires")
 
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
@@ -107,6 +119,7 @@ def main() -> None:
 
     print(
         "dependency policy OK: "
+        f"build backend {build_backend_name}=={build_backend_version}, "
         f"{len(runtime)} runtime requirements, "
         f"{len(ci_direct_requirements)} CI direct requirements, "
         f"{len(pins)} exact CI pins"
