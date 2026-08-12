@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-evidence-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-EVIDENCE-001
+    - AVP-EVIDENCE-002
+    - AVP-EVIDENCE-003
+    - AVP-EVIDENCE-004
+    - AVP-EVIDENCE-005
+    - AVP-EVIDENCE-006
+    - AVP-EVIDENCE-007
+  conditional: []

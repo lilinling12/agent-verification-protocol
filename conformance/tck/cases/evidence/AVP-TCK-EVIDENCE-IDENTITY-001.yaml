@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-EVIDENCE-IDENTITY-001
+  domain: evidence
+  status: draft
+profile: avp-evidence-v0.1
+requirements: [AVP-EVIDENCE-004]
+applicability: mandatory
+type: schema-and-semantic
+schema: schemas/evidence.schema.json
+vector:
+  evidence:
+    evidenceId: ev_state_001
+    type: state_projection
+    artifact:
+      digest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+      size: 3
+      mediaType: application/octet-stream
+    classification: evaluator-confidential
+expect:
+  evidenceIdentityDistinctFromArtifactDigest: true
+  artifactReferenceRequired: true
