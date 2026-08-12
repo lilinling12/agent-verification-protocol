@@ -2,61 +2,65 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Iterable, Mapping
 
 from avp_ref.canonical import digest
 
 from .loader import TCKRepository
-from .reference import TCKCaseResult
+from .reference import TCKCaseResult, TCKStatus
 
 
 def build_report(
     repository: TCKRepository,
     *,
     profile: str,
+    profile_version: str,
     implementation: Mapping[str, object],
+    capabilities: Iterable[str],
     results: Iterable[TCKCaseResult],
 ) -> dict[str, object]:
-    """Build the canonical report payload.
+    """Build the JSON-schema-compatible conformance report.
 
-    The report is deliberately a plain JSON-compatible object. Serialization,
-    signing, and transport are separate concerns.
+    Report construction is deterministic except for caller-provided identity
+    metadata. Signing, persistence and transport remain outside this layer.
     """
 
     result_list = list(results)
-    if not isinstance(implementation, Mapping):
-        raise TypeError("implementation must be a mapping")
     implementation_identity = dict(implementation)
+    capability_list = sorted(set(capabilities))
+    cases: list[dict[str, object]] = []
+    for result in result_list:
+        item: dict[str, object] = {
+            "id": result.case_id,
+            "status": result.status.value,
+            "evidence": list(result.evidence),
+        }
+        if result.status is TCKStatus.SKIP:
+            item["skipReason"] = result.skip_reason
+        cases.append(item)
+
     return {
         "apiVersion": "avp.tck/v0.1",
         "kind": "ConformanceReport",
-        "metadata": {
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "reportDigest": None,
-        },
-        "profile": profile,
-        "tck": {
-            "registryVersion": repository.version,
-            "registryDigest": repository.registry_digest,
+        "profile": {
+            "name": profile,
+            "version": profile_version,
         },
         "implementation": {
-            "identity": implementation_identity,
+            "name": str(implementation_identity.get("name", "unknown")),
+            "version": str(implementation_identity.get("version", "unknown")),
             "identityDigest": digest(implementation_identity),
         },
-        "cases": [
-            {
-                "id": item.case_id,
-                "status": item.status.value,
-                "detail": item.detail,
-                "evidence": list(item.evidence),
-            }
-            for item in result_list
-        ],
+        "tck": {
+            "version": repository.version,
+            "registryDigest": repository.registry_digest,
+        },
+        "declaredCapabilities": capability_list,
+        "cases": cases,
         "summary": {
-            "passed": sum(item.status.value == "PASS" for item in result_list),
-            "failed": sum(item.status.value == "FAIL" for item in result_list),
-            "skipped": sum(item.status.value == "SKIP" for item in result_list),
+            "total": len(result_list),
+            "passed": sum(result.status is TCKStatus.PASS for result in result_list),
+            "failed": sum(result.status is TCKStatus.FAIL for result in result_list),
+            "skipped": sum(result.status is TCKStatus.SKIP for result in result_list),
         },
     }
-
