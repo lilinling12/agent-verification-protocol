@@ -11,7 +11,11 @@ type: positive
 vector:
   oracleId: refund-state
   version: 1.2.0
-  packageDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  entrypoint: tck.oracle:identity
+  codeDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  projections: [tck.identity]
+  inputPointers: {}
+  packageDigest: sha256:bcefef9bacd8ef3a44a067278b98367ced10b89edf355af58d8544aa241f04ce
   scenarioInstanceDigest: sha256:1111111111111111111111111111111111111111111111111111111111111111
   manifestDigest: sha256:2222222222222222222222222222222222222222222222222222222222222222
 expect:
