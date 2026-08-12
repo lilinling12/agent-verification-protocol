@@ -57,5 +57,11 @@ jobs:
         run: |
           python -m venv .wheel-venv
           .wheel-venv/bin/python -m pip install dist/*.whl
-      - name: Installed-wheel conformance smoke
+      - name: Installed-wheel reference smoke
         run: .wheel-venv/bin/avp conformance
+      - name: Installed-wheel TCK smoke
+        run: |
+          .wheel-venv/bin/avp tck run \
+            --repository-root . \
+            --case AVP-TCK-LIFECYCLE-NORMAL-001 \
+            --case AVP-TCK-LIFECYCLE-PAUSE-001
