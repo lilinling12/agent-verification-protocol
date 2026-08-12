@@ -45,7 +45,8 @@ def run_suite() -> list[CaseResult]:
     results.append(CaseResult("AVP-VERIFY-EVIDENCE-001", false_success.task_verdict.value == "FAIL" and bool(false_success.evidence), "self-report does not override state evidence"))
 
     broken = _new_episode(runtime, correct_subject, broken_oracle_package()); runtime.provision(broken.episode_id); runtime.run_subject(broken.episode_id); runtime.verify(broken.episode_id)
-    results.append(CaseResult("AVP-VERIFY-ORACLE-FAILURE-001", broken.validity is Validity.ORACLE_CRASH and broken.state is EpisodeState.INVALID, "crashed Oracle invalidates evaluation without failing the Agent task"))
+    broken_detail = broken.validity_detail.code if broken.validity_detail is not None else None
+    results.append(CaseResult("AVP-VERIFY-ORACLE-FAILURE-001", broken.validity is Validity.ORACLE_FAILURE and broken_detail == "ORACLE_CRASH" and broken.task_verdict.value == "INCONCLUSIVE" and broken.state is EpisodeState.INVALID, "crashed Oracle invalidates evaluation without failing the Agent task"))
 
     chaos = _new_episode(runtime, recovering_subject); runtime.provision(chaos.episode_id); fault = runtime.inject_fault(chaos.episode_id, FaultSpec("tool.error", "order.get", occurrence=1, parameters={"error": "injected tool failure"})); runtime.run_subject(chaos.episode_id); runtime.verify(chaos.episode_id); types = [event.event_type for event in chaos.events]
     results.append(CaseResult("AVP-CHAOS-FAULT-LIFECYCLE-001", chaos.task_verdict.value == "PASS" and all(item in types for item in ("fault.scheduled", "fault.activated", "fault.observed", "fault.cleared")), f"fault {fault.fault_id} activated and recovered"))
