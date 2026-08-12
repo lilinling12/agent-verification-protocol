@@ -1,33 +1,46 @@
-# Agent Verification Protocol — Reference Implementation v0.1
+# Agent Verification Protocol — Alpha Monorepo
 
-This repository is a **working reference implementation** for the proposed Agent Verification Protocol (AVP).
+This repository develops the proposed **Agent Verification Protocol (AVP)** together with its open-source reference implementation and early conformance assets.
 
-It is intentionally small, inspectable and local-first. It demonstrates:
+It is intentionally an Alpha monorepo while protocol semantics are evolving. The repository layout does not make reference implementation behavior normative.
 
-- Episode lifecycle
-- Agent/Evaluator separation
-- authoritative State
-- State digests and diffs
-- snapshot/restore
-- claim/evidence verification
-- false-success detection
-- replay/intervention metadata
-- AVP event timeline
-- an initial conformance runner
-
-## Architecture
+## Authority and repository boundaries
 
 ```text
-MCP  = Agent ↔ Tool
-A2A  = Agent ↔ Agent
-OTel = Telemetry
+spec/          normative protocol semantics
+schemas/       machine-readable protocol contracts
+conformance/   implementation-independent conformance/TCK assets
+runtime/       reference runtime distribution boundary
+adapters/      reference integration boundary
+src/avp_ref/   current Python reference implementation
+tests/         Python reference implementation tests
+benchmarks/    AVS capability/reliability benchmark packs
+```
+
+Authority order: `Specification -> Schemas -> Conformance -> Reference Implementation`.
+
+See `docs/ARCHITECTURE_BOUNDARIES.md` and `repository-boundaries.json`.
+
+## Protocol ownership
+
+```text
+MCP  = Agent <-> Tool / Context
+A2A  = Agent <-> Agent
+OTel = Telemetry / trace propagation
 AVP  = Scenario / Environment / Evidence / Verification / Replay
 ```
+
+AVP does not require the commercial Agent Verification Platform. Hosted scheduling, enterprise environment fabric, production mining, failure intelligence, dashboards, and private benchmark data are separate product capabilities that may implement AVP.
+
+## Reference implementation
+
+The current Python implementation demonstrates immutable ScenarioInstance compilation, Episode lifecycle and Agent/Evaluator separation, Environment/Subject adapter SPIs, authoritative state projection/diff/snapshot, MCP verification, OpenTelemetry correlation, isolated Oracle execution, evidence verification, and early conformance/benchmark runners.
 
 ## Quick start
 
 ```bash
-python -m pip install -e .
+python -m pip install -e '.[dev]'
+bash scripts/quality.sh
 avp demo
 avp conformance
 ```
@@ -39,20 +52,8 @@ python -m pip install -e '.[http]'
 avp serve --port 8790
 ```
 
-## Important
+## Status
 
-This is a **draft open protocol/reference implementation**, not a formal standards-body standard.
+AVP is a draft open protocol, not a formal standards-body standard. Alpha releases may intentionally make breaking changes when doing so improves the eventual language-neutral protocol.
 
-The commercial Agent Verification OS should be able to replace every runtime component while preserving AVP conformance.
-
-## Alpha benchmark smoke run
-
-```bash
-avp benchmark --runs 8
-```
-
-The bundled `enterprise-action-v0.1` AVS pack expands the design surface to Commerce, Calendar, Email, Files, Approval, and MCP orchestration. Only the Commerce Refund world is executable in the reference runtime today; the remaining templates drive the next Environment adapters.
-
-## Repository governance
-
-See `CONTRIBUTING.md`, `GOVERNANCE.md`, `SECURITY.md`, `ROADMAP.md`, and the AEP template under `rfcs/`.
+Repository governance is defined by `CONTRIBUTING.md`, `GOVERNANCE.md`, `SECURITY.md`, `docs/BRANCHING.md`, and `docs/RELEASE_PROCESS.md`.

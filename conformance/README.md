@@ -1,11 +1,9 @@
 # AVP Conformance
 
-The reference implementation currently exercises a small deterministic subset of the full TCK.
+`conformance/` is the implementation-independent conformance surface for AVP. It is not the Python reference implementation's unit-test directory; those tests remain under `tests/`.
 
-Run:
+Conformance cases are derived from requirements in `spec/` and contracts in `schemas/`. A case may clarify how a requirement is proven, but must not silently invent protocol semantics.
 
-```bash
-avp conformance
-```
+A mature case identifies the requirement, deterministic input/vector, expected observable result, negative behavior, required evidence/artifacts, and trust-boundary expectations when applicable.
 
-The full public TCK should evolve independently from this reference implementation.
+Conformance answers whether an implementation satisfies AVP. Benchmarks answer how well an Agent System performs. Those concerns remain separate.

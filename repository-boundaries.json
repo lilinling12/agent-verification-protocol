@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "repository_phase": "alpha-monorepo",
+  "authority_order": ["spec", "schemas", "conformance", "reference-implementation"],
+  "surfaces": {
+    "spec": {"path": "spec", "role": "normative-protocol", "normative": true, "future_repository": "avp-spec"},
+    "schemas": {"path": "schemas", "role": "machine-readable-protocol-contracts", "normative": true, "future_repository": "avp-schema"},
+    "conformance": {"path": "conformance", "role": "implementation-independent-conformance", "normative": false, "derived_from": ["spec", "schemas"], "future_repository": "avp-tck"},
+    "runtime": {"path": "runtime", "role": "reference-runtime-boundary", "normative": false, "implementation_path": "src/avp_ref", "future_repository": "avp-runtime"},
+    "adapters": {"path": "adapters", "role": "reference-integration-boundary", "normative": false, "implementation_path": "src/avp_ref", "future_repository": "avp-adapters"},
+    "benchmarks": {"path": "benchmarks", "role": "capability-and-reliability-evaluation-packs", "normative": false, "future_repository": "avp-benchmarks"},
+    "tests": {"path": "tests", "role": "reference-implementation-tests", "normative": false}
+  },
+  "excluded_surfaces": {
+    "commercial_platform": {"role": "commercial-control-plane", "expected_repository": "private", "normative": false}
+  }
+}
