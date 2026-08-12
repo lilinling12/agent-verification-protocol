@@ -1,0 +1,46 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceRegistry
+metadata:
+  name: avp-tck
+  version: 0.1.0
+  status: draft
+profiles:
+  - id: avp-core-v0.1
+    path: conformance/tck/profiles/avp-core-v0.1.yaml
+cases:
+  - id: AVP-TCK-LIFECYCLE-NORMAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-NORMAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-001, AVP-CORE-008, AVP-CORE-009]
+  - id: AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-002, AVP-CORE-003, AVP-CORE-004]
+  - id: AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-005, AVP-CORE-008, AVP-CORE-009, AVP-CORE-012]
+  - id: AVP-TCK-LIFECYCLE-ILLEGAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-ILLEGAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-009]
+  - id: AVP-TCK-LIFECYCLE-TERMINAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TERMINAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-005]
+  - id: AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-006, AVP-CORE-010]
+  - id: AVP-TCK-LIFECYCLE-QUIESCING-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-QUIESCING-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-011]
+  - id: AVP-TCK-LIFECYCLE-REPLAY-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-REPLAY-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-007]
+  - id: AVP-TCK-LIFECYCLE-PAUSE-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-PAUSE-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-012]

@@ -1,13 +1,27 @@
-apiVersion: avp.spec/v0.1
+apiVersion: avp.tck/v0.1
 kind: ConformanceProfile
 metadata:
-  name: avp-core-v0.1
+  id: avp-core-v0.1
   version: 0.1.0
-profile:
-  requires:
+  status: draft
+specVersion: avp.spec/v0.1
+requirements:
+  mandatory:
     - AVP-CORE-001
     - AVP-CORE-002
+    - AVP-CORE-003
+    - AVP-CORE-004
     - AVP-CORE-005
     - AVP-CORE-006
+    - AVP-CORE-007
+    - AVP-CORE-008
     - AVP-CORE-009
-  tckDomain: lifecycle
+    - AVP-CORE-010
+    - AVP-CORE-011
+  conditional:
+    - id: AVP-CORE-012
+      when: pause-capability-advertised
+resultPolicy:
+  mandatorySuccess: PASS
+  conditionalNotApplicable: SKIP
+  failOnMandatorySkip: true

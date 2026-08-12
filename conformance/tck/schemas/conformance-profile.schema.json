@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:tck:schemas:conformance-profile:0.1",
+  "title": "AVP TCK Conformance Profile",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "specVersion", "requirements", "resultPolicy"],
+  "properties": {
+    "apiVersion": {"const": "avp.tck/v0.1"},
+    "kind": {"const": "ConformanceProfile"},
+    "metadata": {
+      "type": "object",
+      "required": ["id", "version", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+        "version": {"type": "string", "minLength": 1},
+        "status": {"enum": ["draft", "active", "deprecated"]}
+      },
+      "additionalProperties": false
+    },
+    "specVersion": {"type": "string", "minLength": 1},
+    "requirements": {
+      "type": "object",
+      "required": ["mandatory", "conditional"],
+      "properties": {
+        "mandatory": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^AVP-[A-Z][A-Z0-9-]*-[0-9]{3}$"}},
+        "conditional": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "when"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^AVP-[A-Z][A-Z0-9-]*-[0-9]{3}$"},
+              "when": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resultPolicy": {
+      "type": "object",
+      "required": ["mandatorySuccess", "conditionalNotApplicable", "failOnMandatorySkip"],
+      "properties": {
+        "mandatorySuccess": {"const": "PASS"},
+        "conditionalNotApplicable": {"const": "SKIP"},
+        "failOnMandatorySkip": {"const": true}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

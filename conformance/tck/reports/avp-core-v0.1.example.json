@@ -1,0 +1,11 @@
+{
+  "apiVersion": "avp.tck/v0.1",
+  "kind": "ConformanceReport",
+  "generatedAt": "2026-08-12T00:00:00Z",
+  "profile": "avp-core-v0.1",
+  "tckRevision": "example-only",
+  "runner": {"name": "example-runner", "version": "0.1.0"},
+  "implementation": {"name": "example-implementation", "version": "0.1.0"},
+  "cases": [{"id": "AVP-TCK-LIFECYCLE-NORMAL-001", "status": "PASS", "requirements": ["AVP-CORE-001", "AVP-CORE-008", "AVP-CORE-009"]}],
+  "summary": {"total": 1, "passed": 1, "failed": 0, "skipped": 0}
+}
