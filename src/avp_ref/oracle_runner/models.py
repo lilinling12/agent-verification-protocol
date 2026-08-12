@@ -7,14 +7,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
 
-from avp_ref.artifacts import sha256_digest, validate_media_type, validate_sha256_digest
+from avp_ref.artifacts import ArtifactRef, sha256_digest, validate_sha256_digest
 from avp_ref.canonical import digest
 from avp_ref.models import VerificationResult
 
 
 def _freeze(value: object) -> object:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+        return MappingProxyType(
+            {str(key): _freeze(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
     return value
@@ -60,14 +62,33 @@ class OracleSandboxPolicy:
     def __post_init__(self) -> None:
         if self.timeout_seconds <= 0:
             raise ValueError("oracle timeout_seconds must be > 0")
-        for name in ("cpu_seconds", "memory_bytes", "max_file_bytes", "max_open_files", "max_request_bytes", "max_response_bytes"):
+        for name in (
+            "cpu_seconds",
+            "memory_bytes",
+            "max_file_bytes",
+            "max_open_files",
+            "max_request_bytes",
+            "max_response_bytes",
+        ):
             if int(getattr(self, name)) <= 0:
                 raise ValueError(f"oracle {name} must be > 0")
-        inherited = tuple(sorted({item for item in self.inherited_environment if item}))
+        inherited = tuple(
+            sorted({item for item in self.inherited_environment if item})
+        )
         object.__setattr__(self, "inherited_environment", inherited)
 
     def to_dict(self) -> dict[str, object]:
-        return {"timeout_seconds": self.timeout_seconds, "cpu_seconds": self.cpu_seconds, "memory_bytes": self.memory_bytes, "max_file_bytes": self.max_file_bytes, "max_open_files": self.max_open_files, "max_request_bytes": self.max_request_bytes, "max_response_bytes": self.max_response_bytes, "inherited_environment": list(self.inherited_environment), "enforce_resource_limits": self.enforce_resource_limits}
+        return {
+            "timeout_seconds": self.timeout_seconds,
+            "cpu_seconds": self.cpu_seconds,
+            "memory_bytes": self.memory_bytes,
+            "max_file_bytes": self.max_file_bytes,
+            "max_open_files": self.max_open_files,
+            "max_request_bytes": self.max_request_bytes,
+            "max_response_bytes": self.max_response_bytes,
+            "inherited_environment": list(self.inherited_environment),
+            "enforce_resource_limits": self.enforce_resource_limits,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,12 +107,31 @@ class OracleRunnerDescription:
     def __post_init__(self) -> None:
         _require_sha256(self.worker_code_digest, "oracle worker_code_digest")
         if not self.worker_module or not self.allowed_module_prefixes:
-            raise ValueError("oracle runner worker/module allowlist must be non-empty")
-        object.__setattr__(self, "allowed_module_prefixes", tuple(sorted(set(self.allowed_module_prefixes))))
+            raise ValueError(
+                "oracle runner worker/module allowlist must be non-empty"
+            )
+        object.__setattr__(
+            self,
+            "allowed_module_prefixes",
+            tuple(sorted(set(self.allowed_module_prefixes))),
+        )
 
     @property
     def identity_digest(self) -> str:
-        return digest({"name": self.name, "version": self.version, "protocol_version": self.protocol_version, "isolation": self.isolation, "policy": self.policy.to_dict(), "worker_module": self.worker_module, "worker_code_digest": self.worker_code_digest, "allowed_module_prefixes": list(self.allowed_module_prefixes), "filesystem_isolation": self.filesystem_isolation, "network_isolation": self.network_isolation})
+        return digest(
+            {
+                "name": self.name,
+                "version": self.version,
+                "protocol_version": self.protocol_version,
+                "isolation": self.isolation,
+                "policy": self.policy.to_dict(),
+                "worker_module": self.worker_module,
+                "worker_code_digest": self.worker_code_digest,
+                "allowed_module_prefixes": list(self.allowed_module_prefixes),
+                "filesystem_isolation": self.filesystem_isolation,
+                "network_isolation": self.network_isolation,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,14 +152,33 @@ class OraclePackage:
         projections = tuple(sorted({item for item in self.projections if item}))
         if not projections:
             raise ValueError("oracle package must request at least one projection")
-        pointers = {str(name): str(pointer) for name, pointer in self.input_pointers.items()}
-        if any(not name or not pointer.startswith("/") for name, pointer in pointers.items()):
-            raise ValueError("oracle input_pointers must use non-empty RFC 6901 JSON Pointers")
+        pointers = {
+            str(name): str(pointer)
+            for name, pointer in self.input_pointers.items()
+        }
+        if any(
+            not name or not pointer.startswith("/")
+            for name, pointer in pointers.items()
+        ):
+            raise ValueError(
+                "oracle input_pointers must use non-empty RFC 6901 JSON Pointers"
+            )
         object.__setattr__(self, "projections", projections)
-        object.__setattr__(self, "input_pointers", MappingProxyType(dict(sorted(pointers.items()))))
+        object.__setattr__(
+            self,
+            "input_pointers",
+            MappingProxyType(dict(sorted(pointers.items()))),
+        )
 
     def to_dict(self) -> dict[str, object]:
-        return {"oracle_id": self.oracle_id, "version": self.version, "entrypoint": self.entrypoint, "code_digest": self.code_digest, "projections": list(self.projections), "input_pointers": dict(self.input_pointers)}
+        return {
+            "oracle_id": self.oracle_id,
+            "version": self.version,
+            "entrypoint": self.entrypoint,
+            "code_digest": self.code_digest,
+            "projections": list(self.projections),
+            "input_pointers": dict(self.input_pointers),
+        }
 
     @property
     def identity_digest(self) -> str:
@@ -138,11 +197,17 @@ class ProjectionSnapshot:
         _require_sha256(self.state_digest, "projection state_digest")
         frozen = _freeze(self.data)
         if digest(_thaw(frozen)) != self.state_digest:
-            raise ValueError(f"projection digest mismatch: {self.projection_id}")
+            raise ValueError(
+                f"projection digest mismatch: {self.projection_id}"
+            )
         object.__setattr__(self, "data", frozen)
 
     def to_dict(self) -> dict[str, object]:
-        return {"projection_id": self.projection_id, "data": _thaw(self.data), "state_digest": self.state_digest}
+        return {
+            "projection_id": self.projection_id,
+            "data": _thaw(self.data),
+            "state_digest": self.state_digest,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,13 +223,29 @@ class OracleEvaluationContext:
     def __post_init__(self) -> None:
         if not self.episode_id:
             raise ValueError("oracle context episode_id must be non-empty")
-        _require_sha256(self.scenario_instance_digest, "scenario_instance_digest")
+        _require_sha256(
+            self.scenario_instance_digest,
+            "scenario_instance_digest",
+        )
         _require_sha256(self.manifest_digest, "manifest_digest")
         object.__setattr__(self, "inputs", _freeze(self.inputs))
-        object.__setattr__(self, "projections", MappingProxyType(dict(sorted(self.projections.items()))))
+        object.__setattr__(
+            self,
+            "projections",
+            MappingProxyType(dict(sorted(self.projections.items()))),
+        )
 
     def to_dict(self) -> dict[str, object]:
-        return {"episode_id": self.episode_id, "scenario_instance_digest": self.scenario_instance_digest, "manifest_digest": self.manifest_digest, "inputs": _thaw(self.inputs), "projections": {key: value.to_dict() for key, value in self.projections.items()}}
+        return {
+            "episode_id": self.episode_id,
+            "scenario_instance_digest": self.scenario_instance_digest,
+            "manifest_digest": self.manifest_digest,
+            "inputs": _thaw(self.inputs),
+            "projections": {
+                key: value.to_dict()
+                for key, value in self.projections.items()
+            },
+        }
 
     @property
     def input_digest(self) -> str:
@@ -182,12 +263,16 @@ class OracleRequest:
             raise ValueError("oracle request_id must be non-empty")
 
     def to_dict(self) -> dict[str, object]:
-        return {"request_id": self.request_id, "package": self.package.to_dict(), "context": self.context.to_dict()}
+        return {
+            "request_id": self.request_id,
+            "package": self.package.to_dict(),
+            "context": self.context.to_dict(),
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class OracleEvidencePayload:
-    """Private worker-to-parent Evidence representation awaiting trusted publication."""
+    """Private worker-to-parent Evidence representation awaiting publication."""
 
     evidence_id: str
     evidence_type: str
@@ -204,14 +289,23 @@ class OracleEvidencePayload:
             raise ValueError("oracle evidence_type must be non-empty")
         if not isinstance(self.content, bytes):
             raise TypeError("oracle evidence content must be bytes")
-        validate_media_type(self.media_type)
-        validate_sha256_digest(self.digest)
+
+        # ArtifactRef is the public validator for digest/media-type/size shape.
+        # Constructing it here validates representation metadata without
+        # publishing worker-controlled bytes into the trusted parent store.
+        ArtifactRef(self.digest, len(self.content), self.media_type)
         if sha256_digest(self.content) != self.digest:
-            raise ValueError(f"oracle evidence digest mismatch: {self.evidence_id}")
+            raise ValueError(
+                f"oracle evidence digest mismatch: {self.evidence_id}"
+            )
         if not isinstance(self.classification, str) or not self.classification:
             raise ValueError("oracle evidence classification must be non-empty")
-        if self.producer is not None and (not isinstance(self.producer, str) or not self.producer):
-            raise ValueError("oracle evidence producer must be non-empty when present")
+        if self.producer is not None and (
+            not isinstance(self.producer, str) or not self.producer
+        ):
+            raise ValueError(
+                "oracle evidence producer must be non-empty when present"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,7 +329,19 @@ class OracleExecutionArtifact:
     output_digest: str | None
 
     def to_dict(self) -> dict[str, object]:
-        return {"request_id": self.request_id, "oracle_package_digest": self.oracle_package_digest, "oracle_code_digest": self.oracle_code_digest, "runner_config_digest": self.runner_config_digest, "input_digest": self.input_digest, "status": self.status.value, "duration_ms": self.duration_ms, "exit_code": self.exit_code, "stdout_digest": self.stdout_digest, "stderr_digest": self.stderr_digest, "output_digest": self.output_digest}
+        return {
+            "request_id": self.request_id,
+            "oracle_package_digest": self.oracle_package_digest,
+            "oracle_code_digest": self.oracle_code_digest,
+            "runner_config_digest": self.runner_config_digest,
+            "input_digest": self.input_digest,
+            "status": self.status.value,
+            "duration_ms": self.duration_ms,
+            "exit_code": self.exit_code,
+            "stdout_digest": self.stdout_digest,
+            "stderr_digest": self.stderr_digest,
+            "output_digest": self.output_digest,
+        }
 
     @property
     def record_digest(self) -> str:
