@@ -1,0 +1,19 @@
+# Exact repository-development resolution captured from the green CI #38 baseline.
+#
+# This file constrains repository CI/development only. It MUST NOT be used when
+# validating downstream wheel installation because consumers resolve against the
+# compatibility ranges declared in pyproject.toml.
+attrs==26.1.0
+build==1.5.0
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-semantic-conventions==0.65b0
+packaging==26.3
+pyproject-hooks==1.2.0
+PyYAML==6.0.3
+referencing==0.37.0
+rpds-py==2026.6.3
+setuptools==80.9.0
+typing-extensions==4.16.0

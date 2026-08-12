@@ -1,0 +1,10 @@
+version: 0.1
+matrix: compatibility
+status: template
+
+requirements: []
+historical_sources: []
+implementation_evidence: []
+schema_artifacts: []
+tck_cases: []
+decision_records: []

@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-EVIDENCE-DIGEST-001
+  domain: evidence
+  status: draft
+profile: avp-evidence-v0.1
+requirements: [AVP-EVIDENCE-001]
+applicability: mandatory
+type: schema-and-semantic
+schema: schemas/artifact-ref.schema.json
+vector:
+  bytesHex: "415650"
+  expectedSize: 3
+  expectedDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+expect:
+  digestComputedOverExactBytes: true
+  lowercaseSha256Encoding: true

@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible AVP protocol, reference runtime, TCK, or tooling defect
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AVP. Do not include secrets or undisclosed vulnerability details; use SECURITY.md for security reports.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Protocol / schema
+        - AVS compiler
+        - Runtime
+        - Environment adapter
+        - Subject adapter
+        - MCP gateway
+        - Telemetry
+        - Oracle runner
+        - TCK / conformance
+        - Packaging / CLI
+        - Documentation / governance
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.x.y or commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What happened? Include the smallest useful error/output with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What observable protocol/runtime behavior did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Provide deterministic steps, scenario input, or minimal code when possible.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Verification impact
+      description: Does this affect task verdicts, validity, evidence, replayability, authority, or conformance?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Reporter checks
+      options:
+        - label: I searched existing issues for the same defect.
+          required: true
+        - label: I removed credentials, private data, and undisclosed exploit details.
+          required: true

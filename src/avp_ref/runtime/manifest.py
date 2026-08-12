@@ -1,0 +1,94 @@
+"""Immutable, reproducibility-oriented Episode manifest."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Mapping
+
+from avp_ref.canonical import digest
+from avp_ref.environment.models import EnvironmentDescription
+from avp_ref.scenario.models import ScenarioInstance
+from avp_ref.subject.models import SubjectDescription
+
+from .agent import AgentSystem
+
+
+def _resolved_reference_digest(scenario: ScenarioInstance, path: str) -> str | None:
+    compilation = scenario.document.get("compilation", {})
+    for item in compilation.get("resolved_references", ()):
+        if item.get("path") == path:
+            return str(item.get("digest"))
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class EpisodeManifest:
+    protocol_version: str
+    runtime_version: str
+    scenario_instance_digest: str
+    scenario_template_digest: str
+    seed_bundle_digest: str
+    agent_system_digest: str
+    environment_ref_digest: str | None
+    environment_adapter_digest: str
+    subject_adapter_digest: str
+    oracle_package_digest: str
+    oracle_runner_config_digest: str
+    mcp_gateway_config_digest: str | None = None
+    telemetry_config_digest: str | None = None
+    resource_manifest_digest: str | None = None
+
+    @classmethod
+    def create(
+        cls,
+        scenario: ScenarioInstance,
+        agent: AgentSystem,
+        environment: EnvironmentDescription,
+        subject: SubjectDescription,
+        runtime_version: str,
+        *,
+        oracle_package_digest: str,
+        oracle_runner_config_digest: str,
+        mcp_gateway_config_digest: str | None = None,
+        telemetry_config_digest: str | None = None,
+        resource_manifest_digest: str | None = None,
+    ) -> "EpisodeManifest":
+        seed_bundle: Mapping[str, Any] = scenario.document.get("compilation", {}).get("seed_bundle", {})
+        return cls(
+            protocol_version=str(scenario.document.get("apiVersion", "avp.spec/v0.1")),
+            runtime_version=runtime_version,
+            scenario_instance_digest=scenario.instance_digest,
+            scenario_template_digest=scenario.template_digest,
+            seed_bundle_digest=digest(dict(seed_bundle)),
+            agent_system_digest=agent.identity_digest,
+            environment_ref_digest=_resolved_reference_digest(scenario, "$.environment.ref"),
+            environment_adapter_digest=environment.identity_digest,
+            subject_adapter_digest=subject.identity_digest,
+            oracle_package_digest=oracle_package_digest,
+            oracle_runner_config_digest=oracle_runner_config_digest,
+            mcp_gateway_config_digest=mcp_gateway_config_digest,
+            telemetry_config_digest=telemetry_config_digest,
+            resource_manifest_digest=resource_manifest_digest,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "protocol_version": self.protocol_version,
+            "runtime_version": self.runtime_version,
+            "scenario_instance_digest": self.scenario_instance_digest,
+            "scenario_template_digest": self.scenario_template_digest,
+            "seed_bundle_digest": self.seed_bundle_digest,
+            "agent_system_digest": self.agent_system_digest,
+            "environment_ref_digest": self.environment_ref_digest,
+            "environment_adapter_digest": self.environment_adapter_digest,
+            "subject_adapter_digest": self.subject_adapter_digest,
+            "oracle_package_digest": self.oracle_package_digest,
+            "oracle_runner_config_digest": self.oracle_runner_config_digest,
+            "mcp_gateway_config_digest": self.mcp_gateway_config_digest,
+            "telemetry_config_digest": self.telemetry_config_digest,
+            "resource_manifest_digest": self.resource_manifest_digest,
+        }
+
+    @property
+    def manifest_digest(self) -> str:
+        return digest(self.to_dict())

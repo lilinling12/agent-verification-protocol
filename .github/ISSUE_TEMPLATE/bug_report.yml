@@ -1,0 +1,25 @@
+name: Bug report
+about: Report a protocol/reference implementation defect
+title: "[bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected AVP behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AVP / implementation version
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction / evidence

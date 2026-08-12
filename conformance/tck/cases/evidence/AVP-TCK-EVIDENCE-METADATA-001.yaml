@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-EVIDENCE-METADATA-001
+  domain: evidence
+  status: draft
+profile: avp-evidence-v0.1
+requirements: [AVP-EVIDENCE-005]
+applicability: mandatory
+type: semantic
+vector:
+  digest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  metadataVariants:
+    - classification: public
+      producer: oracle:a@1
+    - classification: evaluator-confidential
+      producer: oracle:b@2
+      redaction: {policy: pii-v2}
+expect:
+  artifactDigestUnchanged: true

@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-QUIESCING-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-011]
+applicability: mandatory
+type: negative
+vector:
+  precondition: Episode has entered QUIESCING.
+  action: Subject requests a new side-effecting capability invocation.
+expect:
+  invocationStarted: false
+  lifecycleViolation: true
+note: Work accepted before QUIESCING may settle under the applicable Environment/Profile contract.

@@ -1,0 +1,22 @@
+apiVersion: avp.spec/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-VERIFY-EVIDENCE-001
+  profile: AVP-Verification
+  level: MUST
+description: Critical verification Claims must resolve to immutable evidence.
+preconditions:
+  - reference-world
+  - false-success-subject
+steps:
+  - create_episode
+  - reset
+  - start
+  - wait_for_terminal
+  - verify
+assertions:
+  - path: verification.claims.refund_completed.verdict
+    operator: equals
+    value: FAIL
+  - path: verification.claims.refund_completed.evidence
+    operator: not_empty

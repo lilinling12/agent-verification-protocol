@@ -1,0 +1,67 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-evidence-v0.1
+requirements:
+  - id: AVP-EVIDENCE-001
+    level: MUST
+    area: evidence.artifact.identity
+    statement: An Artifact MUST use SHA-256 over exact bytes as its content identity.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-001
+    schema: schemas/artifact-ref.schema.json
+    conformance: [AVP-TCK-EVIDENCE-DIGEST-001]
+  - id: AVP-EVIDENCE-002
+    level: MUST_NOT
+    area: evidence.artifact.locator
+    statement: A locator MUST NOT redefine or replace Artifact content identity.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-002
+    schema: schemas/artifact-ref.schema.json
+    conformance: [AVP-TCK-EVIDENCE-LOCATOR-001]
+  - id: AVP-EVIDENCE-003
+    level: MUST_NOT
+    area: evidence.artifact.representation
+    statement: Storage MUST NOT silently transform content while reporting a digest of different bytes.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-003
+    conformance: [AVP-TCK-EVIDENCE-REPRESENTATION-001]
+  - id: AVP-EVIDENCE-004
+    level: MUST
+    area: evidence.identity
+    statement: Evidence MUST have stable identity distinct from Artifact identity and reference an ArtifactRef.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-004
+    schema: schemas/evidence.schema.json
+    conformance: [AVP-TCK-EVIDENCE-IDENTITY-001]
+  - id: AVP-EVIDENCE-005
+    level: MUST_NOT
+    area: evidence.metadata
+    statement: Evidence metadata MUST NOT alter Artifact digest for identical bytes.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-005
+    schema: schemas/evidence.schema.json
+    conformance: [AVP-TCK-EVIDENCE-METADATA-001]
+  - id: AVP-EVIDENCE-006
+    level: MUST
+    area: evidence.integrity
+    statement: Dereferenced bytes used for verification MUST match declared size and SHA-256 digest.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-006
+    schema: schemas/artifact-ref.schema.json
+    conformance: [AVP-TCK-EVIDENCE-INTEGRITY-001]
+  - id: AVP-EVIDENCE-007
+    level: MUST_NOT
+    area: evidence.artifact.immutability
+    statement: Published Artifact bytes MUST NOT be mutated in place under the same digest.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-007
+    conformance: [AVP-TCK-EVIDENCE-IMMUTABILITY-001]
+  - id: AVP-EVIDENCE-008
+    level: SHOULD
+    area: evidence.transport
+    statement: Large or sensitive evidence SHOULD be transported by reference.
+    spec: spec/evidence/evidence-artifact-identity.md
+    anchor: avp-evidence-008
+    schema: schemas/evidence.schema.json
+    conformance: []
+    conformance_rationale: Non-blocking transport recommendation; profile conformance is not failed solely for choosing another permitted representation.

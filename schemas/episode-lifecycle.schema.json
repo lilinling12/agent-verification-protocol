@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:episode-lifecycle:0.1",
+  "title": "AVP Episode Lifecycle Transition",
+  "description": "Machine-readable shape for an AVP Core Episode lifecycle transition. Transition legality is defined by the AVP specification and TCK, not by JSON Schema.",
+  "type": "object",
+  "required": ["episodeId", "sequence", "previousState", "resultingState", "cause"],
+  "properties": {
+    "episodeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previousState": {"$ref": "#/$defs/episodeState"},
+    "resultingState": {"$ref": "#/$defs/episodeState"},
+    "cause": {"$ref": "#/$defs/transitionCause"},
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "episodeState": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "PROVISIONING",
+        "READY",
+        "RUNNING",
+        "PAUSED",
+        "QUIESCING",
+        "VERIFYING",
+        "COMPLETED",
+        "ABORTED",
+        "INVALID",
+        "INFRA_FAILED"
+      ]
+    },
+    "transitionCause": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

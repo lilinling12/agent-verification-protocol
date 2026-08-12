@@ -1,0 +1,30 @@
+# CODEOWNERS is intentionally explicit while AVP has one active maintainer.
+# Replace individual ownership with scoped teams as the maintainer group grows.
+
+* @lilinling12
+
+# Protect repository policy and ownership declarations.
+/.github/ @lilinling12
+/GOVERNANCE.md @lilinling12
+/SECURITY.md @lilinling12
+/CONTRIBUTING.md @lilinling12
+/repository-boundaries.json @lilinling12
+/docs/ARCHITECTURE_BOUNDARIES.md @lilinling12
+
+# Normative protocol surfaces.
+/spec/ @lilinling12
+/rfcs/ @lilinling12
+/schemas/ @lilinling12
+
+# Conformance and public evaluation surfaces.
+/conformance/ @lilinling12
+/benchmarks/ @lilinling12
+
+# Reference implementation distribution boundaries.
+/runtime/ @lilinling12
+/adapters/ @lilinling12
+
+# Privileged evaluator implementation boundaries.
+/src/avp_ref/runtime/ @lilinling12
+/src/avp_ref/oracle_runner/ @lilinling12
+/src/avp_ref/mcp/ @lilinling12

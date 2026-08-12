@@ -1,0 +1,16 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-EVIDENCE-REPRESENTATION-001
+  domain: evidence
+  status: draft
+profile: avp-evidence-v0.1
+requirements: [AVP-EVIDENCE-003]
+applicability: mandatory
+type: negative
+vector:
+  firstBytesHex: "7b2261223a312c2262223a327d"
+  secondBytesHex: "7b2262223a322c2261223a317d"
+expect:
+  storageDoesNotCanonicalizeImplicitly: true
+  differentBytesRequireOwnDigest: true

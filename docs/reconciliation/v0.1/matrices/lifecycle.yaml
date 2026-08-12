@@ -1,0 +1,35 @@
+matrix_version: "1.1"
+domain: lifecycle
+status: promoted-draft
+historical_sources:
+  - baseline: avp-design-alpha-v0.1
+    document: docs/spec/03-agent-verification-protocol.md
+    preserved_sha256: 73a9c43c91a54f23d7b5cdb0772ca497130ee5293979b7b66047f204313bc92f
+implementation_evidence:
+  - src/avp_ref/runtime/state.py
+  - src/avp_ref/runtime/episode.py
+normative_target:
+  - spec/core/episode-lifecycle.md
+  - spec/core/terminology.md
+requirement_index: spec/core/requirement-index.yaml
+schema_artifacts:
+  - schemas/episode-lifecycle.schema.json
+decision_records:
+  - docs/reconciliation/v0.1/decisions/episode-lifecycle-001.md
+semantic_drift:
+  - source: src/avp_ref/runtime/state.py
+    observation: The reference implementation currently labels its Python state-machine module as normative.
+    resolution: Reference code is implementation evidence only; wording will be corrected in the later implementation-alignment PR.
+  - source: historical-design
+    observation: Historical documents mix product execution phases with protocol concepts in places.
+    resolution: Core promotes only observable verification semantics and explicitly excludes scheduler topology.
+conformance_required:
+  - AVP-TCK-LIFECYCLE-NORMAL-001
+  - AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001
+  - AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001
+  - AVP-TCK-LIFECYCLE-ILLEGAL-001
+  - AVP-TCK-LIFECYCLE-TERMINAL-001
+  - AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001
+  - AVP-TCK-LIFECYCLE-QUIESCING-001
+  - AVP-TCK-LIFECYCLE-REPLAY-001
+  - AVP-TCK-LIFECYCLE-PAUSE-001

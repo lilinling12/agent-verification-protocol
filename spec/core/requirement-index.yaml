@@ -1,0 +1,91 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-core-v0.1
+requirements:
+  - id: AVP-CORE-001
+    level: MUST
+    area: episode.lifecycle
+    statement: An Episode MUST have exactly one AVP lifecycle state at every observable instant.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-001
+    conformance: [AVP-TCK-LIFECYCLE-NORMAL-001]
+  - id: AVP-CORE-002
+    level: MUST
+    area: episode.transition
+    statement: Every observable lifecycle state change MUST produce an Episode-local ordered transition record.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-002
+    conformance: [AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001]
+  - id: AVP-CORE-003
+    level: MUST
+    area: episode.identity
+    statement: An Episode MUST retain one stable Episode identifier for its lifetime.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-003
+    conformance: [AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001]
+  - id: AVP-CORE-004
+    level: MUST
+    area: episode.transition
+    statement: A transition record MUST contain episode identity, monotonic sequence, previous/resulting states, and a cause code.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-004
+    schema: schemas/episode-lifecycle.schema.json
+    conformance: [AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001]
+  - id: AVP-CORE-005
+    level: MUST_NOT
+    area: episode.termination
+    statement: A terminal Episode MUST NOT transition to any other lifecycle state.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-005
+    conformance: [AVP-TCK-LIFECYCLE-TERMINAL-001]
+  - id: AVP-CORE-006
+    level: MUST
+    area: episode.result-separation
+    statement: An implementation MUST represent lifecycle state, Task Verdict, and Validity as distinct protocol dimensions.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-006
+    conformance: [AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001]
+  - id: AVP-CORE-007
+    level: MUST
+    area: episode.replay
+    statement: A replayed Episode MUST have a new identity and preserve an explicit reference to its source Episode.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-007
+    conformance: [AVP-TCK-LIFECYCLE-REPLAY-001]
+  - id: AVP-CORE-008
+    level: MUST
+    area: episode.lifecycle
+    statement: A conforming Core implementation MUST support an unambiguous projection onto all required Core states.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-008
+    schema: schemas/episode-lifecycle.schema.json
+    conformance: [AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001]
+  - id: AVP-CORE-009
+    level: MUST
+    area: episode.transition
+    statement: An implementation MUST reject or classify as protocol-invalid transitions not permitted by the negotiated lifecycle relation.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-009
+    conformance: [AVP-TCK-LIFECYCLE-ILLEGAL-001, AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001]
+  - id: AVP-CORE-010
+    level: MUST_NOT
+    area: episode.result-separation
+    statement: Lifecycle terminal states MUST NOT be interpreted as Task Verdict values.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-010
+    conformance: [AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001]
+  - id: AVP-CORE-011
+    level: MUST_NOT
+    area: episode.quiescing
+    statement: After entering QUIESCING an implementation MUST NOT initiate a new Subject-requested side effect for that Episode.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-011
+    conformance: [AVP-TCK-LIFECYCLE-QUIESCING-001]
+  - id: AVP-CORE-012
+    level: MUST
+    condition: pause-capability-advertised
+    area: episode.pause
+    statement: A pause-capable implementation MUST use only the Core pause transitions defined by the lifecycle relation.
+    spec: spec/core/episode-lifecycle.md
+    anchor: avp-core-012
+    conformance: [AVP-TCK-LIFECYCLE-PAUSE-001]

@@ -1,0 +1,14 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-LIFECYCLE-TERMINAL-001
+  domain: lifecycle
+  status: draft
+profile: avp-core-v0.1
+requirements: [AVP-CORE-005]
+applicability: mandatory
+type: negative
+vector:
+  terminalStates: [COMPLETED, ABORTED, INVALID, INFRA_FAILED]
+expect:
+  everyOutboundTransitionRejected: true

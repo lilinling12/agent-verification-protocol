@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:artifact-ref:0.1",
+  "title": "AVP Artifact Reference",
+  "description": "Reference to immutable Artifact bytes. Digest identity is over exact bytes; URI is locator metadata.",
+  "type": "object",
+  "required": ["digest", "size", "mediaType"],
+  "properties": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mediaType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "uri": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
