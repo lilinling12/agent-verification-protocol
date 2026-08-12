@@ -1,0 +1,13 @@
+apiVersion: avp.spec/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-core-v0.1
+  version: 0.1.0
+profile:
+  requires:
+    - AVP-CORE-001
+    - AVP-CORE-002
+    - AVP-CORE-005
+    - AVP-CORE-006
+    - AVP-CORE-009
+  tckDomain: lifecycle
