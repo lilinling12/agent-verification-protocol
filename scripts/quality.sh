@@ -9,6 +9,9 @@ python -m compileall -q src tests scripts
 echo "== Dependency policy =="
 python scripts/validate_dependencies.py
 
+echo "== Release metadata =="
+python scripts/validate_release_metadata.py
+
 echo "== Unit tests =="
 python -m unittest discover -s tests -v
 

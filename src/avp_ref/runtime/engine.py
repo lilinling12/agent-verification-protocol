@@ -12,6 +12,7 @@ import uuid
 from dataclasses import replace
 from typing import Any, Mapping
 
+from avp_ref._version import __version__ as _RUNTIME_VERSION
 from avp_ref.artifacts import ArtifactStore, ArtifactStoreError, InMemoryArtifactStore
 from avp_ref.canonical import digest
 from avp_ref.environment import (
@@ -58,8 +59,6 @@ from .agent import AgentSystem
 from .episode import Episode
 from .manifest import EpisodeManifest
 from .state import EpisodeState, InvalidEpisodeTransition
-
-_RUNTIME_VERSION = "0.3.0-alpha.1"
 
 
 class SubjectSession:

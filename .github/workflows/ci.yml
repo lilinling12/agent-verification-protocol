@@ -60,11 +60,24 @@ jobs:
         run: python -m pip check
       - name: Build source and wheel distributions
         run: python -m build
+      - name: Validate built-wheel metadata
+        run: python scripts/validate_release_metadata.py --wheel dist/*.whl
       - name: Install wheel in an unconstrained clean environment
         run: |
           python -m venv .wheel-venv
           .wheel-venv/bin/python -m pip install dist/*.whl
           .wheel-venv/bin/python -m pip check
+      - name: Verify installed-wheel identity
+        run: |
+          .wheel-venv/bin/python - <<'PY'
+          from importlib.metadata import version
+          from avp_ref import __version__
+          from avp_ref.runtime import ReferenceRuntime
+
+          assert version("avp-reference") == __version__
+          assert ReferenceRuntime().capabilities()["implementation"]["version"] == __version__
+          print(f"installed-wheel identity OK: avp-reference {__version__}")
+          PY
       - name: Installed-wheel reference smoke
         run: .wheel-venv/bin/avp conformance
       - name: Installed-wheel TCK smoke
