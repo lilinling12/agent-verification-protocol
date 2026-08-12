@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 from typing import Mapping
 
-from avp_ref.canonical import digest
-from avp_ref.models import Evidence, Validity, VerificationResult
+from avp_ref.artifacts import sha256_digest
+from avp_ref.models import Validity, VerificationResult
 
 from .errors import OracleProtocolError
-from .models import OracleEvaluationContext, OracleEvaluationOutput, OraclePackage, OracleRequest, ProjectionSnapshot
+from .models import OracleEvaluationContext, OracleEvaluationOutput, OracleEvidencePayload, OraclePackage, OracleRequest, ProjectionSnapshot
 
-PROTOCOL_VERSION = "avp.oracle/v1"
+PROTOCOL_VERSION = "avp.oracle/v2"
 
 
 def _json_bytes(value: Mapping[str, object]) -> bytes:
@@ -63,26 +65,26 @@ def encode_success(request_id: str, output: OracleEvaluationOutput, *, max_bytes
     for item in output.evidence:
         if item.evidence_id in evidence_ids:
             raise OracleProtocolError(f"duplicate Oracle evidence id: {item.evidence_id}")
-        if digest(item.data) != item.digest:
+        if sha256_digest(item.content) != item.digest:
             raise OracleProtocolError(f"Oracle evidence digest mismatch: {item.evidence_id}")
         evidence_ids.add(item.evidence_id)
-        evidence_payload.append({"evidence_id": item.evidence_id, "kind": item.kind, "data": item.data, "digest": item.digest, "classification": item.classification})
+        encoded: dict[str, object] = {
+            "evidence_id": item.evidence_id,
+            "type": item.evidence_type,
+            "media_type": item.media_type,
+            "digest": item.digest,
+            "content_base64": base64.b64encode(item.content).decode("ascii"),
+            "classification": item.classification,
+        }
+        if item.producer is not None:
+            encoded["producer"] = item.producer
+        evidence_payload.append(encoded)
     results_payload: list[dict[str, object]] = []
     for item in output.results:
         missing = set(item.evidence_ids) - evidence_ids
         if missing:
             raise OracleProtocolError(f"verification result references missing evidence: {sorted(missing)}")
-        results_payload.append({
-            "claim_id": item.claim_id,
-            "dimension": item.dimension,
-            "verdict": item.verdict,
-            "severity": item.severity,
-            "method": item.method,
-            "evaluator_version": item.evaluator_version,
-            "evidence_ids": list(item.evidence_ids),
-            "confidence": item.confidence,
-            "validity": item.validity.value,
-        })
+        results_payload.append({"claim_id": item.claim_id, "dimension": item.dimension, "verdict": item.verdict, "severity": item.severity, "method": item.method, "evaluator_version": item.evaluator_version, "evidence_ids": list(item.evidence_ids), "confidence": item.confidence, "validity": item.validity.value})
     frame = _json_bytes({"protocol": PROTOCOL_VERSION, "request_id": request_id, "status": "SUCCESS", "results": results_payload, "evidence": evidence_payload})
     if len(frame) > max_bytes:
         raise OracleProtocolError("Oracle response exceeds configured frame limit")
@@ -97,16 +99,37 @@ def decode_success(frame: bytes, *, expected_request_id: str, max_bytes: int) ->
     results_raw = raw.get("results")
     if not isinstance(evidence_raw, list) or not isinstance(results_raw, list):
         raise OracleProtocolError("Oracle response results/evidence must be arrays")
-    evidence: list[Evidence] = []
+    evidence: list[OracleEvidencePayload] = []
     evidence_ids: set[str] = set()
     for raw_item in evidence_raw:
         item = _mapping(raw_item, "evidence item")
         evidence_id = _string(item.get("evidence_id"), "evidence_id")
+        if evidence_id in evidence_ids:
+            raise OracleProtocolError(f"duplicate Oracle evidence id: {evidence_id}")
+        try:
+            content = base64.b64decode(
+                _string(item.get("content_base64"), "evidence.content_base64"),
+                validate=True,
+            )
+        except (binascii.Error, ValueError) as exc:
+            raise OracleProtocolError("Oracle evidence content is not valid canonical base64") from exc
         item_digest = _string(item.get("digest"), "evidence.digest")
-        if evidence_id in evidence_ids or digest(item.get("data")) != item_digest:
-            raise OracleProtocolError("Oracle evidence is duplicated or has an invalid digest")
+        if sha256_digest(content) != item_digest:
+            raise OracleProtocolError(f"Oracle evidence digest mismatch: {evidence_id}")
+        try:
+            payload = OracleEvidencePayload(
+                evidence_id=evidence_id,
+                evidence_type=_string(item.get("type"), "evidence.type"),
+                content=content,
+                media_type=_string(item.get("media_type"), "evidence.media_type"),
+                digest=item_digest,
+                classification=_string(item.get("classification", "evaluator-confidential"), "evidence.classification"),
+                producer=_optional_string(item.get("producer"), "evidence.producer"),
+            )
+        except (TypeError, ValueError) as exc:
+            raise OracleProtocolError(f"invalid Oracle evidence payload: {evidence_id}") from exc
         evidence_ids.add(evidence_id)
-        evidence.append(Evidence(evidence_id, _string(item.get("kind"), "evidence.kind"), item.get("data"), item_digest, _string(item.get("classification", "evaluator-confidential"), "evidence.classification")))
+        evidence.append(payload)
     results: list[VerificationResult] = []
     for raw_item in results_raw:
         item = _mapping(raw_item, "result item")
@@ -123,17 +146,7 @@ def decode_success(frame: bytes, *, expected_request_id: str, max_bytes: int) ->
             validity = Validity(_string(item.get("validity", Validity.VALID.value), "result.validity"))
         except ValueError as exc:
             raise OracleProtocolError("Oracle result validity is unknown") from exc
-        results.append(VerificationResult(
-            _string(item.get("claim_id"), "result.claim_id"),
-            _string(item.get("dimension"), "result.dimension"),
-            verdict,
-            _string(item.get("severity"), "result.severity"),
-            _string(item.get("method"), "result.method"),
-            _string(item.get("evaluator_version"), "result.evaluator_version"),
-            refs,
-            float(confidence),
-            validity,
-        ))
+        results.append(VerificationResult(_string(item.get("claim_id"), "result.claim_id"), _string(item.get("dimension"), "result.dimension"), verdict, _string(item.get("severity"), "result.severity"), _string(item.get("method"), "result.method"), _string(item.get("evaluator_version"), "result.evaluator_version"), refs, float(confidence), validity))
     return OracleEvaluationOutput(tuple(results), tuple(evidence))
 
 
@@ -164,6 +177,12 @@ def _string(value: object, label: str) -> str:
     if not isinstance(value, str) or not value:
         raise OracleProtocolError(f"{label} must be a non-empty string")
     return value
+
+
+def _optional_string(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    return _string(value, label)
 
 
 def _string_list(value: object, label: str) -> list[str]:

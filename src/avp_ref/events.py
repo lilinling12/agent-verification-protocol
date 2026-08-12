@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from .models import AVPEvent, Evidence
+from .models import AVPEvent
 
 
 class EventRecorder:
+    """Append observable AVP events and forward them to optional telemetry."""
+
     def __init__(self, episode):
         self.episode = episode
 
@@ -24,15 +26,4 @@ class EventRecorder:
         telemetry = self.episode.telemetry
         if telemetry is not None:
             telemetry.record_event(event)
-            artifact = telemetry.artifact
-            if artifact is not None:
-                evidence_id = f"ev_{self.episode.episode_id}_telemetry"
-                if evidence_id not in self.episode.evidence:
-                    self.episode.evidence[evidence_id] = Evidence(
-                        evidence_id,
-                        "telemetry_artifact",
-                        artifact.to_dict(),
-                        artifact.artifact_digest,
-                        classification="evaluator-confidential",
-                    )
         return event

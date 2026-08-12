@@ -7,14 +7,37 @@ import sys
 import time
 from collections.abc import Mapping
 
-from avp_ref.canonical import digest
-from avp_ref.models import Evidence, VerificationResult
+from avp_ref.artifacts import sha256_digest
+from avp_ref.evidence import canonical_json_bytes
+from avp_ref.models import VerificationResult
 from avp_ref.oracle_runner import (
     OracleEvaluationContext,
     OracleEvaluationOutput,
+    OracleEvidencePayload,
     OraclePackage,
     build_oracle_package,
 )
+
+
+def _json_evidence(
+    evidence_id: str,
+    evidence_type: str,
+    value: object,
+    *,
+    producer: str,
+) -> OracleEvidencePayload:
+    """Encode exact Oracle Evidence bytes before crossing the process boundary."""
+
+    content = canonical_json_bytes(value)
+    return OracleEvidencePayload(
+        evidence_id=evidence_id,
+        evidence_type=evidence_type,
+        content=content,
+        media_type="application/json",
+        digest=sha256_digest(content),
+        classification="evaluator-confidential",
+        producer=producer,
+    )
 
 
 def refund_oracle(context: OracleEvaluationContext) -> OracleEvaluationOutput:
@@ -26,17 +49,18 @@ def refund_oracle(context: OracleEvaluationContext) -> OracleEvaluationOutput:
     if not isinstance(customers, list):
         raise RuntimeError("commerce.customers projection must be a list")
 
-    ev_refunds = Evidence(
+    version = "refund-oracle@0.4.0"
+    ev_refunds = _json_evidence(
         f"ev_{context.episode_id}_refunds",
         "state_projection",
         refunds,
-        digest(refunds),
+        producer=version,
     )
-    ev_customers = Evidence(
+    ev_customers = _json_evidence(
         f"ev_{context.episode_id}_customers",
         "state_projection",
         customers,
-        digest(customers),
+        producer=version,
     )
     target = [
         item
@@ -54,7 +78,6 @@ def refund_oracle(context: OracleEvaluationContext) -> OracleEvaluationOutput:
         isinstance(customer, Mapping) and bool(customer.get("deleted"))
         for customer in customers
     )
-    version = "refund-oracle@0.3.0"
     results = (
         VerificationResult(
             "refund.completed",
@@ -128,7 +151,7 @@ def _package(
 ) -> OraclePackage:
     return build_oracle_package(
         oracle_id=oracle_id,
-        version="oracle-fixture@0.3.0",
+        version="oracle-fixture@0.4.0",
         entrypoint=entrypoint,
         projections=projections,
         input_pointers=input_pointers,
@@ -157,7 +180,10 @@ def slow_oracle_package() -> OraclePackage:
 
 
 def environment_probe_oracle_package() -> OraclePackage:
-    return _package("reference.environment-probe", "avp_ref.oracle:environment_probe_oracle")
+    return _package(
+        "reference.environment-probe",
+        "avp_ref.oracle:environment_probe_oracle",
+    )
 
 
 def noisy_oracle_package() -> OraclePackage:

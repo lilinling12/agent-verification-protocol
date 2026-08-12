@@ -27,7 +27,7 @@ from .models import (
 from .package import module_code_digest, parse_entrypoint
 from .protocol import PROTOCOL_VERSION, decode_success, encode_request
 
-_RUNNER_VERSION = "0.2.0-alpha.7"
+_RUNNER_VERSION = "0.2.0-alpha.8"
 _PROTOCOL_EXIT = 65
 _ORACLE_CRASH_EXIT = 70
 _SECURITY_EXIT = 77
@@ -38,8 +38,8 @@ class SubprocessOracleRunner:
     """Reference process boundary for evaluator-owned Oracle code.
 
     The subprocess receives a sanitized environment and a temporary working
-    directory. On POSIX, the worker applies rlimits before importing the Oracle.
-    This is intentionally not described as a network/filesystem sandbox.
+    directory. POSIX resource limits are applied when configured, but this
+    implementation does not claim network or filesystem sandboxing.
     """
 
     def __init__(
@@ -49,13 +49,19 @@ class SubprocessOracleRunner:
         worker_module: str = "avp_ref.oracle_worker",
         allowed_module_prefixes: tuple[str, ...] = ("avp_ref.",),
     ) -> None:
-        self.policy = policy or OracleSandboxPolicy(enforce_resource_limits=(os.name == "posix"))
+        self.policy = policy or OracleSandboxPolicy(
+            enforce_resource_limits=(os.name == "posix")
+        )
         if not worker_module or not allowed_module_prefixes:
-            raise OracleConfigurationError("worker_module and allowed_module_prefixes must be configured")
+            raise OracleConfigurationError(
+                "worker_module and allowed_module_prefixes must be configured"
+            )
         self.worker_module = worker_module
         self.allowed_module_prefixes = tuple(sorted(set(allowed_module_prefixes)))
         if self.policy.enforce_resource_limits and os.name != "posix":
-            raise OracleSecurityError("POSIX resource limits were required on a platform that cannot enforce them")
+            raise OracleSecurityError(
+                "POSIX resource limits were required on a platform that cannot enforce them"
+            )
 
     def describe(self) -> OracleRunnerDescription:
         return OracleRunnerDescription(
@@ -74,7 +80,9 @@ class SubprocessOracleRunner:
     def evaluate(self, request: OracleRequest) -> OracleExecutionResult:
         module_name, _ = parse_entrypoint(request.package.entrypoint)
         if not self._module_allowed(module_name):
-            raise OracleSecurityError(f"Oracle module is outside runner allowlist: {module_name}")
+            raise OracleSecurityError(
+                f"Oracle module is outside runner allowlist: {module_name}"
+            )
         frame = encode_request(request, max_bytes=self.policy.max_request_bytes)
         started = time.monotonic()
         status = OracleExecutionStatus.CRASHED
@@ -101,10 +109,12 @@ class SubprocessOracleRunner:
             termination = self._wait_bounded(process, stdout_file, stderr_file)
             return_code = process.returncode
             stdout_bytes, stdout_digest, stdout_oversized = self._read_and_digest(
-                stdout_file, self.policy.max_response_bytes
+                stdout_file,
+                self.policy.max_response_bytes,
             )
             _, stderr_digest, stderr_oversized = self._read_and_digest(
-                stderr_file, self.policy.max_file_bytes
+                stderr_file,
+                self.policy.max_file_bytes,
             )
 
             if termination == "timeout":
@@ -223,7 +233,10 @@ class SubprocessOracleRunner:
         return os.fstat(file_object.fileno()).st_size
 
     @staticmethod
-    def _read_and_digest(file_object: BinaryIO, capture_limit: int) -> tuple[bytes, str, bool]:
+    def _read_and_digest(
+        file_object: BinaryIO,
+        capture_limit: int,
+    ) -> tuple[bytes, str, bool]:
         file_object.seek(0)
         hasher = hashlib.sha256()
         captured = bytearray()
@@ -280,9 +293,11 @@ class SubprocessOracleRunner:
                 "evidence": [
                     {
                         "evidence_id": item.evidence_id,
-                        "kind": item.kind,
+                        "type": item.evidence_type,
+                        "media_type": item.media_type,
                         "digest": item.digest,
                         "classification": item.classification,
+                        "producer": item.producer,
                     }
                     for item in output.evidence
                 ],
