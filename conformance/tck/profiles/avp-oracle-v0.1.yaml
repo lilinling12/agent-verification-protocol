@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-oracle-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-ORACLE-001
+    - AVP-ORACLE-002
+    - AVP-ORACLE-003
+    - AVP-ORACLE-004
+    - AVP-ORACLE-005
+    - AVP-ORACLE-006
+    - AVP-ORACLE-007
+  conditional: []

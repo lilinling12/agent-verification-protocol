@@ -1,0 +1,60 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-oracle-v0.1
+requirements:
+  - id: AVP-ORACLE-001
+    level: MUST
+    area: oracle.identity
+    statement: Every Oracle evaluation MUST bind a stable Oracle identifier, version, and immutable package digest.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-001
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-IDENTITY-001]
+  - id: AVP-ORACLE-002
+    level: MUST
+    area: oracle.input.scope
+    statement: An Oracle MUST receive only declared evaluation inputs/projections/Evidence capabilities and MUST NOT receive unrestricted live runtime handles.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-002
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-INPUT-SCOPE-001]
+  - id: AVP-ORACLE-003
+    level: MUST
+    area: oracle.input.integrity
+    statement: Oracle inputs MUST be integrity-bound to the relevant Episode and Oracle identities so substitution is detectable.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-003
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-IDENTITY-001, AVP-TCK-ORACLE-INPUT-SCOPE-001]
+  - id: AVP-ORACLE-004
+    level: MUST_NOT
+    area: oracle.failure.task-separation
+    statement: Oracle execution failure MUST NOT by itself produce task FAIL; a blocked evaluation MUST be INCONCLUSIVE and invalid.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-004
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-FAILURE-SEPARATION-001]
+  - id: AVP-ORACLE-005
+    level: MUST
+    area: oracle.failure.validity
+    statement: Oracle execution failure MUST use top-level ORACLE_FAILURE and preserve a non-empty validityDetail.code when the cause is known.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-005
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-FAILURE-SEPARATION-001]
+  - id: AVP-ORACLE-006
+    level: MUST_NOT
+    area: oracle.result.evidence-integrity
+    statement: Oracle results MUST NOT be accepted when referenced Evidence is missing or integrity-invalid.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-006
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001]
+  - id: AVP-ORACLE-007
+    level: MUST
+    area: oracle.execution.audit
+    statement: A verifier MUST preserve an immutable auditable record binding Oracle/package identity, input identity, execution outcome, and accepted results.
+    spec: spec/oracle/oracle-evaluation-contract.md
+    anchor: avp-oracle-007
+    schema: schemas/oracle-evaluation.schema.json
+    conformance: [AVP-TCK-ORACLE-IDENTITY-001]

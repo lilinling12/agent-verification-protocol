@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ORACLE-FAILURE-SEPARATION-001
+  domain: oracle
+  status: draft
+profile: avp-oracle-v0.1
+requirements: [AVP-ORACLE-004, AVP-ORACLE-005]
+applicability: mandatory
+type: negative
+vector:
+  failures:
+    - executionStatus: TIMEOUT
+      expectedDetailCode: ORACLE_TIMEOUT
+    - executionStatus: CRASHED
+      expectedDetailCode: ORACLE_CRASH
+    - executionStatus: PROTOCOL_ERROR
+      expectedDetailCode: ORACLE_PROTOCOL_ERROR
+    - executionStatus: SECURITY_VIOLATION
+      expectedDetailCode: ORACLE_SECURITY_VIOLATION
+expect:
+  evaluationValidity: ORACLE_FAILURE
+  taskVerdict: INCONCLUSIVE
+  episodeInvalid: true
+  detailPreserved: true

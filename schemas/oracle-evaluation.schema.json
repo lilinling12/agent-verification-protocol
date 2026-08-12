@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avp.dev/schemas/oracle-evaluation.schema.json",
+  "title": "AVP Oracle Evaluation Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["oracle", "inputDigest", "evaluationValidity", "taskVerdict"],
+  "properties": {
+    "oracle": {"$ref": "#/$defs/oracleIdentity"},
+    "inputDigest": {"$ref": "#/$defs/sha256"},
+    "executionRecordDigest": {"$ref": "#/$defs/sha256"},
+    "evaluationValidity": {
+      "type": "string",
+      "enum": ["VALID", "ORACLE_FAILURE"]
+    },
+    "validityDetail": {"$ref": "#/$defs/validityDetail"},
+    "taskVerdict": {
+      "type": "string",
+      "enum": ["PASS", "PARTIAL", "FAIL", "INCONCLUSIVE"]
+    },
+    "evidenceIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"evaluationValidity": {"const": "ORACLE_FAILURE"}}, "required": ["evaluationValidity"]},
+      "then": {
+        "required": ["validityDetail"],
+        "properties": {"taskVerdict": {"const": "INCONCLUSIVE"}}
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "oracleIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oracleId", "version", "packageDigest"],
+      "properties": {
+        "oracleId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "packageDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "validityDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 512},
+        "evidenceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        }
+      }
+    }
+  }
+}
