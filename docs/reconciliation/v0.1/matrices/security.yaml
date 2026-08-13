@@ -1,6 +1,6 @@
 version: "0.1"
 matrix: security
-status: proposed
+status: normative-candidate
 
 domain: security-boundary
 
@@ -13,6 +13,7 @@ authority_chain:
     - docs/reconciliation/v0.1/decisions/security-boundary-001.md
   normative:
     - rfcs/AEP-0002-security-boundary-contract.md
+    - spec/security/security-boundary-contract.md
 
 requirements:
   - AVP-SECURITY-001
@@ -22,19 +23,23 @@ requirements:
   - AVP-SECURITY-005
   - AVP-SECURITY-006
 
-historical_sources:
-  - threat-model
-  - architecture
+schema_artifacts:
+  - schemas/security-assurance.schema.json
+
+tck_cases:
+  - AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
+  - AVP-TCK-SECURITY-CAPABILITY-DENY-001
+  - AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001
+  - AVP-TCK-SECURITY-HIDDEN-MATERIAL-001
+  - AVP-TCK-SECURITY-FAULT-SECRECY-001
+  - AVP-TCK-SECURITY-ASSURANCE-HONESTY-001
 
 implementation_evidence:
   - src/avp_ref/runtime/engine.py
   - src/avp_ref/subject/adapter.py
   - SECURITY.md
 
-schema_artifacts: []
-tck_cases: []
-decision_records: []
-
 note: >-
-  This matrix is intentionally proposed. Security semantics require reconciliation
-  and TCK coverage before promotion.
+  Runtime evidence is intentionally separated from deployment security claims.
+  The reference runtime may prove API-level semantics but must not claim
+  hardened sandbox properties without additional evidence.
