@@ -1,6 +1,6 @@
 matrix_version: "1.0"
 domain: oracle
-status: promoted-draft
+status: accepted
 historical_sources:
   - baseline: avp-design-alpha-v0.1
     document: docs/spec/03-agent-verification-protocol.md

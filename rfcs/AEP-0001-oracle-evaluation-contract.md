@@ -1,8 +1,9 @@
 # AEP-0001 — Oracle Evaluation Contract v0.1
 
-- Status: Proposed
+- Status: Accepted
 - Authors: AVP maintainers
 - Created: 2026-08-13
+- Accepted: 2026-08-13
 - Target AVP version: 0.1
 
 ## Problem

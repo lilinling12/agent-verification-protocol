@@ -1,6 +1,6 @@
 # Oracle Evaluation Contract Reconciliation Decision 001
 
-Status: Proposed for the AVP v0.1 draft candidate.
+Status: Accepted for the AVP v0.1 draft candidate on 2026-08-13.
 
 ## Context
 
