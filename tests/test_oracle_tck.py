@@ -9,7 +9,13 @@ from jsonschema import Draft202012Validator
 
 from avp_ref.artifacts import sha256_digest
 from avp_ref.models import TaskVerdict, Validity, ValidityDetail, VerificationResult
-from avp_ref.oracle_runner import OracleEvaluationRecord
+from avp_ref.oracle_runner import (
+    OracleEvaluationRecord,
+    OracleExecutionArtifact,
+    OracleExecutionResult,
+    OracleExecutionStatus,
+    oracle_output_digest,
+)
 from avp_ref.tck_adapter import TCKRepository, TCKRunner, TCKStatus
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +58,54 @@ class ReferenceOracleTCKTest(unittest.TestCase):
             ValidityDetail("ORACLE_CRASH", evidence_ids=("ev_1", "ev_1"))
         with self.assertRaises(ValueError):
             ValidityDetail("ORACLE_CRASH", message="x" * 513)
+
+    def test_oracle_execution_result_detaches_mutable_runner_collections(self) -> None:
+        verification = VerificationResult(
+            "oracle.audit.bound",
+            "state.postcondition",
+            "PASS",
+            "critical",
+            "oracle_tck",
+            "0.1.0",
+        )
+        runner_results = [verification]
+        runner_evidence: list[object] = []
+        output_digest = oracle_output_digest(
+            tuple(runner_results),
+            tuple(runner_evidence),
+        )
+        artifact = OracleExecutionArtifact(
+            request_id="oracle_req_test",
+            oracle_package_digest=sha256_digest(b"package"),
+            oracle_code_digest=sha256_digest(b"code"),
+            runner_config_digest=sha256_digest(b"runner"),
+            input_digest=sha256_digest(b"input"),
+            status=OracleExecutionStatus.SUCCESS,
+            duration_ms=1,
+            exit_code=0,
+            stdout_digest=sha256_digest(b""),
+            stderr_digest=sha256_digest(b""),
+            output_digest=output_digest,
+        )
+        execution = OracleExecutionResult(
+            request_id="oracle_req_test",
+            status=OracleExecutionStatus.SUCCESS,
+            results=runner_results,  # type: ignore[arg-type]
+            evidence=runner_evidence,  # type: ignore[arg-type]
+            artifact=artifact,
+        )
+
+        runner_results.clear()
+        runner_evidence.append(object())
+
+        self.assertIsInstance(execution.results, tuple)
+        self.assertIsInstance(execution.evidence, tuple)
+        self.assertEqual((verification,), execution.results)
+        self.assertEqual((), execution.evidence)
+        self.assertEqual(
+            output_digest,
+            oracle_output_digest(execution.results, execution.evidence),
+        )
 
     def test_oracle_evaluation_record_is_schema_valid_and_immutable(self) -> None:
         result = VerificationResult(

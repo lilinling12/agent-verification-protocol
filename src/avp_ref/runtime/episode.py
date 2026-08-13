@@ -19,7 +19,18 @@ from .state import EpisodeState, InvalidEpisodeTransition, assert_transition
 
 @dataclass(slots=True)
 class Episode:
-    """Mutable execution record bound to immutable Scenario/Agent identities."""
+    """Mutable execution record bound to immutable Scenario/Agent identities.
+
+    Lifecycle history is append-only through the public API. A state change and
+    its canonical transition record share one mutation boundary, while callers
+    receive only an immutable tuple view of that history. Each canonical record
+    is also projected onto the AVP event timeline for implementation-neutral
+    observation by TCK adapters and protocol bindings.
+
+    Oracle acceptance is frozen at terminal verification boundaries. A later
+    Episode-wide infrastructure failure may invalidate the Episode, but it must
+    not rewrite an Oracle result set that was already accepted by the verifier.
+    """
 
     episode_id: str
     scenario: ScenarioInstance
@@ -53,10 +64,14 @@ class Episode:
 
     @property
     def transition_records(self) -> tuple[EpisodeTransition, ...]:
+        """Return an immutable view of canonical lifecycle transition records."""
+
         return tuple(self._transition_records)
 
     @property
     def replay_source(self) -> ReplaySourceIdentity | None:
+        """Return the immutable source relationship when this Episode is a replay."""
+
         return self._replay_source
 
     @property
@@ -66,6 +81,13 @@ class Episode:
         return self._oracle_evaluation
 
     def bind_replay_source(self, source: ReplaySourceIdentity) -> None:
+        """Bind replay identity exactly once before execution begins.
+
+        Replay ancestry is identity metadata, not mutable runtime state. Binding
+        after a lifecycle transition would make the observable Episode identity
+        history ambiguous and is therefore rejected.
+        """
+
         if self.state is not EpisodeState.CREATED or self._transition_records:
             raise InvalidEpisodeTransition(
                 "replay source must be bound while the Episode is CREATED"
@@ -84,16 +106,21 @@ class Episode:
     ) -> EpisodeTransition:
         """Apply one legal state change and append its canonical record.
 
-        When verification reaches a terminal state, the accepted Oracle result
-        representation is frozen before the lifecycle transition is exposed.
-        Later Episode-wide failures therefore cannot rewrite what the Oracle
-        evaluation itself concluded.
+        All validation completes before mutation. An illegal target or invalid
+        explicit cause therefore leaves both state and transition history
+        unchanged. Event emission happens after the canonical state/record pair
+        is committed; telemetry failures cannot erase lifecycle evidence.
+
+        For verification terminal states, Oracle acceptance is frozen before the
+        transition becomes observable. The freeze is conservative: infrastructure
+        failure before a trustworthy execution record exists does not manufacture
+        a successful Oracle Evaluation Record.
         """
 
         previous = self.state
         assert_transition(previous, target)
         if target in {EpisodeState.COMPLETED, EpisodeState.INVALID}:
-            self._freeze_oracle_evaluation()
+            self._freeze_oracle_evaluation(target)
         resolved_cause = cause or default_transition_cause(previous, target)
         record = EpisodeTransition(
             episode_id=self.episode_id,
@@ -115,7 +142,17 @@ class Episode:
         )
         return record
 
-    def _freeze_oracle_evaluation(self) -> None:
+    def _freeze_oracle_evaluation(self, target: EpisodeState) -> None:
+        """Freeze verifier acceptance only when the event/evidence chain is sufficient.
+
+        Oracle failures may legitimately have no execution-record Artifact when
+        failure occurs before the runner can produce one. A VALID acceptance
+        record is stricter: it is never inferred without an immutable execution
+        record, and on an INVALID Episode it is only inferred after verification
+        results reached the verifier acceptance list. This prevents an Artifact
+        publication failure from being misrepresented as successful acceptance.
+        """
+
         if self._oracle_evaluation is not None:
             return
         started = next(
@@ -163,6 +200,12 @@ class Episode:
                 execution_record_digest = value
 
         oracle_failure = self.validity is Validity.ORACLE_FAILURE
+        if not oracle_failure:
+            if execution_record_digest is None:
+                return
+            if target is EpisodeState.INVALID and not self.verification:
+                return
+
         accepted_results = () if oracle_failure else tuple(self.verification)
         if oracle_failure:
             oracle_task_verdict = TaskVerdict.INCONCLUSIVE

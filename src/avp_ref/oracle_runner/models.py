@@ -272,6 +272,8 @@ class ProjectionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class OracleEvaluationContext:
+    """Complete parent-to-Oracle data surface; no live evaluator handles exist."""
+
     episode_id: str
     scenario_instance_digest: str
     manifest_digest: str
@@ -326,6 +328,8 @@ class OracleRequest:
 
 @dataclass(frozen=True, slots=True)
 class OracleEvidencePayload:
+    """Private worker-to-parent Evidence representation awaiting publication."""
+
     evidence_id: str
     evidence_type: str
     content: bytes
@@ -341,6 +345,10 @@ class OracleEvidencePayload:
             raise ValueError("oracle evidence_type must be non-empty")
         if not isinstance(self.content, bytes):
             raise TypeError("oracle evidence content must be bytes")
+
+        # ArtifactRef is the public validator for digest/media-type/size shape.
+        # Constructing it here validates representation metadata without
+        # publishing worker-controlled bytes into the trusted parent store.
         ArtifactRef(self.digest, len(self.content), self.media_type)
         if sha256_digest(self.content) != self.digest:
             raise ValueError(f"oracle evidence digest mismatch: {self.evidence_id}")
@@ -389,6 +397,8 @@ class OracleExecutionArtifact:
 
     @property
     def record_digest(self) -> str:
+        """Digest the structured execution record; this is not Artifact identity."""
+
         return digest(self.to_dict())
 
 
@@ -401,15 +411,23 @@ class OracleExecutionResult:
     artifact: OracleExecutionArtifact
 
     def __post_init__(self) -> None:
+        # Protocol objects may arrive from third-party runner adapters. Normalize
+        # mutable list inputs before validating the output digest so the object
+        # cannot be changed through a caller-held collection after construction.
+        results = tuple(self.results)
+        evidence = tuple(self.evidence)
+        object.__setattr__(self, "results", results)
+        object.__setattr__(self, "evidence", evidence)
+
         if self.request_id != self.artifact.request_id:
             raise OracleProtocolError("Oracle execution request identity mismatch")
         if self.status is not self.artifact.status:
             raise OracleProtocolError("Oracle execution status and artifact status differ")
         if self.status is OracleExecutionStatus.SUCCESS:
-            expected = oracle_output_digest(self.results, self.evidence)
+            expected = oracle_output_digest(results, evidence)
             if self.artifact.output_digest != expected:
                 raise OracleProtocolError("Oracle execution output digest mismatch")
-        elif self.results or self.evidence or self.artifact.output_digest is not None:
+        elif results or evidence or self.artifact.output_digest is not None:
             raise OracleProtocolError("failed Oracle execution cannot expose accepted output")
 
 
