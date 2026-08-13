@@ -1,10 +1,40 @@
-version: 0.1
+version: "0.1"
 matrix: security
-status: template
+status: proposed
 
-requirements: []
-historical_sources: []
-implementation_evidence: []
+domain: security-boundary
+
+authority_chain:
+  historical_source:
+    - docs/design/alpha-v0.1/16-security-threat-model.md
+    - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+    - ADR-001-scope-and-boundaries.md
+  reconciliation:
+    - docs/reconciliation/v0.1/decisions/security-boundary-001.md
+  normative:
+    - rfcs/AEP-0002-security-boundary-contract.md
+
+requirements:
+  - AVP-SECURITY-001
+  - AVP-SECURITY-002
+  - AVP-SECURITY-003
+  - AVP-SECURITY-004
+  - AVP-SECURITY-005
+  - AVP-SECURITY-006
+
+historical_sources:
+  - threat-model
+  - architecture
+
+implementation_evidence:
+  - src/avp_ref/runtime/engine.py
+  - src/avp_ref/subject/adapter.py
+  - SECURITY.md
+
 schema_artifacts: []
 tck_cases: []
 decision_records: []
+
+note: >-
+  This matrix is intentionally proposed. Security semantics require reconciliation
+  and TCK coverage before promotion.
