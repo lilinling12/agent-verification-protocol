@@ -4,6 +4,112 @@ metadata:
   version: 0.1.0
   status: draft
 cases:
+  - id: AVP-TCK-LIFECYCLE-NORMAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-NORMAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-001, AVP-CORE-008, AVP-CORE-009]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TRANSITION-RECORD-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-002, AVP-CORE-003, AVP-CORE-004]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TRANSITION-MATRIX-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-005, AVP-CORE-008, AVP-CORE-009, AVP-CORE-012]
+    applicability: mixed
+  - id: AVP-TCK-LIFECYCLE-ILLEGAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-ILLEGAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-009]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-TERMINAL-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-TERMINAL-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-005]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-RESULT-SEPARATION-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-006, AVP-CORE-010]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-QUIESCING-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-QUIESCING-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-011]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-REPLAY-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-REPLAY-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-007]
+    applicability: mandatory
+  - id: AVP-TCK-LIFECYCLE-PAUSE-001
+    path: conformance/tck/cases/lifecycle/AVP-TCK-LIFECYCLE-PAUSE-001.yaml
+    profile: avp-core-v0.1
+    requirements: [AVP-CORE-012]
+    applicability: conditional
+    when: pause-capability-advertised
+  - id: AVP-TCK-EVIDENCE-DIGEST-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-DIGEST-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-001]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-LOCATOR-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-LOCATOR-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-002]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-REPRESENTATION-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-REPRESENTATION-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-003]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-IDENTITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-IDENTITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-004]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-METADATA-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-METADATA-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-005]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-INTEGRITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-INTEGRITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-006]
+    applicability: mandatory
+  - id: AVP-TCK-EVIDENCE-IMMUTABILITY-001
+    path: conformance/tck/cases/evidence/AVP-TCK-EVIDENCE-IMMUTABILITY-001.yaml
+    profile: avp-evidence-v0.1
+    requirements: [AVP-EVIDENCE-007]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-IDENTITY-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-IDENTITY-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-001, AVP-ORACLE-003, AVP-ORACLE-007]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-INPUT-SCOPE-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-INPUT-SCOPE-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-002, AVP-ORACLE-003]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-FAILURE-SEPARATION-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-FAILURE-SEPARATION-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-004, AVP-ORACLE-005]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-006]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-EXECUTION-AUDIT-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-EXECUTION-AUDIT-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-007]
+    applicability: mandatory
   - id: AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
     path: conformance/tck/cases/security/AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001.yaml
     profile: avp-security-v0.1

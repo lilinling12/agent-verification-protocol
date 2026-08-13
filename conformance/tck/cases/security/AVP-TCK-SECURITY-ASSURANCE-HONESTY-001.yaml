@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SECURITY-ASSURANCE-HONESTY-001
+  domain: security
+  status: draft
+profile: avp-security-v0.1
+requirements: [AVP-SECURITY-006]
+applicability: mandatory
+type: positive
+vector:
+  expectedIsolation:
+    apiCapability: verified
+    credentialContext: not-claimed
+    process: not-claimed
+    network: not-claimed
+    tenant: not-claimed
+    sandbox: not-claimed
+expect:
+  baseRuntimeSecurityProfileAdvertised: false
+  declarationMatches: true

@@ -1,0 +1,16 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SECURITY-HIDDEN-MATERIAL-001
+  domain: security
+  status: draft
+profile: avp-security-v0.1
+requirements: [AVP-SECURITY-004]
+applicability: mandatory
+type: negative
+vector:
+  sentinel: AVP_TCK_HIDDEN_ANSWER_7a31e0f1
+  hiddenFields: [success, invariants, faults, security, graders, extensions]
+expect:
+  sentinelAbsent: true
+  hiddenFieldsAbsent: true

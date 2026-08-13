@@ -1,0 +1,16 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
+  domain: security
+  status: draft
+profile: avp-security-v0.1
+requirements: [AVP-SECURITY-001]
+applicability: mandatory
+type: positive
+vector:
+  expectedPublicMethods: [observe, call_tool, trace_headers]
+  forbiddenPublicMethods: [project, digest, snapshot, restore, inject_fault, clear_fault, verify, read_evidence]
+expect:
+  apiCapability: verified
+  privilegedPublicMethodsAbsent: true
