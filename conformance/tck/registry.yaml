@@ -105,3 +105,8 @@ cases:
     profile: avp-oracle-v0.1
     requirements: [AVP-ORACLE-006]
     applicability: mandatory
+  - id: AVP-TCK-ORACLE-EXECUTION-AUDIT-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-EXECUTION-AUDIT-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-007]
+    applicability: mandatory

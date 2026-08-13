@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from typing import Any
 
 from avp_ref.artifacts import sha256_digest
@@ -15,10 +15,12 @@ from avp_ref.oracle_runner import (
     OracleExecutionResult,
     OracleExecutionStatus,
     OraclePackage,
+    OracleProtocolError,
     OracleRequest,
     OracleRunnerDescription,
     ProjectionSnapshot,
     SubprocessOracleRunner,
+    oracle_output_digest,
 )
 from avp_ref.reference import (
     correct_subject,
@@ -73,6 +75,11 @@ def _execution(
     evidence: tuple[object, ...] = (),
 ) -> OracleExecutionResult:
     empty_digest = sha256_digest(b"")
+    output_digest = (
+        oracle_output_digest(results, evidence)
+        if status is OracleExecutionStatus.SUCCESS
+        else None
+    )
     return OracleExecutionResult(
         request_id=request.request_id,
         status=status,
@@ -89,7 +96,7 @@ def _execution(
             exit_code=0 if status is OracleExecutionStatus.SUCCESS else 1,
             stdout_digest=empty_digest,
             stderr_digest=empty_digest,
-            output_digest=empty_digest if status is OracleExecutionStatus.SUCCESS else None,
+            output_digest=output_digest,
         ),
     )
 
@@ -121,6 +128,7 @@ class ReferenceOracleTCKAdapter:
             "AVP-TCK-ORACLE-INPUT-SCOPE-001",
             "AVP-TCK-ORACLE-FAILURE-SEPARATION-001",
             "AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001",
+            "AVP-TCK-ORACLE-EXECUTION-AUDIT-001",
         }
     )
 
@@ -135,6 +143,7 @@ class ReferenceOracleTCKAdapter:
             "AVP-TCK-ORACLE-INPUT-SCOPE-001": self._input_scope,
             "AVP-TCK-ORACLE-FAILURE-SEPARATION-001": self._failure_separation,
             "AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001": self._evidence_integrity,
+            "AVP-TCK-ORACLE-EXECUTION-AUDIT-001": self._execution_audit,
         }.get(case_id)
         if evaluator is None:
             raise TCKAdapterError(f"unsupported reference Oracle TCK case: {case_id}")
@@ -147,6 +156,12 @@ class ReferenceOracleTCKAdapter:
         raw_pointers = vector.get("inputPointers")
         if not isinstance(raw_pointers, Mapping):
             raise TCKAdapterError(f"{case_id} inputPointers must be an object")
+        expected_package_digest = self._string(
+            vector.get("packageDigest"), f"{case_id} packageDigest"
+        )
+        package_bytes = self._hex(
+            vector.get("packageBytesHex"), f"{case_id} packageBytesHex"
+        )
         package = OraclePackage(
             oracle_id=self._string(vector.get("oracleId"), f"{case_id} oracleId"),
             version=self._string(vector.get("version"), f"{case_id} version"),
@@ -157,9 +172,7 @@ class ReferenceOracleTCKAdapter:
                 self._string(k, f"{case_id} input name"): self._string(v, f"{case_id} input pointer")
                 for k, v in raw_pointers.items()
             },
-        )
-        expected_package_digest = self._string(
-            vector.get("packageDigest"), f"{case_id} packageDigest"
+            package_digest=expected_package_digest,
         )
         projection = ProjectionSnapshot(projections[0], [], digest([]))
         context = OracleEvaluationContext(
@@ -175,7 +188,8 @@ class ReferenceOracleTCKAdapter:
         description = SubprocessOracleRunner().describe()
         execution = _execution(request, description, OracleExecutionStatus.SUCCESS)
         valid = (
-            package.identity_digest == expected_package_digest
+            sha256_digest(package_bytes) == expected_package_digest
+            and package.identity_digest == expected_package_digest
             and execution.artifact.oracle_package_digest == expected_package_digest
             and execution.artifact.oracle_code_digest == package.code_digest
             and execution.artifact.input_digest == context.input_digest
@@ -185,7 +199,7 @@ class ReferenceOracleTCKAdapter:
         return self._result(
             case_id,
             valid,
-            "Oracle package, context and execution identities are independently digest-bound",
+            "opaque package identity, input identity and execution identity are independently bound",
             "Oracle package/input/execution identity binding drifted",
         )
 
@@ -326,6 +340,98 @@ class ReferenceOracleTCKAdapter:
             valid,
             "missing and digest-invalid Evidence invalidate Oracle evaluation without task failure",
             "Oracle Evidence integrity failure was accepted or misclassified",
+        )
+
+    def _execution_audit(self, case: Mapping[str, Any]) -> TCKCaseResult:
+        case_id = self._case_id(case)
+        vector = self._vector(case, case_id)
+        raw = vector.get("acceptedResult")
+        if not isinstance(raw, Mapping):
+            raise TCKAdapterError(f"{case_id} acceptedResult must be an object")
+        result = VerificationResult(
+            self._string(raw.get("claimId"), f"{case_id} claimId"),
+            self._string(raw.get("dimension"), f"{case_id} dimension"),
+            self._string(raw.get("verdict"), f"{case_id} verdict"),
+            self._string(raw.get("severity"), f"{case_id} severity"),
+            self._string(raw.get("method"), f"{case_id} method"),
+            self._string(raw.get("evaluatorVersion"), f"{case_id} evaluatorVersion"),
+            confidence=float(raw.get("confidence", 1.0)),
+        )
+
+        def accepted(request: OracleRequest, description: OracleRunnerDescription) -> OracleExecutionResult:
+            return _execution(
+                request,
+                description,
+                OracleExecutionStatus.SUCCESS,
+                results=(result,),
+            )
+
+        episode = _run_episode(_ScriptedOracleRunner(accepted))
+        record = episode.oracle_evaluation
+        execution_event = next(
+            event for event in episode.events if event.event_type == "oracle.execution.completed"
+        )
+        execution_evidence_id = f"ev_{episode.episode_id}_oracle_execution"
+        accepted_bound = (
+            record is not None
+            and record.evaluation_validity is Validity.VALID
+            and record.execution_record_digest == execution_event.payload.get("artifact_digest")
+            and len(record.accepted_results) == 1
+            and record.accepted_results[0].claim_id == result.claim_id
+            and execution_evidence_id in record.accepted_results[0].evidence_ids
+            and record.record_digest == digest(record.to_dict())
+        )
+        immutable = False
+        if record is not None:
+            try:
+                record.oracle_id = "tampered"  # type: ignore[misc]
+            except (FrozenInstanceError, AttributeError):
+                immutable = True
+
+        def substituted(
+            request: OracleRequest,
+            description: OracleRunnerDescription,
+        ) -> OracleExecutionResult:
+            empty_digest = sha256_digest(b"")
+            artifact = OracleExecutionArtifact(
+                request_id=request.request_id,
+                oracle_package_digest=request.package.identity_digest,
+                oracle_code_digest=request.package.code_digest,
+                runner_config_digest=description.identity_digest,
+                input_digest=request.context.input_digest,
+                status=OracleExecutionStatus.SUCCESS,
+                duration_ms=1,
+                exit_code=0,
+                stdout_digest=empty_digest,
+                stderr_digest=empty_digest,
+                output_digest=sha256_digest(b"substituted-output"),
+            )
+            return OracleExecutionResult(
+                request.request_id,
+                OracleExecutionStatus.SUCCESS,
+                (result,),
+                (),
+                artifact,
+            )
+
+        substituted_episode = _run_episode(_ScriptedOracleRunner(substituted))
+        substituted_detail = (
+            substituted_episode.validity_detail.code
+            if substituted_episode.validity_detail is not None
+            else None
+        )
+        substitution_rejected = (
+            substituted_episode.validity is Validity.ORACLE_FAILURE
+            and substituted_episode.task_verdict is TaskVerdict.INCONCLUSIVE
+            and substituted_episode.state is EpisodeState.INVALID
+            and substituted_detail == "ORACLE_PROTOCOL_ERROR"
+            and not substituted_episode.verification
+        )
+        return self._result(
+            case_id,
+            accepted_bound and immutable and substitution_rejected,
+            "execution identity, accepted result representation and substitution rejection are auditable",
+            "Oracle execution acceptance audit binding is incomplete",
         )
 
     @staticmethod

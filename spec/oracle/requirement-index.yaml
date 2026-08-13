@@ -5,7 +5,7 @@ requirements:
   - id: AVP-ORACLE-001
     level: MUST
     area: oracle.identity
-    statement: Every Oracle evaluation MUST bind a stable Oracle identifier, version, and immutable package digest.
+    statement: Every Oracle evaluation MUST bind a stable Oracle identifier, version identifier, and immutable opaque package digest.
     spec: spec/oracle/oracle-evaluation-contract.md
     anchor: avp-oracle-001
     schema: schemas/oracle-evaluation.schema.json
@@ -53,8 +53,8 @@ requirements:
   - id: AVP-ORACLE-007
     level: MUST
     area: oracle.execution.audit
-    statement: A verifier MUST preserve an immutable auditable record binding Oracle/package identity, input identity, execution outcome, and accepted results.
+    statement: A verifier MUST preserve immutable execution/output identity and the exact verification-result values accepted from that execution.
     spec: spec/oracle/oracle-evaluation-contract.md
     anchor: avp-oracle-007
     schema: schemas/oracle-evaluation.schema.json
-    conformance: [AVP-TCK-ORACLE-IDENTITY-001]
+    conformance: [AVP-TCK-ORACLE-IDENTITY-001, AVP-TCK-ORACLE-EXECUTION-AUDIT-001]

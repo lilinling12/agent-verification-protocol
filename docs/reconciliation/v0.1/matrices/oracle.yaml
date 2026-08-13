@@ -17,6 +17,7 @@ implementation_evidence:
   - src/avp_ref/oracle_runner/subprocess.py
   - src/avp_ref/runtime/engine.py
   - tests/test_oracle_isolation.py
+  - tests/test_oracle_tck.py
 normative_target:
   - spec/oracle/oracle-evaluation-contract.md
 requirement_index: spec/oracle/requirement-index.yaml
@@ -27,13 +28,20 @@ decision_records:
   - rfcs/AEP-0001-oracle-evaluation-contract.md
 semantic_drift:
   - source: src/avp_ref/models.py
-    observation: Runner-specific Oracle failure modes are exposed as top-level Validity values.
+    observation: Runner-specific Oracle failure modes were exposed as top-level Validity values.
     resolution: Collapse them to ORACLE_FAILURE and preserve the specific reason in validityDetail.code.
+  - source: src/avp_ref/oracle_runner/models.py
+    observation: Reference OraclePackage.identity_digest is derived from a Python package descriptor and could be mistaken for a portable package canonicalization rule.
+    resolution: Treat packageDigest as opaque package identity; allow the reference model to bind an externally supplied digest while keeping descriptor canonicalization implementation-specific.
+  - source: src/avp_ref/runtime/engine.py
+    observation: Runner output was recorded, but the verifier's post-validation accepted result representation was not preserved as its own immutable Oracle Evaluation Record.
+    resolution: Publish a schema-valid Oracle Evaluation Record and require execution/output identity validation before accepting results.
   - source: src/avp_ref/oracle_runner/protocol.py
-    observation: The reference worker uses avp.oracle/v2 single-frame JSON IPC.
+    observation: The reference worker uses a private single-frame JSON IPC protocol.
     resolution: Keep the framing implementation-specific; promote its observable integrity behavior, not the transport.
 conformance_required:
   - AVP-TCK-ORACLE-IDENTITY-001
   - AVP-TCK-ORACLE-INPUT-SCOPE-001
   - AVP-TCK-ORACLE-FAILURE-SEPARATION-001
   - AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001
+  - AVP-TCK-ORACLE-EXECUTION-AUDIT-001

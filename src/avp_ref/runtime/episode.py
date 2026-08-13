@@ -7,6 +7,7 @@ from typing import Any
 
 from avp_ref.environment.models import SnapshotRef
 from avp_ref.models import AVPEvent, Evidence, TaskVerdict, Validity, ValidityDetail, VerificationResult
+from avp_ref.oracle_runner.models import OracleEvaluationRecord
 from avp_ref.scenario.models import ScenarioInstance
 
 from .agent import AgentSystem
@@ -18,14 +19,7 @@ from .state import EpisodeState, InvalidEpisodeTransition, assert_transition
 
 @dataclass(slots=True)
 class Episode:
-    """Mutable execution record bound to immutable Scenario/Agent identities.
-
-    Lifecycle history is append-only through the public API. A state change and
-    its canonical transition record share one mutation boundary, while callers
-    receive only an immutable tuple view of that history. Each canonical record
-    is also projected onto the AVP event timeline for implementation-neutral
-    observation by TCK adapters and protocol bindings.
-    """
+    """Mutable execution record bound to immutable Scenario/Agent identities."""
 
     episode_id: str
     scenario: ScenarioInstance
@@ -41,6 +35,11 @@ class Episode:
     snapshots: dict[str, SnapshotRef] = field(default_factory=dict)
     verification: list[VerificationResult] = field(default_factory=list)
     telemetry: Any = field(default=None, repr=False)
+    _oracle_evaluation: OracleEvaluationRecord | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
     _transition_records: list[EpisodeTransition] = field(
         default_factory=list,
         init=False,
@@ -54,24 +53,19 @@ class Episode:
 
     @property
     def transition_records(self) -> tuple[EpisodeTransition, ...]:
-        """Return an immutable view of canonical lifecycle transition records."""
-
         return tuple(self._transition_records)
 
     @property
     def replay_source(self) -> ReplaySourceIdentity | None:
-        """Return the immutable source relationship when this Episode is a replay."""
-
         return self._replay_source
 
+    @property
+    def oracle_evaluation(self) -> OracleEvaluationRecord | None:
+        """Return the immutable verifier-side Oracle acceptance record."""
+
+        return self._oracle_evaluation
+
     def bind_replay_source(self, source: ReplaySourceIdentity) -> None:
-        """Bind replay identity exactly once before execution begins.
-
-        Replay ancestry is identity metadata, not mutable runtime state. Binding
-        after a lifecycle transition would make the observable Episode identity
-        history ambiguous and is therefore rejected.
-        """
-
         if self.state is not EpisodeState.CREATED or self._transition_records:
             raise InvalidEpisodeTransition(
                 "replay source must be bound while the Episode is CREATED"
@@ -90,14 +84,16 @@ class Episode:
     ) -> EpisodeTransition:
         """Apply one legal state change and append its canonical record.
 
-        All validation completes before mutation. An illegal target or invalid
-        explicit cause therefore leaves both state and transition history
-        unchanged. Event emission happens after the canonical state/record pair
-        is committed; telemetry failures cannot erase lifecycle evidence.
+        When verification reaches a terminal state, the accepted Oracle result
+        representation is frozen before the lifecycle transition is exposed.
+        Later Episode-wide failures therefore cannot rewrite what the Oracle
+        evaluation itself concluded.
         """
 
         previous = self.state
         assert_transition(previous, target)
+        if target in {EpisodeState.COMPLETED, EpisodeState.INVALID}:
+            self._freeze_oracle_evaluation()
         resolved_cause = cause or default_transition_cause(previous, target)
         record = EpisodeTransition(
             episode_id=self.episode_id,
@@ -118,3 +114,87 @@ class Episode:
             payload=record.to_dict(),
         )
         return record
+
+    def _freeze_oracle_evaluation(self) -> None:
+        if self._oracle_evaluation is not None:
+            return
+        started = next(
+            (
+                event
+                for event in self.events
+                if event.event_type == "episode.verification.started"
+            ),
+            None,
+        )
+        request = next(
+            (
+                event
+                for event in self.events
+                if event.event_type == "oracle.execution.started"
+            ),
+            None,
+        )
+        execution = next(
+            (
+                event
+                for event in reversed(self.events)
+                if event.event_type
+                in {"oracle.execution.completed", "oracle.execution.failed"}
+            ),
+            None,
+        )
+        if started is None or request is None:
+            return
+
+        oracle_id = started.payload.get("oracle_id")
+        oracle_version = started.payload.get("oracle_version")
+        package_digest = started.payload.get("oracle_package_digest")
+        input_digest = request.payload.get("input_digest")
+        if not all(
+            isinstance(value, str) and value
+            for value in (oracle_id, oracle_version, package_digest, input_digest)
+        ):
+            return
+
+        execution_record_digest = None
+        if execution is not None:
+            value = execution.payload.get("artifact_digest")
+            if isinstance(value, str) and value:
+                execution_record_digest = value
+
+        oracle_failure = self.validity is Validity.ORACLE_FAILURE
+        accepted_results = () if oracle_failure else tuple(self.verification)
+        if oracle_failure:
+            oracle_task_verdict = TaskVerdict.INCONCLUSIVE
+        else:
+            oracle_task_verdict = (
+                TaskVerdict.FAIL
+                if any(
+                    result.verdict == "FAIL" and result.severity == "critical"
+                    for result in accepted_results
+                )
+                else TaskVerdict.PASS
+            )
+        evidence_ids = tuple(
+            sorted(
+                {
+                    evidence_id
+                    for result in accepted_results
+                    for evidence_id in result.evidence_ids
+                }
+            )
+        )
+        self._oracle_evaluation = OracleEvaluationRecord(
+            oracle_id=oracle_id,
+            oracle_version=oracle_version,
+            package_digest=package_digest,
+            input_digest=input_digest,
+            execution_record_digest=execution_record_digest,
+            evaluation_validity=(
+                Validity.ORACLE_FAILURE if oracle_failure else Validity.VALID
+            ),
+            task_verdict=oracle_task_verdict,
+            accepted_results=accepted_results,
+            evidence_ids=evidence_ids,
+            validity_detail=self.validity_detail if oracle_failure else None,
+        )
