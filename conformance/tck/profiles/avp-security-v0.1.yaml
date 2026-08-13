@@ -1,0 +1,16 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-security-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-SECURITY-001
+    - AVP-SECURITY-002
+    - AVP-SECURITY-003
+    - AVP-SECURITY-004
+    - AVP-SECURITY-005
+    - AVP-SECURITY-006
+  conditional: []
