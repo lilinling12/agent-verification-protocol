@@ -15,6 +15,7 @@ _EVIDENCE_TYPE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-
 _EVIDENCE_CLASSIFICATIONS: Final[frozenset[str]] = frozenset(
     {"public", "workspace", "subject-visible", "evaluator-confidential", "secret", "regulated"}
 )
+_VALIDITY_DETAIL_CODE: Final[re.Pattern[str]] = re.compile(r"^[A-Z][A-Z0-9_]{0,127}$")
 
 
 def _freeze(value: object) -> object:
@@ -47,14 +48,46 @@ class Validity(str, Enum):
     ENVIRONMENT_FAILURE = "ENVIRONMENT_FAILURE"
     RESET_FAILURE = "RESET_FAILURE"
     ORACLE_FAILURE = "ORACLE_FAILURE"
-    ORACLE_TIMEOUT = "ORACLE_TIMEOUT"
-    ORACLE_CRASH = "ORACLE_CRASH"
-    ORACLE_PROTOCOL_ERROR = "ORACLE_PROTOCOL_ERROR"
-    ORACLE_SECURITY_VIOLATION = "ORACLE_SECURITY_VIOLATION"
     TRACE_INCOMPLETE = "TRACE_INCOMPLETE"
     INFRA_CONFOUND = "INFRA_CONFOUND"
     CONTAMINATED = "CONTAMINATED"
     UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True, slots=True)
+class ValidityDetail:
+    """Structured diagnostic metadata for one invalid evaluation.
+
+    The detail refines ``Validity`` without creating another outcome axis. It is
+    intentionally immutable because it becomes part of the auditable Episode
+    record once an evaluation is invalidated.
+    """
+
+    code: str
+    message: str | None = None
+    evidence_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.code, str) or _VALIDITY_DETAIL_CODE.fullmatch(self.code) is None:
+            raise ValueError("validity detail code must be an AVP uppercase token")
+        if self.message is not None and (
+            not isinstance(self.message, str) or not 1 <= len(self.message) <= 512
+        ):
+            raise ValueError("validity detail message must contain 1..512 characters when present")
+        evidence_ids = tuple(self.evidence_ids)
+        if not all(isinstance(item, str) and 1 <= len(item) <= 256 for item in evidence_ids):
+            raise ValueError("validity detail evidence ids must contain 1..256 characters")
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("validity detail evidence ids must be unique")
+        object.__setattr__(self, "evidence_ids", evidence_ids)
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {"code": self.code}
+        if self.message is not None:
+            result["message"] = self.message
+        if self.evidence_ids:
+            result["evidenceIds"] = list(self.evidence_ids)
+        return result
 
 
 @dataclass(frozen=True, slots=True)

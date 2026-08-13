@@ -40,6 +40,7 @@ def decode_request(frame: bytes, *, max_bytes: int) -> OracleRequest:
         code_digest=_string(package_raw.get("code_digest"), "package.code_digest"),
         projections=tuple(_string_list(package_raw.get("projections"), "package.projections")),
         input_pointers={str(k): _string(v, f"package.input_pointers.{k}") for k, v in _mapping(package_raw.get("input_pointers", {}), "package.input_pointers").items()},
+        package_digest=_optional_string(package_raw.get("package_digest"), "package.package_digest"),
     )
     projections_raw = _mapping(context_raw.get("projections"), "context.projections")
     projections: dict[str, ProjectionSnapshot] = {}

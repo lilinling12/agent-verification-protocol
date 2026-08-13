@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from avp_ref.artifacts import ArtifactStore
+from avp_ref.artifacts import ArtifactDigestMismatch, ArtifactStore
 from avp_ref.canonical import canonical_json
 from avp_ref.models import Evidence
 
@@ -42,7 +42,13 @@ class EvidencePublisher:
         extensions: Mapping[str, object] | None = None,
         expected_digest: str | None = None,
     ) -> Evidence:
-        """Publish already-encoded bytes without changing their representation."""
+        """Publish already-encoded bytes without changing their representation.
+
+        ``expected_digest`` belongs to the caller-controlled Evidence contract.
+        A mismatch is therefore rejected as invalid publication input at this
+        boundary rather than being exposed as a backing-store infrastructure
+        failure. Direct ArtifactStore users still receive ArtifactDigestMismatch.
+        """
 
         Evidence.validate_metadata(
             evidence_id=evidence_id,
@@ -54,11 +60,14 @@ class EvidencePublisher:
             raise TypeError("redaction must be a mapping when present")
         if extensions is not None and not isinstance(extensions, Mapping):
             raise TypeError("extensions must be a mapping when present")
-        artifact = self._store.put_bytes(
-            content,
-            media_type=media_type,
-            expected_digest=expected_digest,
-        )
+        try:
+            artifact = self._store.put_bytes(
+                content,
+                media_type=media_type,
+                expected_digest=expected_digest,
+            )
+        except ArtifactDigestMismatch as exc:
+            raise ValueError("Evidence content does not match its declared digest") from exc
         return Evidence(
             evidence_id=evidence_id,
             evidence_type=evidence_type,

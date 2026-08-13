@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ORACLE-INPUT-SCOPE-001
+  domain: oracle
+  status: draft
+profile: avp-oracle-v0.1
+requirements: [AVP-ORACLE-002, AVP-ORACLE-003]
+applicability: mandatory
+type: negative
+vector:
+  declaredInputs: [target_order_id]
+  declaredProjections: [commerce.refunds]
+  forbiddenContextKeys: [runtime, environment_handle, subject_handle, evaluator_credentials, agent_report, prompt, tool_history]
+expect:
+  undeclaredInputsAbsent: true
+  forbiddenHandlesAbsent: true
+  contextDigestStable: true

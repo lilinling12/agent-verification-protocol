@@ -8,6 +8,7 @@ from typing import Any, Iterable
 from .models import TCKAdapterError, TCKCaseResult
 from .reference_aligned import AlignedReferenceTCKAdapter
 from .reference_evidence import ReferenceEvidenceTCKAdapter
+from .reference_oracle import ReferenceOracleTCKAdapter
 
 
 class ReferenceConformanceAdapter:
@@ -18,6 +19,7 @@ class ReferenceConformanceAdapter:
         self._delegates = (
             AlignedReferenceTCKAdapter(capabilities=capability_set),
             ReferenceEvidenceTCKAdapter(),
+            ReferenceOracleTCKAdapter(),
         )
         owners: dict[str, object] = {}
         for delegate in self._delegates:

@@ -3,17 +3,19 @@ from __future__ import annotations
 import json
 import unittest
 from pathlib import Path
+from typing import BinaryIO
 
 from jsonschema import Draft202012Validator
 
 from avp_ref.artifacts import (
     ArtifactIntegrityError,
     ArtifactRef,
+    ArtifactStoreError,
     InMemoryArtifactStore,
     sha256_digest,
 )
 from avp_ref.evidence import EvidencePublisher, canonical_json_bytes
-from avp_ref.models import Evidence
+from avp_ref.models import Evidence, Validity
 from avp_ref.reference import (
     correct_subject,
     reference_agent_system,
@@ -22,10 +24,64 @@ from avp_ref.reference import (
     reference_scenario,
     reference_subject_adapter,
 )
-from avp_ref.runtime import ReferenceRuntime
+from avp_ref.runtime import EpisodeState, ReferenceRuntime
 from avp_ref.telemetry import OpenTelemetryBridge
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class _FailOracleExecutionStore:
+    """Delegate store that fails only when publishing Oracle execution JSON.
+
+    This targets the production failure boundary discovered during final review:
+    the runner has returned, but the immutable execution Artifact cannot be
+    persisted. Other Episode Evidence remains available so the test isolates
+    that one failure instead of depending on a brittle publication counter.
+    """
+
+    def __init__(self) -> None:
+        self._delegate = InMemoryArtifactStore()
+
+    def put_bytes(
+        self,
+        data: bytes,
+        *,
+        media_type: str,
+        expected_digest: str | None = None,
+    ) -> ArtifactRef:
+        if (
+            media_type == "application/json"
+            and b'"oracle_package_digest"' in data
+            and b'"runner_config_digest"' in data
+        ):
+            raise ArtifactStoreError("injected Oracle execution publication failure")
+        return self._delegate.put_bytes(
+            data,
+            media_type=media_type,
+            expected_digest=expected_digest,
+        )
+
+    def put_stream(
+        self,
+        stream: BinaryIO,
+        *,
+        media_type: str,
+        expected_digest: str | None = None,
+    ) -> ArtifactRef:
+        return self.put_bytes(
+            stream.read(),
+            media_type=media_type,
+            expected_digest=expected_digest,
+        )
+
+    def open_reader(self, ref: ArtifactRef) -> BinaryIO:
+        return self._delegate.open_reader(ref)
+
+    def get_bytes(self, ref: ArtifactRef) -> bytes:
+        return self._delegate.get_bytes(ref)
+
+    def contains(self, digest: str) -> bool:
+        return self._delegate.contains(digest)
 
 
 def _evidence_schema() -> dict[str, object]:
@@ -133,6 +189,27 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIsInstance(parsed, list)
         self.assertEqual(content, canonical_json_bytes(parsed))
         self.assertEqual("application/json", evidence.artifact.media_type)
+
+    def test_oracle_execution_publication_failure_remains_fail_closed(self) -> None:
+        runtime = ReferenceRuntime(artifact_store=_FailOracleExecutionStore())
+        episode = runtime.create_episode(
+            reference_scenario(),
+            reference_agent_system("oracle-publication-failure"),
+            reference_environment(),
+            reference_subject_adapter(correct_subject),
+            reference_oracle_package(),
+        )
+        runtime.provision(episode.episode_id)
+        runtime.run_subject(episode.episode_id)
+
+        verified = runtime.verify(episode.episode_id)
+
+        self.assertIs(episode, verified)
+        self.assertIs(EpisodeState.INVALID, episode.state)
+        self.assertIs(Validity.INFRA_CONFOUND, episode.validity)
+        self.assertEqual("INCONCLUSIVE", episode.task_verdict.value)
+        self.assertIsNone(episode.validity_detail)
+        self.assertIsNone(episode.oracle_evaluation)
 
     def test_integrity_failure_is_not_silently_accepted(self) -> None:
         store = InMemoryArtifactStore()

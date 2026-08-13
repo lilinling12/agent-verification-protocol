@@ -1,10 +1,47 @@
-version: 0.1
-matrix: oracle
-status: template
-
-requirements: []
-historical_sources: []
-implementation_evidence: []
-schema_artifacts: []
-tck_cases: []
-decision_records: []
+matrix_version: "1.0"
+domain: oracle
+status: accepted
+historical_sources:
+  - baseline: avp-design-alpha-v0.1
+    document: docs/spec/03-agent-verification-protocol.md
+    preserved_sha256: 73a9c43c91a54f23d7b5cdb0772ca497130ee5293979b7b66047f204313bc92f
+  - baseline: avp-design-alpha-v0.1
+    document: docs/spec/16-security-threat-model.md
+    preserved_sha256: 11be27f77bfe3b0929ef3ea442d85fc01a292af620f4de0637e27eb7c365a2f3
+  - baseline: avp-design-alpha-v0.1
+    document: docs/spec/17-oracle-sdk.md
+    preserved_sha256: a2e099eed1967733092ee0fa2763faf684d88ce19f3596710bbe3727e95b1e73
+implementation_evidence:
+  - src/avp_ref/oracle_runner/models.py
+  - src/avp_ref/oracle_runner/protocol.py
+  - src/avp_ref/oracle_runner/subprocess.py
+  - src/avp_ref/runtime/engine.py
+  - tests/test_oracle_isolation.py
+  - tests/test_oracle_tck.py
+normative_target:
+  - spec/oracle/oracle-evaluation-contract.md
+requirement_index: spec/oracle/requirement-index.yaml
+schema_artifacts:
+  - schemas/oracle-evaluation.schema.json
+decision_records:
+  - docs/reconciliation/v0.1/decisions/oracle-evaluation-contract-001.md
+  - rfcs/AEP-0001-oracle-evaluation-contract.md
+semantic_drift:
+  - source: src/avp_ref/models.py
+    observation: Runner-specific Oracle failure modes were exposed as top-level Validity values.
+    resolution: Collapse them to ORACLE_FAILURE and preserve the specific reason in validityDetail.code.
+  - source: src/avp_ref/oracle_runner/models.py
+    observation: Reference OraclePackage.identity_digest is derived from a Python package descriptor and could be mistaken for a portable package canonicalization rule.
+    resolution: Treat packageDigest as opaque package identity; allow the reference model to bind an externally supplied digest while keeping descriptor canonicalization implementation-specific.
+  - source: src/avp_ref/runtime/engine.py
+    observation: Runner output was recorded, but the verifier's post-validation accepted result representation was not preserved as its own immutable Oracle Evaluation Record.
+    resolution: Publish a schema-valid Oracle Evaluation Record and require execution/output identity validation before accepting results.
+  - source: src/avp_ref/oracle_runner/protocol.py
+    observation: The reference worker uses a private single-frame JSON IPC protocol.
+    resolution: Keep the framing implementation-specific; promote its observable integrity behavior, not the transport.
+conformance_required:
+  - AVP-TCK-ORACLE-IDENTITY-001
+  - AVP-TCK-ORACLE-INPUT-SCOPE-001
+  - AVP-TCK-ORACLE-FAILURE-SEPARATION-001
+  - AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001
+  - AVP-TCK-ORACLE-EXECUTION-AUDIT-001

@@ -30,7 +30,7 @@ from avp_ref.environment import (
 from avp_ref.evidence import EvidencePublisher
 from avp_ref.events import EventRecorder
 from avp_ref.mcp import MCPGatewayError, MCPVerificationGateway
-from avp_ref.models import Evidence, TaskVerdict, Validity
+from avp_ref.models import Evidence, TaskVerdict, Validity, ValidityDetail
 from avp_ref.oracle_runner import (
     OracleEvaluationContext,
     OracleExecutionResult,
@@ -124,6 +124,7 @@ class ReferenceRuntime:
                 "AVP-MCP-Gateway",
                 "AVP-Telemetry",
                 "AVP-Oracle-Isolation",
+                "AVP-Oracle",
                 "AVP-Snapshot",
                 "AVP-Verification",
                 "AVP-Replay",
@@ -135,6 +136,7 @@ class ReferenceRuntime:
                 "environment_adapter_spi": "avp.environment/v0.1",
                 "subject_adapter_spi": "avp.subject/v0.1",
                 "oracle_runner_spi": self._oracle_runner.describe().protocol_version,
+                "oracle_profile": "avp-oracle-v0.1",
                 "mcp_protocol": "2026-07-28",
                 "telemetry_bridge": "avp.telemetry/v0.1",
                 "evidence_profile": "avp-evidence-v0.1",
@@ -263,6 +265,7 @@ class ReferenceRuntime:
             )
         except (SubjectAdapterError, MCPGatewayError) as exc:
             episode.validity = Validity.INFRA_CONFOUND
+            episode.validity_detail = None
             episode.transition(EpisodeState.INFRA_FAILED)
             recorder.emit(
                 "episode.provision.failed",
@@ -274,6 +277,7 @@ class ReferenceRuntime:
             raise
         except Exception as exc:
             episode.validity = Validity.ENVIRONMENT_FAILURE
+            episode.validity_detail = None
             episode.transition(EpisodeState.INFRA_FAILED)
             recorder.emit(
                 "environment.provision.failed",
@@ -337,6 +341,7 @@ class ReferenceRuntime:
                 f"subject infrastructure error: {type(exc).__name__}: {exc}"
             )
             episode.validity = Validity.INFRA_CONFOUND
+            episode.validity_detail = None
             recorder.emit(
                 "agent.invocation.completed",
                 "agent",
@@ -402,27 +407,29 @@ class ReferenceRuntime:
             )
             execution = self._oracle_runner.evaluate(request)
         except OracleRunnerError as exc:
-            validity = (
-                Validity.ORACLE_SECURITY_VIOLATION
+            detail_code = (
+                "ORACLE_SECURITY_VIOLATION"
                 if isinstance(exc, OracleSecurityError)
-                else Validity.ORACLE_PROTOCOL_ERROR
+                else "ORACLE_PROTOCOL_ERROR"
             )
-            return self._invalidate_evaluation(
-                episode,
-                recorder,
-                environment_adapter,
-                environment_handle,
-                validity,
-                str(exc),
-            )
-        except Exception as exc:
             return self._invalidate_evaluation(
                 episode,
                 recorder,
                 environment_adapter,
                 environment_handle,
                 Validity.ORACLE_FAILURE,
-                str(exc),
+                "Oracle runner rejected the evaluation",
+                detail=ValidityDetail(detail_code),
+            )
+        except Exception:
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.ORACLE_FAILURE,
+                "Oracle runner raised an unexpected evaluation error",
+                detail=ValidityDetail("ORACLE_RUNNER_ERROR"),
             )
 
         try:
@@ -430,14 +437,14 @@ class ReferenceRuntime:
                 episode,
                 execution,
             )
-        except (ArtifactStoreError, TypeError, ValueError) as exc:
+        except (ArtifactStoreError, TypeError, ValueError):
             return self._invalidate_evaluation(
                 episode,
                 recorder,
                 environment_adapter,
                 environment_handle,
                 Validity.INFRA_CONFOUND,
-                f"oracle execution Artifact publication failed: {exc}",
+                "Oracle execution Artifact publication failed",
             )
 
         episode.evidence[execution_evidence.evidence_id] = execution_evidence
@@ -465,13 +472,14 @@ class ReferenceRuntime:
                 recorder,
                 environment_adapter,
                 environment_handle,
-                self._oracle_validity(execution.status),
-                execution.status.value,
+                Validity.ORACLE_FAILURE,
+                f"Oracle execution ended with status {execution.status.value}",
+                detail=self._oracle_failure_detail(execution.status),
             )
 
         publication_error = self._publish_oracle_evidence(episode, execution)
         if publication_error is not None:
-            validity, reason = publication_error
+            validity, detail, reason = publication_error
             return self._invalidate_evaluation(
                 episode,
                 recorder,
@@ -479,6 +487,7 @@ class ReferenceRuntime:
                 environment_handle,
                 validity,
                 reason,
+                detail=detail,
             )
 
         episode.verification = [
@@ -499,8 +508,9 @@ class ReferenceRuntime:
                 recorder,
                 environment_adapter,
                 environment_handle,
-                Validity.ORACLE_PROTOCOL_ERROR,
-                f"verification references unresolved Evidence: {unresolved}",
+                Validity.ORACLE_FAILURE,
+                "Oracle result references Evidence absent from the Episode registry",
+                detail=ValidityDetail("ORACLE_PROTOCOL_ERROR"),
             )
 
         for result in episode.verification:
@@ -527,6 +537,7 @@ class ReferenceRuntime:
             else TaskVerdict.PASS
         )
         episode.validity = Validity.VALID
+        episode.validity_detail = None
 
         try:
             telemetry_artifact = self._finalize_telemetry(
@@ -534,14 +545,14 @@ class ReferenceRuntime:
                 complete=True,
                 strict=True,
             )
-        except ArtifactStoreError as exc:
+        except ArtifactStoreError:
             return self._invalidate_evaluation(
                 episode,
                 recorder,
                 environment_adapter,
                 environment_handle,
                 Validity.INFRA_CONFOUND,
-                f"Telemetry Evidence Artifact publication failed: {exc}",
+                "Telemetry Evidence Artifact publication failed",
             )
         if self._required_telemetry_missing(telemetry_artifact):
             return self._invalidate_evaluation(
@@ -675,12 +686,13 @@ class ReferenceRuntime:
         self,
         episode: Episode,
         execution: OracleExecutionResult,
-    ) -> tuple[Validity, str] | None:
+    ) -> tuple[Validity, ValidityDetail | None, str] | None:
         for item in execution.evidence:
             if item.evidence_id in episode.evidence:
                 return (
-                    Validity.ORACLE_PROTOCOL_ERROR,
-                    f"duplicate evidence id: {item.evidence_id}",
+                    Validity.ORACLE_FAILURE,
+                    ValidityDetail("ORACLE_PROTOCOL_ERROR"),
+                    "Oracle output contains a duplicate Evidence identifier",
                 )
             try:
                 evidence = self._evidence_publisher.publish_bytes(
@@ -692,15 +704,17 @@ class ReferenceRuntime:
                     classification=item.classification,
                     producer=item.producer,
                 )
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError):
                 return (
-                    Validity.ORACLE_PROTOCOL_ERROR,
-                    f"invalid Oracle evidence metadata: {exc}",
+                    Validity.ORACLE_FAILURE,
+                    ValidityDetail("ORACLE_PROTOCOL_ERROR"),
+                    "Oracle output contains invalid Evidence metadata or content",
                 )
-            except ArtifactStoreError as exc:
+            except ArtifactStoreError:
                 return (
                     Validity.INFRA_CONFOUND,
-                    f"Oracle Evidence Artifact publication failed: {exc}",
+                    None,
+                    "Oracle Evidence Artifact publication failed",
                 )
             episode.evidence[evidence.evidence_id] = evidence
         return None
@@ -771,14 +785,16 @@ class ReferenceRuntime:
         return OracleRequest("oracle_req_" + uuid.uuid4().hex, package, context)
 
     @staticmethod
-    def _oracle_validity(status: OracleExecutionStatus) -> Validity:
-        return {
-            OracleExecutionStatus.TIMEOUT: Validity.ORACLE_TIMEOUT,
-            OracleExecutionStatus.CRASHED: Validity.ORACLE_CRASH,
-            OracleExecutionStatus.PROTOCOL_ERROR: Validity.ORACLE_PROTOCOL_ERROR,
-            OracleExecutionStatus.SECURITY_VIOLATION: Validity.ORACLE_SECURITY_VIOLATION,
-            OracleExecutionStatus.SUCCESS: Validity.VALID,
+    def _oracle_failure_detail(status: OracleExecutionStatus) -> ValidityDetail:
+        if status is OracleExecutionStatus.SUCCESS:
+            raise ValueError("SUCCESS does not define an Oracle failure detail")
+        detail_code = {
+            OracleExecutionStatus.TIMEOUT: "ORACLE_TIMEOUT",
+            OracleExecutionStatus.CRASHED: "ORACLE_CRASH",
+            OracleExecutionStatus.PROTOCOL_ERROR: "ORACLE_PROTOCOL_ERROR",
+            OracleExecutionStatus.SECURITY_VIOLATION: "ORACLE_SECURITY_VIOLATION",
         }[status]
+        return ValidityDetail(detail_code)
 
     def _invalidate_evaluation(
         self,
@@ -788,21 +804,40 @@ class ReferenceRuntime:
         handle: EnvironmentHandle,
         validity: Validity,
         reason: str,
+        *,
+        detail: ValidityDetail | None = None,
     ) -> Episode:
+        if validity is Validity.VALID:
+            raise ValueError("cannot invalidate an evaluation with VALID validity")
+        if validity is Validity.ORACLE_FAILURE and detail is None:
+            raise ValueError("ORACLE_FAILURE requires a structured validity detail")
+        if not isinstance(reason, str) or not reason:
+            raise ValueError("evaluation invalidation reason must be non-empty")
+
         episode.validity = validity
+        episode.validity_detail = detail
         episode.task_verdict = TaskVerdict.INCONCLUSIVE
+        payload: dict[str, object] = {
+            "to": validity.value,
+            "reason": reason[:512],
+        }
+        if detail is not None:
+            payload["detail"] = detail.to_dict()
         recorder.emit(
             "evaluation.validity.changed",
             "evaluator",
             adapter.logical_time(handle),
-            {"to": validity.value, "reason": reason[:512]},
+            payload,
         )
         episode.transition(EpisodeState.INVALID)
+        invalid_payload: dict[str, object] = {"validity": episode.validity.value}
+        if detail is not None:
+            invalid_payload["validity_detail"] = detail.to_dict()
         recorder.emit(
             "episode.invalid",
             "orchestrator",
             adapter.logical_time(handle),
-            {"validity": episode.validity.value},
+            invalid_payload,
         )
         self._finalize_telemetry(episode, complete=False, strict=False)
         return episode

@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001
+  domain: oracle
+  status: draft
+profile: avp-oracle-v0.1
+requirements: [AVP-ORACLE-006]
+applicability: mandatory
+type: negative
+vector:
+  missingEvidenceId: ev_missing
+  declaredDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  tamperedBytesHex: "415651"
+expect:
+  missingReferenceRejected: true
+  digestMismatchRejected: true
+  taskFailureNotInferred: true

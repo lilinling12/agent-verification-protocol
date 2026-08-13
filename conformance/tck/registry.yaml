@@ -85,3 +85,28 @@ cases:
     profile: avp-evidence-v0.1
     requirements: [AVP-EVIDENCE-007]
     applicability: mandatory
+  - id: AVP-TCK-ORACLE-IDENTITY-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-IDENTITY-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-001, AVP-ORACLE-003, AVP-ORACLE-007]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-INPUT-SCOPE-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-INPUT-SCOPE-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-002, AVP-ORACLE-003]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-FAILURE-SEPARATION-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-FAILURE-SEPARATION-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-004, AVP-ORACLE-005]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-EVIDENCE-INTEGRITY-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-006]
+    applicability: mandatory
+  - id: AVP-TCK-ORACLE-EXECUTION-AUDIT-001
+    path: conformance/tck/cases/oracle/AVP-TCK-ORACLE-EXECUTION-AUDIT-001.yaml
+    profile: avp-oracle-v0.1
+    requirements: [AVP-ORACLE-007]
+    applicability: mandatory

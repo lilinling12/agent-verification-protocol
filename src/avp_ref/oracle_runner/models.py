@@ -9,7 +9,9 @@ from types import MappingProxyType
 
 from avp_ref.artifacts import ArtifactRef, sha256_digest, validate_sha256_digest
 from avp_ref.canonical import digest
-from avp_ref.models import VerificationResult
+from avp_ref.models import TaskVerdict, Validity, ValidityDetail, VerificationResult
+
+from .errors import OracleProtocolError
 
 
 def _freeze(value: object) -> object:
@@ -35,6 +37,57 @@ def _require_sha256(value: str, label: str) -> None:
         validate_sha256_digest(value)
     except ValueError as exc:
         raise ValueError(f"{label} must be a sha256 digest") from exc
+
+
+def _verification_result_dict(item: VerificationResult) -> dict[str, object]:
+    return {
+        "claimId": item.claim_id,
+        "dimension": item.dimension,
+        "verdict": item.verdict,
+        "severity": item.severity,
+        "method": item.method,
+        "evaluatorVersion": item.evaluator_version,
+        "evidenceIds": list(item.evidence_ids),
+        "confidence": item.confidence,
+        "validity": item.validity.value,
+    }
+
+
+def oracle_output_digest(
+    results: tuple[VerificationResult, ...],
+    evidence: tuple[object, ...],
+) -> str:
+    """Digest the trusted metadata representation of one Oracle output."""
+
+    return digest(
+        {
+            "results": [
+                {
+                    "claim_id": item.claim_id,
+                    "dimension": item.dimension,
+                    "verdict": item.verdict,
+                    "severity": item.severity,
+                    "method": item.method,
+                    "evaluator_version": item.evaluator_version,
+                    "evidence_ids": list(item.evidence_ids),
+                    "confidence": item.confidence,
+                    "validity": item.validity.value,
+                }
+                for item in results
+            ],
+            "evidence": [
+                {
+                    "evidence_id": item.evidence_id,
+                    "type": item.evidence_type,
+                    "media_type": item.media_type,
+                    "digest": item.digest,
+                    "classification": item.classification,
+                    "producer": item.producer,
+                }
+                for item in evidence
+            ],
+        }
+    )
 
 
 class OracleExecutionStatus(str, Enum):
@@ -136,7 +189,7 @@ class OracleRunnerDescription:
 
 @dataclass(frozen=True, slots=True)
 class OraclePackage:
-    """Immutable identity and minimum data contract of an Oracle package."""
+    """Immutable Oracle descriptor with an optional packaging-layer identity."""
 
     oracle_id: str
     version: str
@@ -144,11 +197,14 @@ class OraclePackage:
     code_digest: str
     projections: tuple[str, ...]
     input_pointers: Mapping[str, str] = field(default_factory=dict)
+    package_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.oracle_id or not self.version or not self.entrypoint:
             raise ValueError("oracle package identity fields must be non-empty")
         _require_sha256(self.code_digest, "oracle code_digest")
+        if self.package_digest is not None:
+            _require_sha256(self.package_digest, "oracle package_digest")
         projections = tuple(sorted({item for item in self.projections if item}))
         if not projections:
             raise ValueError("oracle package must request at least one projection")
@@ -170,7 +226,7 @@ class OraclePackage:
             MappingProxyType(dict(sorted(pointers.items()))),
         )
 
-    def to_dict(self) -> dict[str, object]:
+    def descriptor_dict(self) -> dict[str, object]:
         return {
             "oracle_id": self.oracle_id,
             "version": self.version,
@@ -180,9 +236,15 @@ class OraclePackage:
             "input_pointers": dict(self.input_pointers),
         }
 
+    def to_dict(self) -> dict[str, object]:
+        result = self.descriptor_dict()
+        if self.package_digest is not None:
+            result["package_digest"] = self.package_digest
+        return result
+
     @property
     def identity_digest(self) -> str:
-        return digest(self.to_dict())
+        return self.package_digest or digest(self.descriptor_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,9 +259,7 @@ class ProjectionSnapshot:
         _require_sha256(self.state_digest, "projection state_digest")
         frozen = _freeze(self.data)
         if digest(_thaw(frozen)) != self.state_digest:
-            raise ValueError(
-                f"projection digest mismatch: {self.projection_id}"
-            )
+            raise ValueError(f"projection digest mismatch: {self.projection_id}")
         object.__setattr__(self, "data", frozen)
 
     def to_dict(self) -> dict[str, object]:
@@ -223,10 +283,7 @@ class OracleEvaluationContext:
     def __post_init__(self) -> None:
         if not self.episode_id:
             raise ValueError("oracle context episode_id must be non-empty")
-        _require_sha256(
-            self.scenario_instance_digest,
-            "scenario_instance_digest",
-        )
+        _require_sha256(self.scenario_instance_digest, "scenario_instance_digest")
         _require_sha256(self.manifest_digest, "manifest_digest")
         object.__setattr__(self, "inputs", _freeze(self.inputs))
         object.__setattr__(
@@ -242,8 +299,7 @@ class OracleEvaluationContext:
             "manifest_digest": self.manifest_digest,
             "inputs": _thaw(self.inputs),
             "projections": {
-                key: value.to_dict()
-                for key, value in self.projections.items()
+                key: value.to_dict() for key, value in self.projections.items()
             },
         }
 
@@ -295,17 +351,13 @@ class OracleEvidencePayload:
         # publishing worker-controlled bytes into the trusted parent store.
         ArtifactRef(self.digest, len(self.content), self.media_type)
         if sha256_digest(self.content) != self.digest:
-            raise ValueError(
-                f"oracle evidence digest mismatch: {self.evidence_id}"
-            )
+            raise ValueError(f"oracle evidence digest mismatch: {self.evidence_id}")
         if not isinstance(self.classification, str) or not self.classification:
             raise ValueError("oracle evidence classification must be non-empty")
         if self.producer is not None and (
             not isinstance(self.producer, str) or not self.producer
         ):
-            raise ValueError(
-                "oracle evidence producer must be non-empty when present"
-            )
+            raise ValueError("oracle evidence producer must be non-empty when present")
 
 
 @dataclass(frozen=True, slots=True)
@@ -357,3 +409,97 @@ class OracleExecutionResult:
     results: tuple[VerificationResult, ...]
     evidence: tuple[OracleEvidencePayload, ...]
     artifact: OracleExecutionArtifact
+
+    def __post_init__(self) -> None:
+        # Protocol objects may arrive from third-party runner adapters. Normalize
+        # mutable list inputs before validating the output digest so the object
+        # cannot be changed through a caller-held collection after construction.
+        results = tuple(self.results)
+        evidence = tuple(self.evidence)
+        object.__setattr__(self, "results", results)
+        object.__setattr__(self, "evidence", evidence)
+
+        if self.request_id != self.artifact.request_id:
+            raise OracleProtocolError("Oracle execution request identity mismatch")
+        if self.status is not self.artifact.status:
+            raise OracleProtocolError("Oracle execution status and artifact status differ")
+        if self.status is OracleExecutionStatus.SUCCESS:
+            expected = oracle_output_digest(results, evidence)
+            if self.artifact.output_digest != expected:
+                raise OracleProtocolError("Oracle execution output digest mismatch")
+        elif results or evidence or self.artifact.output_digest is not None:
+            raise OracleProtocolError("failed Oracle execution cannot expose accepted output")
+
+
+@dataclass(frozen=True, slots=True)
+class OracleEvaluationRecord:
+    oracle_id: str
+    oracle_version: str
+    package_digest: str
+    input_digest: str
+    execution_record_digest: str | None
+    evaluation_validity: Validity
+    task_verdict: TaskVerdict
+    accepted_results: tuple[VerificationResult, ...] = ()
+    evidence_ids: tuple[str, ...] = ()
+    validity_detail: ValidityDetail | None = None
+
+    def __post_init__(self) -> None:
+        if not self.oracle_id or not self.oracle_version:
+            raise ValueError("Oracle evaluation identity fields must be non-empty")
+        _require_sha256(self.package_digest, "Oracle evaluation package_digest")
+        _require_sha256(self.input_digest, "Oracle evaluation input_digest")
+        if self.execution_record_digest is not None:
+            _require_sha256(
+                self.execution_record_digest,
+                "Oracle evaluation execution_record_digest",
+            )
+        if self.evaluation_validity not in {Validity.VALID, Validity.ORACLE_FAILURE}:
+            raise ValueError("Oracle evaluation validity must be VALID or ORACLE_FAILURE")
+        accepted = tuple(self.accepted_results)
+        evidence_ids = tuple(self.evidence_ids)
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("Oracle evaluation evidence ids must be unique")
+        if not all(isinstance(item, str) and 1 <= len(item) <= 256 for item in evidence_ids):
+            raise ValueError("Oracle evaluation evidence ids must contain 1..256 characters")
+        if any(item.validity is not Validity.VALID for item in accepted):
+            raise ValueError("accepted Oracle verification results must be VALID")
+        if self.evaluation_validity is Validity.ORACLE_FAILURE:
+            if self.validity_detail is None:
+                raise ValueError("ORACLE_FAILURE requires validity_detail")
+            if self.task_verdict is not TaskVerdict.INCONCLUSIVE:
+                raise ValueError("ORACLE_FAILURE requires INCONCLUSIVE task verdict")
+            if accepted:
+                raise ValueError("ORACLE_FAILURE cannot contain accepted results")
+        else:
+            if self.execution_record_digest is None:
+                raise ValueError("VALID Oracle evaluation requires execution_record_digest")
+            if self.validity_detail is not None:
+                raise ValueError("VALID Oracle evaluation cannot contain validity_detail")
+        object.__setattr__(self, "accepted_results", accepted)
+        object.__setattr__(self, "evidence_ids", evidence_ids)
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "oracle": {
+                "oracleId": self.oracle_id,
+                "version": self.oracle_version,
+                "packageDigest": self.package_digest,
+            },
+            "inputDigest": self.input_digest,
+            "evaluationValidity": self.evaluation_validity.value,
+            "taskVerdict": self.task_verdict.value,
+            "acceptedResults": [
+                _verification_result_dict(item) for item in self.accepted_results
+            ],
+            "evidenceIds": list(self.evidence_ids),
+        }
+        if self.execution_record_digest is not None:
+            result["executionRecordDigest"] = self.execution_record_digest
+        if self.validity_detail is not None:
+            result["validityDetail"] = self.validity_detail.to_dict()
+        return result
+
+    @property
+    def record_digest(self) -> str:
+        return digest(self.to_dict())

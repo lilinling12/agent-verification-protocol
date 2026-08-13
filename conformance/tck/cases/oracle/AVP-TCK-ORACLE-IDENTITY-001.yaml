@@ -1,0 +1,26 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ORACLE-IDENTITY-001
+  domain: oracle
+  status: draft
+profile: avp-oracle-v0.1
+requirements: [AVP-ORACLE-001, AVP-ORACLE-003, AVP-ORACLE-007]
+applicability: mandatory
+type: positive
+vector:
+  oracleId: refund-state
+  version: 1.2.0
+  entrypoint: tck.oracle:identity
+  codeDigest: sha256:71b630bb194950f6f95f14b69c470cb016a17bff18369bbf5def9cfb6ce656a4
+  packageBytesHex: "4156502d4f5241434c452d5041434b414745"
+  packageDigest: sha256:2e16d71538e5639118eaa21c29fd2fb6c3dd0dbdf435e7055569a47c7cb947dd
+  projections: [tck.identity]
+  inputPointers: {}
+  scenarioInstanceDigest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  manifestDigest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+expect:
+  packageDigestOpaque: true
+  identityBound: true
+  inputIntegrityBound: true
+  executionRecordAuditable: true

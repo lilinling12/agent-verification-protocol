@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ORACLE-EXECUTION-AUDIT-001
+  domain: oracle
+  status: draft
+profile: avp-oracle-v0.1
+requirements: [AVP-ORACLE-007]
+applicability: mandatory
+type: negative
+vector:
+  acceptedResult:
+    claimId: oracle.audit.bound
+    dimension: state.postcondition
+    verdict: PASS
+    severity: critical
+    method: oracle_tck
+    evaluatorVersion: 0.1.0
+    confidence: 1.0
+expect:
+  executionRecordBound: true
+  acceptedResultsPreserved: true
+  evaluationRecordImmutable: true
+  outputSubstitutionRejected: true
