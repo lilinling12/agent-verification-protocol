@@ -15,9 +15,7 @@ from .models import (
     TelemetryPolicy,
 )
 
-_TERMINAL_EVENTS = frozenset(
-    {"episode.completed", "episode.invalid", "episode.resources.released"}
-)
+_AUTO_FINALIZE_EVENTS = frozenset({"episode.completed", "episode.invalid"})
 _SAFE_PAYLOAD_KEYS = frozenset(
     {
         "manifest_digest",
@@ -100,7 +98,7 @@ class _NoopSession:
         if self._artifact is not None:
             return
         self._events += 1
-        if event.event_type in _TERMINAL_EVENTS:
+        if event.event_type in _AUTO_FINALIZE_EVENTS:
             self.finalize(complete=True)
 
     def inject_headers(self) -> Mapping[str, str]:
@@ -161,11 +159,11 @@ class _OpenTelemetrySession:
         )
         self._context = trace.set_span_in_context(self._root)
         self._events = 0
+        self._seen_event_types: set[str] = set()
         self._propagated = 0
         self._artifact: TelemetryArtifact | None = None
         self._open_spans: dict[str, Any] = {}
         self._mapping_incomplete = False
-        self._terminal_seen = False
 
     @property
     def artifact(self) -> TelemetryArtifact | None:
@@ -212,6 +210,7 @@ class _OpenTelemetrySession:
             return
 
         self._events += 1
+        self._seen_event_types.add(event.event_type)
         attributes = self._attrs(event)
         self._root.add_event(f"avp.{event.event_type}", attributes)
         correlation_id = str(event.payload.get("correlation_id") or "")
@@ -247,8 +246,7 @@ class _OpenTelemetrySession:
                     span.set_status(Status(StatusCode.ERROR, outcome))
                 span.end()
 
-        if event.event_type in _TERMINAL_EVENTS:
-            self._terminal_seen = True
+        if event.event_type in _AUTO_FINALIZE_EVENTS:
             self.finalize(complete=True)
 
     def inject_headers(self) -> Mapping[str, str]:
@@ -295,7 +293,12 @@ class _OpenTelemetrySession:
             span for span in all_spans if span.context.trace_id == context.trace_id
         )
 
-        complete_mapping = complete and self._terminal_seen and not self._mapping_incomplete
+        missing_required_events = set(self._policy.required_event_types) - self._seen_event_types
+        complete_mapping = (
+            complete
+            and not self._mapping_incomplete
+            and not missing_required_events
+        )
         if complete_mapping:
             completeness = TelemetryCompleteness.COMPLETE
         else:
