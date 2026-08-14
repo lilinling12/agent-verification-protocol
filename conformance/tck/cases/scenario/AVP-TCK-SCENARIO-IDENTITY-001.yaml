@@ -1,0 +1,33 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-IDENTITY-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-004]
+applicability: mandatory
+type: positive
+vector:
+  instance:
+    apiVersion: avp.spec/v0.1
+    kind: ScenarioInstance
+    metadata: {name: identity-vector, version: "1"}
+    environment: {type: stub}
+    actors: [{id: subject, type: agent}]
+    capabilities: {subject: {tools: []}}
+    task: {instruction: Return OK}
+    budgets: {maxSteps: 3}
+    provenance: {compiler: implementation-a}
+    instanceDigest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  identityPolicy:
+    canonicalization: RFC8785-JCS
+    digest: SHA-256
+    excludeTopLevel: [instanceDigest, provenance]
+expect:
+  digestPrefix: "sha256:"
+  lowercaseHexLength: 64
+  memberOrderIndependent: true
+  whitespaceIndependent: true
+  provenanceIndependent: true
+  semanticMutationChangesDigest: true
