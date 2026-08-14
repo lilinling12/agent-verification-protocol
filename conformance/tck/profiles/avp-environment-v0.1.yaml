@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-environment-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-ENVIRONMENT-001
+    - AVP-ENVIRONMENT-002
+    - AVP-ENVIRONMENT-003
+    - AVP-ENVIRONMENT-004
+    - AVP-ENVIRONMENT-005
+    - AVP-ENVIRONMENT-006
+    - AVP-ENVIRONMENT-007
+    - AVP-ENVIRONMENT-008
+    - AVP-ENVIRONMENT-009
+    - AVP-ENVIRONMENT-010
+    - AVP-ENVIRONMENT-011
+  conditional: []
