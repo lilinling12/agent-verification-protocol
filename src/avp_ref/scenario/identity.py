@@ -14,6 +14,8 @@ from typing import Any
 
 import rfc8785
 
+from .errors import ScenarioIdentityError
+
 
 _EXCLUDED_TOP_LEVEL_FIELDS = frozenset({"instanceDigest", "provenance"})
 
@@ -43,3 +45,26 @@ def scenario_instance_digest(document: Mapping[str, Any]) -> str:
 
     payload = canonical_instance_bytes(document)
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def verify_scenario_instance_identity(
+    document: Mapping[str, Any],
+    *,
+    expected_digest: str | None = None,
+) -> str:
+    """Fail closed unless declared and computed ScenarioInstance identity agree."""
+
+    declared = document.get("instanceDigest")
+    if not isinstance(declared, str) or not declared:
+        raise ScenarioIdentityError("ScenarioInstance instanceDigest is missing")
+
+    computed = scenario_instance_digest(document)
+    if declared != computed:
+        raise ScenarioIdentityError(
+            "ScenarioInstance instanceDigest does not match RFC 8785 semantic content"
+        )
+    if expected_digest is not None and expected_digest != declared:
+        raise ScenarioIdentityError(
+            "ScenarioInstance object identity does not match serialized instanceDigest"
+        )
+    return computed
