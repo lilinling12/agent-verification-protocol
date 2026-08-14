@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-TOOL-ERROR-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-007]
+applicability: mandatory
+type: negative
+vector:
+  tool: order.get
+  arguments: {order_id: ord_1}
+  toolErrorResult:
+    resultType: complete
+    isError: true
+    content:
+      - type: text
+        text: order not found
+expect:
+  resultReturnedToSubject: true
+  successfulResultNotClaimed: true
+  toolErrorOutcomeRecorded: true
+  resultIdentityPresent: true
+  upstreamFailureNotClaimed: true
