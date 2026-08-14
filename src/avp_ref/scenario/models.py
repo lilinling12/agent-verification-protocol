@@ -6,15 +6,20 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from .errors import ScenarioIdentityError
 
 FrozenValue = Any
 
 
 def deep_freeze(value: Any) -> FrozenValue:
-    """Recursively freeze JSON-compatible data."""
-
+    """Recursively freeze JSON-compatible data without coercing member names."""
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): deep_freeze(item) for key, item in value.items()})
+        frozen: dict[str, FrozenValue] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ScenarioIdentityError("Scenario JSON object member names must be strings")
+            frozen[key] = deep_freeze(item)
+        return MappingProxyType(frozen)
     if isinstance(value, list | tuple):
         return tuple(deep_freeze(item) for item in value)
     return value
@@ -22,7 +27,6 @@ def deep_freeze(value: Any) -> FrozenValue:
 
 def deep_thaw(value: FrozenValue) -> Any:
     """Convert frozen domain data back to plain JSON-compatible containers."""
-
     if isinstance(value, Mapping):
         return {key: deep_thaw(item) for key, item in value.items()}
     if isinstance(value, tuple):
@@ -33,7 +37,6 @@ def deep_thaw(value: FrozenValue) -> Any:
 @dataclass(frozen=True, slots=True)
 class SeedBundle:
     """Independent deterministic seeds for AVS nondeterminism dimensions."""
-
     scenario: int
     environment: int
     data: int
@@ -59,7 +62,6 @@ class SeedBundle:
 @dataclass(frozen=True, slots=True)
 class ResolvedReference:
     """Deterministic record of one AVS URI resolution."""
-
     path: str
     uri: str
     digest: str
@@ -84,7 +86,6 @@ class ResolvedReference:
 @dataclass(frozen=True, slots=True)
 class GeneratorRecord:
     """Audit record for a parameter value produced by a generator."""
-
     parameter: str
     generator_type: str
     generator_version: str
@@ -101,39 +102,28 @@ class GeneratorRecord:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioInstance:
-    """Immutable, identity-verified materialized ScenarioInstance.
-
-    Construction fails closed unless the public ``instance_digest`` attribute,
-    serialized ``instanceDigest`` field, and RFC 8785/SHA-256 recomputation all
-    agree. This protects Runtime callers that receive an instance from code
-    other than the reference compiler.
-    """
-
+    """Immutable, schema-valid, identity-verified materialized ScenarioInstance."""
     template_digest: str
     instance_digest: str
     document: Mapping[str, FrozenValue]
 
     def __post_init__(self) -> None:
         from .identity import verify_scenario_instance_identity
+        from .loader import validate_instance
 
+        validate_instance(self.document)
         verify_scenario_instance_identity(self.document, expected_digest=self.instance_digest)
+        object.__setattr__(self, "document", deep_freeze(self.document))
 
     def to_dict(self) -> dict[str, Any]:
         return deep_thaw(self.document)
 
     def subject_projection(self, actor_id: str = "subject") -> Mapping[str, FrozenValue]:
         """Return the conservative Agent-Plane view of this instance."""
-
         doc = self.document
-        actors = [
-            deep_thaw(actor)
-            for actor in doc.get("actors", ())
-            if actor.get("id") == actor_id
-        ]
+        actors = [deep_thaw(actor) for actor in doc.get("actors", ()) if actor.get("id") == actor_id]
         capabilities = doc.get("capabilities", {})
-        actor_capabilities = (
-            capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
-        )
+        actor_capabilities = capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
         public = {
             "apiVersion": doc["apiVersion"],
             "kind": doc["kind"],
