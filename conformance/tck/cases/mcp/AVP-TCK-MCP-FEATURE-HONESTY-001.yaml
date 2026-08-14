@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-FEATURE-HONESTY-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-008]
+applicability: mandatory
+type: negative
+vector:
+  tool: order.get
+  response:
+    resultType: input_required
+    inputRequests:
+      confirm:
+        type: elicitation
+        message: Continue?
+        schema: {type: boolean}
+expect:
+  unsupportedMrtrRejected: true
+  ordinarySuccessNotFabricated: true
+  mrtrSupportNotClaimed: true
