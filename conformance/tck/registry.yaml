@@ -245,3 +245,43 @@ cases:
     profile: avp-mcp-interop-v0.1
     requirements: [AVP-MCP-008]
     applicability: mandatory
+  - id: AVP-TCK-OTEL-ROOT-CORRELATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-ROOT-CORRELATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-001]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-EVENT-CORRELATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-EVENT-CORRELATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-002]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-TOOL-CORRELATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-TOOL-CORRELATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-003]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-OUTCOME-PRESERVATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-OUTCOME-PRESERVATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-004]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-PROPAGATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-PROPAGATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-005]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-DATA-MINIMIZATION-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-DATA-MINIMIZATION-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-006]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-COMPLETENESS-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-COMPLETENESS-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-007]
+    applicability: mandatory
+  - id: AVP-TCK-OTEL-EVIDENCE-BINDING-001
+    path: conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-EVIDENCE-BINDING-001.yaml
+    profile: avp-otel-mapping-v0.1
+    requirements: [AVP-OTEL-008]
+    applicability: mandatory
