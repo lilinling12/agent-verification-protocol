@@ -1,0 +1,27 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-LIFECYCLE-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-001, AVP-ENVIRONMENT-002, AVP-ENVIRONMENT-011]
+applicability: mandatory
+type: mixed
+vector:
+  scenarioBinding:
+    requireScenarioIdentity: true
+  lifecycle:
+    - provision
+    - verify-bound-scenario
+    - release
+    - operate-after-release
+  negativeControls:
+    - mutate-handle-scenario-identity
+    - operate-after-release
+expect:
+  opaqueHandle: true
+  scenarioIdentityBound: true
+  mismatchedScenarioHandleRejected: true
+  releasedHandleRejected: true
+  implicitReprovisionForbidden: true
