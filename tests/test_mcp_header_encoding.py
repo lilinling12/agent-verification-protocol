@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from avp_ref.mcp import MCPGatewayPolicy, MCPVerificationGateway
+from avp_ref.mcp import (
+    MCPGatewayPolicy,
+    MCPPermissionDenied,
+    MCPVerificationGateway,
+)
 from avp_ref.mcp.transport import encode_mcp_header_value
 
 
@@ -67,6 +71,34 @@ class HeaderTransport:
         raise AssertionError(method)
 
 
+class InvalidHeaderLocationTransport(HeaderTransport):
+    def __init__(self, input_schema: dict) -> None:
+        super().__init__()
+        self.input_schema = input_schema
+
+    def request(self, method, params=None, *, name=None, extra_headers=None):
+        if method != "tools/list":
+            return super().request(
+                method,
+                params,
+                name=name,
+                extra_headers=extra_headers,
+            )
+        self.calls.append(
+            (method, dict(params or {}), name, dict(extra_headers or {}))
+        )
+        return {
+            "tools": [
+                {
+                    "name": "invalid.header",
+                    "inputSchema": self.input_schema,
+                }
+            ],
+            "ttlMs": 0,
+            "cacheScope": "private",
+        }
+
+
 class MCPHeaderEncodingTest(unittest.TestCase):
     def test_header_encoding_matches_mcp_examples(self):
         self.assertEqual("us-west1", encode_mcp_header_value("us-west1"))
@@ -122,6 +154,56 @@ class MCPHeaderEncodingTest(unittest.TestCase):
         )
         self.assertEqual("-7", headers["Mcp-Param-Count"])
         self.assertEqual("true", headers["Mcp-Param-Enabled"])
+
+    def test_unreachable_header_annotations_exclude_tool_definition(self):
+        invalid_schemas = (
+            {
+                "type": "object",
+                "properties": {
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "x-mcp-header": "ArrayValue",
+                        },
+                    }
+                },
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "x-mcp-header": "VariantValue",
+                            },
+                            {"type": "integer"},
+                        ]
+                    }
+                },
+            },
+            {
+                "type": "object",
+                "$defs": {
+                    "hidden": {
+                        "type": "string",
+                        "x-mcp-header": "DefinitionValue",
+                    }
+                },
+                "properties": {"value": {"$ref": "#/$defs/hidden"}},
+            },
+        )
+
+        for schema in invalid_schemas:
+            with self.subTest(schema=schema):
+                gateway = MCPVerificationGateway(
+                    InvalidHeaderLocationTransport(schema),
+                    MCPGatewayPolicy(frozenset({"invalid.header"})),
+                    endpoint_identity="https://mcp.example.test/mcp",
+                )
+                with self.assertRaises(MCPPermissionDenied):
+                    gateway.open()
 
 
 if __name__ == "__main__":
