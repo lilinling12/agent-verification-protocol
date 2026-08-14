@@ -107,6 +107,7 @@ class _NoopSession:
         return {}
 
     def finalize(self, *, complete: bool = True) -> TelemetryArtifact:
+        del complete
         if self._artifact is None:
             completeness = (
                 TelemetryCompleteness.REQUIRED_MISSING
@@ -147,7 +148,6 @@ class _OpenTelemetrySession:
     def __init__(self, episode_id, manifest_digest, tracer, exporter, policy) -> None:
         from opentelemetry import trace
 
-        self._trace = trace
         self._episode_id = episode_id
         self._tracer = tracer
         self._exporter = exporter
@@ -165,6 +165,7 @@ class _OpenTelemetrySession:
         self._artifact: TelemetryArtifact | None = None
         self._open_spans: dict[str, Any] = {}
         self._mapping_incomplete = False
+        self._terminal_seen = False
 
     @property
     def artifact(self) -> TelemetryArtifact | None:
@@ -247,6 +248,7 @@ class _OpenTelemetrySession:
                 span.end()
 
         if event.event_type in _TERMINAL_EVENTS:
+            self._terminal_seen = True
             self.finalize(complete=True)
 
     def inject_headers(self) -> Mapping[str, str]:
@@ -293,16 +295,15 @@ class _OpenTelemetrySession:
             span for span in all_spans if span.context.trace_id == context.trace_id
         )
 
-        if not complete:
-            completeness = TelemetryCompleteness.INCOMPLETE
-        elif self._mapping_incomplete:
+        complete_mapping = complete and self._terminal_seen and not self._mapping_incomplete
+        if complete_mapping:
+            completeness = TelemetryCompleteness.COMPLETE
+        else:
             completeness = (
                 TelemetryCompleteness.REQUIRED_MISSING
-                if self._policy.required
+                if self._policy.required and complete
                 else TelemetryCompleteness.INCOMPLETE
             )
-        else:
-            completeness = TelemetryCompleteness.COMPLETE
 
         if self._policy.required and (not context.is_valid or not spans):
             completeness = TelemetryCompleteness.REQUIRED_MISSING
