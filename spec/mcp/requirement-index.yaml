@@ -33,7 +33,7 @@ requirements:
   - id: AVP-MCP-005
     level: MUST
     area: call-binding
-    statement: Accepted MCP interactions bind correlation, tool, argument, schema, catalog, result, and upstream-failure identity.
+    statement: Accepted MCP interactions bind correlation, tool, argument, schema, catalog, result, and explicit outcome identity.
     spec: spec/mcp/mcp-tools-interop-contract.md
     anchor: avp-mcp-005
     conformance: [AVP-TCK-MCP-CALL-BINDING-001]
@@ -47,10 +47,10 @@ requirements:
   - id: AVP-MCP-007
     level: MUST
     area: failure-separation
-    statement: Upstream failures remain distinct from successful accepted MCP tool results.
+    statement: Successful results, MCP tool execution errors, and upstream/protocol failures remain explicitly distinguishable in verification evidence.
     spec: spec/mcp/mcp-tools-interop-contract.md
     anchor: avp-mcp-007
-    conformance: [AVP-TCK-MCP-UPSTREAM-FAILURE-001]
+    conformance: [AVP-TCK-MCP-UPSTREAM-FAILURE-001, AVP-TCK-MCP-TOOL-ERROR-001]
   - id: AVP-MCP-008
     level: MUST
     area: feature-honesty
