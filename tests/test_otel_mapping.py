@@ -31,7 +31,7 @@ def _event(
 
 class OpenTelemetryMappingInvariantTest(unittest.TestCase):
     def test_mcp_tool_error_remains_result_but_marks_tool_span_error(self) -> None:
-        bridge = OpenTelemetryBridge()
+        bridge = OpenTelemetryBridge(TelemetryPolicy(required_event_types=()))
         session = bridge.start_episode(
             "ep_otel_mapping",
             "sha256:" + "a" * 64,
