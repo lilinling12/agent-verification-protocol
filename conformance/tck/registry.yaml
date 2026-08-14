@@ -205,3 +205,43 @@ cases:
     profile: avp-environment-v0.1
     requirements: [AVP-ENVIRONMENT-010]
     applicability: mandatory
+  - id: AVP-TCK-MCP-REVISION-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-REVISION-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-001, AVP-MCP-006]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-CAPABILITY-DENY-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-CAPABILITY-DENY-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-002]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-BASELINE-IDENTITY-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-BASELINE-IDENTITY-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-003]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-SCHEMA-DRIFT-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-SCHEMA-DRIFT-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-004]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-CALL-BINDING-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-CALL-BINDING-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-005]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-TOOL-ERROR-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-TOOL-ERROR-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-007]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-UPSTREAM-FAILURE-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-UPSTREAM-FAILURE-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-007]
+    applicability: mandatory
+  - id: AVP-TCK-MCP-FEATURE-HONESTY-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-FEATURE-HONESTY-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-008]
+    applicability: mandatory

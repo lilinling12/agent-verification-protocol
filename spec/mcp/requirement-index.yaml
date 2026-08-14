@@ -1,0 +1,60 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-mcp-interop-v0.1
+requirements:
+  - id: AVP-MCP-001
+    level: MUST
+    area: revision-binding
+    statement: AVP MCP verification binds the selected MCP revision and preserves MCP as the external protocol authority.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-001
+    conformance: [AVP-TCK-MCP-REVISION-001]
+  - id: AVP-MCP-002
+    level: MUST
+    area: capability-binding
+    statement: Subject-visible MCP tools are restricted to compiled Scenario capabilities before upstream execution.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-002
+    conformance: [AVP-TCK-MCP-CAPABILITY-DENY-001]
+  - id: AVP-MCP-003
+    level: MUST
+    area: baseline-identity
+    statement: Verification binds a stable tool-contract baseline and excludes cache-only retrieval metadata from contract drift.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-003
+    conformance: [AVP-TCK-MCP-BASELINE-IDENTITY-001]
+  - id: AVP-MCP-004
+    level: MUST
+    area: schema-drift
+    statement: Tool inputs and declared structured outputs are validated, and claimed pre-call material drift detection fails closed before side effects.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-004
+    conformance: [AVP-TCK-MCP-SCHEMA-DRIFT-001]
+  - id: AVP-MCP-005
+    level: MUST
+    area: call-binding
+    statement: Accepted MCP interactions bind correlation, tool, argument, schema, catalog, result, and explicit outcome identity.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-005
+    conformance: [AVP-TCK-MCP-CALL-BINDING-001]
+  - id: AVP-MCP-006
+    level: MUST
+    area: wire-preservation
+    statement: AVP metadata does not overwrite or conflict with mandatory semantics of the selected MCP transport/revision.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-006
+    conformance: [AVP-TCK-MCP-REVISION-001]
+  - id: AVP-MCP-007
+    level: MUST
+    area: failure-separation
+    statement: Successful results, MCP tool execution errors, and upstream/protocol failures remain explicitly distinguishable in verification evidence.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-007
+    conformance: [AVP-TCK-MCP-UPSTREAM-FAILURE-001, AVP-TCK-MCP-TOOL-ERROR-001]
+  - id: AVP-MCP-008
+    level: MUST
+    area: feature-honesty
+    statement: Unsupported MCP feature/result shapes fail closed and are never flattened into ordinary successful tool completion.
+    spec: spec/mcp/mcp-tools-interop-contract.md
+    anchor: avp-mcp-008
+    conformance: [AVP-TCK-MCP-FEATURE-HONESTY-001]

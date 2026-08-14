@@ -1,0 +1,103 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: mcp
+  status: promoted-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-MCP-001
+    decision: bind-external-protocol-authority
+    implementationEvidence:
+      - src/avp_ref/mcp/models.py
+      - src/avp_ref/mcp/transport.py
+    notes: MCP 2026-07-28 is the external protocol authority; AVP does not redefine wire semantics or require server/discover.
+  - requirement: AVP-MCP-002
+    decision: promote-avp-capability-binding
+    implementationEvidence:
+      - src/avp_ref/mcp/gateway.py
+      - spec/security/security-boundary-contract.md
+      - spec/scenario/scenario-contract.md
+    notes: Subject-visible MCP tools bind to compiled Scenario capabilities and fail closed before upstream invocation.
+  - requirement: AVP-MCP-003
+    decision: promote-verification-identity
+    implementationEvidence:
+      - src/avp_ref/mcp/models.py
+      - src/avp_ref/mcp/gateway.py
+    notes: Baseline tool-contract identity is AVP-owned; MCP cache TTL/scope/page shape remain retrieval metadata and are not contract identity.
+  - requirement: AVP-MCP-004
+    decision: promote-fail-closed-validation
+    implementationEvidence:
+      - src/avp_ref/mcp/gateway.py
+      - tests/test_mcp_gateway.py
+      - tests/test_mcp_call_outcome.py
+    notes: Input and successful structured-output validation plus claimed pre-call drift detection are verification requirements. MCP tool execution errors remain distinct from successful structured output.
+  - requirement: AVP-MCP-005
+    decision: promote-verification-call-binding
+    implementationEvidence:
+      - src/avp_ref/mcp/models.py
+      - src/avp_ref/runtime/manifest.py
+      - src/avp_ref/runtime/engine.py
+    notes: Call records bind correlation, tool, arguments, schema, catalog, result identity when present, and explicit outcome. Episode manifest/gateway-open evidence bind endpoint policy, server identity, selected revision, and baseline catalog without duplicating those fields in every call record.
+  - requirement: AVP-MCP-006
+    decision: compose-with-mcp-wire-semantics
+    implementationEvidence:
+      - src/avp_ref/mcp/transport.py
+      - src/avp_ref/mcp/gateway.py
+      - tests/test_mcp_header_encoding.py
+    notes: Acceptance audit fixed MCP 2026-07-28 mirrored-header Base64 sentinel encoding, static properties-chain annotation reachability, and JSON-Schema integer normalization/safe-range handling. MCP remains authoritative for the wire semantics.
+  - requirement: AVP-MCP-007
+    decision: promote-call-outcome-separation
+    implementationEvidence:
+      - src/avp_ref/mcp/gateway.py
+      - src/avp_ref/mcp/models.py
+      - tests/test_mcp_call_outcome.py
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-TOOL-ERROR-001.yaml
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-UPSTREAM-FAILURE-001.yaml
+    notes: Verification evidence explicitly distinguishes SUCCESS, MCP TOOL_ERROR (including isError=true with real result identity), and UPSTREAM_ERROR (no MCP result identity). Tool execution errors remain available to the Subject/model but cannot be claimed as successful completion.
+  - requirement: AVP-MCP-008
+    decision: promote-feature-honesty
+    implementationEvidence:
+      - src/avp_ref/mcp/gateway.py
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-FEATURE-HONESTY-001.yaml
+    notes: MRTR is not mandatory for AVP v0.1; unsupported input_required results fail closed instead of being flattened into success.
+nonNormativeImplementationDetails:
+  - Python MCPVerificationGateway class/API
+  - urllib Streamable HTTP implementation
+  - server/discover bootstrap choice
+  - MCPToolCatalog/MCPCallRecord dataclass shapes
+  - internal digest helper implementation
+  - MCP SDK selection
+  - cache implementation
+  - authorization implementation
+externalAuthority:
+  protocol: Model Context Protocol
+  revision: "2026-07-28"
+  ownedSemantics:
+    - JSON-RPC and message patterns
+    - Streamable HTTP transport
+    - request metadata and mirrored headers
+    - tools/list and tools/call
+    - tool JSON Schema semantics
+    - cache metadata
+    - authorization
+    - MRTR
+    - extensions
+acceptanceAudit:
+  status: passed
+  evidence:
+    - portable MCP profile is mandatory and reference-conformant at 8/8 cases
+    - spec traceability covers 61 requirements, 48 registered TCK cases, and 7 profiles
+    - source, package, clean-wheel install, and installed-wheel TCK checks pass
+    - MCP wire compatibility gaps found during audit were corrected rather than encoded as AVP-specific wire rules
+    - verification identity composes Episode manifest gateway configuration, gateway-open server/catalog identity, and per-call schema/catalog/result/outcome binding
+    - unsupported MRTR remains explicitly unclaimed and fails closed
+  nonClaims:
+    - AVP MCP conformance is not MCP protocol certification beyond the selected verification mapping
+    - server/discover is not required by AVP
+    - MCP authorization/OAuth is not replaced by Scenario capability policy
+    - MRTR support is not claimed by the reference implementation
+nextGates:
+  - clean final-head CI and Governance after reconciliation promotion
+  - no unresolved review threads or base drift
+  - mark PR ready for review
+  - explicit merge authorization

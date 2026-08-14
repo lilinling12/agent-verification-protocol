@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-CAPABILITY-DENY-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-002]
+applicability: mandatory
+type: negative
+vector:
+  allowedTools: [order.get]
+  attemptedTool: customer.delete
+expect:
+  deniedBeforeUpstreamCall: true
+  upstreamToolsCallCount: 0
+  noAcceptedResultIdentity: true

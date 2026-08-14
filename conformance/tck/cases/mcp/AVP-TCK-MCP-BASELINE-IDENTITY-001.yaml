@@ -1,0 +1,29 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-BASELINE-IDENTITY-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-003]
+applicability: mandatory
+type: mixed
+vector:
+  baselineTools:
+    - name: order.get
+      inputSchema:
+        type: object
+        properties:
+          order_id: {type: string}
+        required: [order_id]
+  retrievalVariants:
+    - ttlMs: 1000
+      cacheScope: private
+      pagePartition: [1]
+    - ttlMs: 250
+      cacheScope: private
+      pagePartition: [1]
+expect:
+  equalToolContractHasStableIdentity: true
+  cacheMetadataDoesNotChangeContractIdentity: true
+  toolNameAndSchemaBound: true

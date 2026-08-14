@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-mcp-interop-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-MCP-001
+    - AVP-MCP-002
+    - AVP-MCP-003
+    - AVP-MCP-004
+    - AVP-MCP-005
+    - AVP-MCP-006
+    - AVP-MCP-007
+    - AVP-MCP-008
+  conditional: []

@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-CALL-BINDING-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-005]
+applicability: mandatory
+type: positive
+vector:
+  correlationId: call_7
+  tool: order.get
+  arguments: {order_id: ord_1}
+  result:
+    resultType: complete
+    structuredContent: {ok: true}
+expect:
+  correlationBound: true
+  toolNameBound: true
+  argumentsIdentityBound: true
+  schemaIdentityBound: true
+  catalogIdentityBound: true
+  acceptedResultIdentityBound: true
+  upstreamFailureFalse: true

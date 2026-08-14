@@ -9,6 +9,7 @@ from .models import TCKAdapterError, TCKCaseResult
 from .reference_aligned import AlignedReferenceTCKAdapter
 from .reference_environment import ReferenceEnvironmentTCKAdapter
 from .reference_evidence import ReferenceEvidenceTCKAdapter
+from .reference_mcp import ReferenceMCPTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
 from .reference_security import ReferenceSecurityTCKAdapter
@@ -27,6 +28,7 @@ class ReferenceConformanceAdapter:
             ReferenceOracleTCKAdapter(),
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
+            ReferenceMCPTCKAdapter(),
             ReferenceSecurityTCKAdapter(),
             ReferenceSecurityFaultTCKAdapter(),
             ReferenceSecurityAssuranceTCKAdapter(),
