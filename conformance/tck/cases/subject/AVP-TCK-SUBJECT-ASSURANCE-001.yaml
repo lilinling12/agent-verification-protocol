@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-ASSURANCE-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-009]
+applicability: mandatory
+type: negative
+vector:
+  adapterKind: in_process
+  claimedIsolation:
+    - process
+    - network
+    - tenant
+expect:
+  unsupportedIsolationClaimsRejected: true
+  inProcessDoesNotImplyProcessIsolation: true
+  strongerClaimsRequireSecurityAssuranceEvidence: true
