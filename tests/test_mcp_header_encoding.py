@@ -99,6 +99,45 @@ class InvalidHeaderLocationTransport(HeaderTransport):
         }
 
 
+class NestedHeaderTransport(HeaderTransport):
+    def request(self, method, params=None, *, name=None, extra_headers=None):
+        if method != "tools/list":
+            return super().request(
+                method,
+                params,
+                name=name,
+                extra_headers=extra_headers,
+            )
+        self.calls.append(
+            (method, dict(params or {}), name, dict(extra_headers or {}))
+        )
+        return {
+            "tools": [
+                {
+                    "name": "nested.echo",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "context": {
+                                "type": "object",
+                                "properties": {
+                                    "tenant": {
+                                        "type": "string",
+                                        "x-mcp-header": "Tenant",
+                                    }
+                                },
+                                "required": ["tenant"],
+                            }
+                        },
+                        "required": ["context"],
+                    },
+                }
+            ],
+            "ttlMs": 0,
+            "cacheScope": "private",
+        }
+
+
 class MCPHeaderEncodingTest(unittest.TestCase):
     def test_header_encoding_matches_mcp_examples(self):
         self.assertEqual("us-west1", encode_mcp_header_value("us-west1"))
@@ -154,6 +193,19 @@ class MCPHeaderEncodingTest(unittest.TestCase):
         )
         self.assertEqual("-7", headers["Mcp-Param-Count"])
         self.assertEqual("true", headers["Mcp-Param-Enabled"])
+
+    def test_nested_properties_header_path_remains_supported(self):
+        transport = NestedHeaderTransport()
+        gateway = MCPVerificationGateway(
+            transport,
+            MCPGatewayPolicy(frozenset({"nested.echo"})),
+            endpoint_identity="https://mcp.example.test/mcp",
+        )
+        gateway.open()
+        gateway.call_tool("nested.echo", {"context": {"tenant": "tenant-a"}})
+
+        call = next(item for item in transport.calls if item[0] == "tools/call")
+        self.assertEqual("tenant-a", call[3]["Mcp-Param-Tenant"])
 
     def test_unreachable_header_annotations_exclude_tool_definition(self):
         invalid_schemas = (
