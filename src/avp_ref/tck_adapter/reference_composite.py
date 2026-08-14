@@ -10,6 +10,7 @@ from .reference_aligned import AlignedReferenceTCKAdapter
 from .reference_evidence import ReferenceEvidenceTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
 from .reference_security import ReferenceSecurityTCKAdapter
+from .reference_security_fault import ReferenceSecurityFaultTCKAdapter
 
 
 class ReferenceConformanceAdapter:
@@ -22,6 +23,7 @@ class ReferenceConformanceAdapter:
             ReferenceEvidenceTCKAdapter(),
             ReferenceOracleTCKAdapter(),
             ReferenceSecurityTCKAdapter(),
+            ReferenceSecurityFaultTCKAdapter(),
         )
         owners: dict[str, object] = {}
         for delegate in self._delegates:
