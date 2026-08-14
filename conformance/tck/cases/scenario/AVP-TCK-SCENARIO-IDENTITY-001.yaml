@@ -7,7 +7,7 @@ metadata:
 profile: avp-scenario-v0.1
 requirements: [AVP-SCENARIO-004]
 applicability: mandatory
-type: positive
+type: negative
 vector:
   instance:
     apiVersion: avp.spec/v0.1
@@ -19,12 +19,14 @@ vector:
     task: {instruction: Return OK}
     budgets: {maxSteps: 3}
     provenance: {compiler: implementation-a}
-    instanceDigest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    instanceDigest: sha256:249b09b211865ead71a0c5fa6b34d76d22b466a8cd668415ec6336978c75291e
   identityPolicy:
     canonicalization: RFC8785-JCS
     digest: SHA-256
     excludeTopLevel: [instanceDigest, provenance]
 expect:
+  declaredDigestMatchesContent: true
+  tamperedDeclaredDigestRejected: true
   digestPrefix: "sha256:"
   lowercaseHexLength: 64
   memberOrderIndependent: true
