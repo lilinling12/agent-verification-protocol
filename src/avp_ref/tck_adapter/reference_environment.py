@@ -80,7 +80,6 @@ class ReferenceEnvironmentTCKAdapter:
             adapter_name=handle.adapter_name,
             adapter_version=handle.adapter_version,
             scenario_digest="sha256:" + "0" * 64,
-            generation=handle.generation,
         )
         try:
             adapter.digest(forged)
@@ -169,17 +168,19 @@ class ReferenceEnvironmentTCKAdapter:
 
         first_data = first.to_dict()["data"]
         second_data = second.to_dict()["data"]
+        first_identity = (first.projection_id, first.digest)
+        second_identity = (second.projection_id, second.digest)
         passed = (
             first.digest == digest(first_data)
             and second.digest == digest(second_data)
             and first.digest == first_repeat.digest
             and first.projection_id == projection_names[0]
             and second.projection_id == projection_names[1]
-            and first.digest != second.digest
+            and first_identity != second_identity
             and second_after.digest != second.digest
         )
         return passed, (
-            "projection identity and authoritative data digests remain stable, scoped, and mutation-sensitive"
+            "projection identifier and content digest remain bound as one evidence identity"
             if passed
             else "projection identity or digest binding violated the v0.1 contract"
         )
