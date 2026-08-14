@@ -19,6 +19,7 @@ from .errors import (
 )
 from .models import (
     MCP_PROTOCOL_VERSION,
+    MCPCallOutcome,
     MCPCallRecord,
     MCPGatewayDescription,
     MCPGatewayPolicy,
@@ -180,22 +181,29 @@ class MCPVerificationGateway:
                     None,
                     baseline.schema_digest,
                     self._catalog.catalog_digest,
-                    True,
+                    MCPCallOutcome.UPSTREAM_ERROR,
                 )
             )
             raise
 
         normalized = self._normalize_call_result(result)
-        if baseline.output_schema is not None:
+        outcome = (
+            MCPCallOutcome.TOOL_ERROR
+            if normalized.get("isError") is True
+            else MCPCallOutcome.SUCCESS
+        )
+
+        if outcome is MCPCallOutcome.SUCCESS and baseline.output_schema is not None:
             if "structuredContent" not in normalized:
                 raise MCPProtocolError(
-                    "tool declares outputSchema but response has no structuredContent"
+                    "tool declares outputSchema but successful response has no structuredContent"
                 )
             self._validate_instance(
                 normalized["structuredContent"],
                 baseline.output_schema,
                 "structuredContent",
             )
+
         self._records.append(
             MCPCallRecord(
                 correlation,
@@ -204,7 +212,7 @@ class MCPVerificationGateway:
                 digest(normalized),
                 baseline.schema_digest,
                 self._catalog.catalog_digest,
-                False,
+                outcome,
             )
         )
         return normalized
