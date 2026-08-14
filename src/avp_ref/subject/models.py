@@ -12,7 +12,9 @@ from avp_ref.canonical import digest
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
+        return MappingProxyType(
+            {str(key): _freeze(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
     return value
@@ -27,8 +29,13 @@ def _thaw(value: Any) -> Any:
 
 
 class SubjectStatus(str, Enum):
+    """Successful SubjectResult terminal state.
+
+    Material non-success outcomes are represented by the typed SubjectAdapterError
+    taxonomy rather than by a second, ambiguous result channel.
+    """
+
     COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,17 +112,32 @@ class ToolCall:
         object.__setattr__(self, "arguments", _freeze(self.arguments))
 
     def to_dict(self) -> dict[str, Any]:
-        return {"call_id": self.call_id, "name": self.name, "arguments": _thaw(self.arguments)}
+        return {
+            "call_id": self.call_id,
+            "name": self.name,
+            "arguments": _thaw(self.arguments),
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class SubjectResult:
+    """Successful completion produced by a Subject Adapter.
+
+    Execution, transport, protocol, timeout and budget failures use typed
+    SubjectAdapterError subclasses and therefore cannot be mistaken for a
+    successful result object.
+    """
+
     status: SubjectStatus
     report: str | None
     steps: int
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.status is not SubjectStatus.COMPLETED:
+            raise ValueError("SubjectResult status must be COMPLETED")
         if self.steps < 0:
             raise ValueError("steps must be >= 0")
+        if self.report is not None and not isinstance(self.report, str):
+            raise ValueError("SubjectResult report must be a string or null")
         object.__setattr__(self, "metadata", _freeze(self.metadata))
