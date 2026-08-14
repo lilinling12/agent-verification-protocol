@@ -52,18 +52,21 @@ entries:
   - requirement: AVP-SUBJECT-006
     decision: promote-failure-separation
     implementationEvidence:
+      - src/avp_ref/subject/models.py
       - src/avp_ref/subject/errors.py
       - src/avp_ref/subject/http.py
       - src/avp_ref/runtime/engine.py
       - conformance/tck/cases/subject/AVP-TCK-SUBJECT-OUTCOME-001.yaml
-    notes: Completion, explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion remain distinguishable; infrastructure failure is not converted into task failure or success.
+    notes: SubjectResult represents successful completion only; explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion use typed failure channels and remain distinguishable from task verdict semantics.
   - requirement: AVP-SUBJECT-007
     decision: promote-fail-closed-result-validation
     implementationEvidence:
+      - src/avp_ref/subject/models.py
       - src/avp_ref/subject/http.py
       - src/avp_ref/runtime/engine.py
+      - tests/test_subject_models.py
       - conformance/tck/cases/subject/AVP-TCK-SUBJECT-RESULT-001.yaml
-    notes: Malformed, contradictory, unsupported, and non-completed terminal states fail closed; the concrete HTTP frame schema remains non-normative.
+    notes: SubjectResult rejects non-completion states and malformed reports at the model boundary; malformed, contradictory, or unsupported transport terminals also fail closed while concrete HTTP frame syntax remains non-normative.
   - requirement: AVP-SUBJECT-008
     decision: promote-stale-handle-fail-closed
     implementationEvidence:
@@ -99,12 +102,12 @@ acceptanceAudit:
     - remote Subject payloads use Scenario Subject task projection and sanitized Agent identity, excluding arbitrary evaluator AgentSystem metadata
     - evaluator-owned step budgets reject late completion rather than being enlarged or silently ignored
     - unauthorized adapter-API tool capability use is denied before downstream routing without claiming process sandbox containment
-    - explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion remain distinguishable from successful completion
-    - malformed, contradictory, unsupported, and non-completed terminal results fail closed
+    - SubjectResult is completion-only; explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion remain typed and distinguishable from successful completion
+    - malformed reports, contradictory/unsupported transport terminals, and attempted non-completion result construction fail closed
     - in-process reference adapter truthfully claims isolation none and does not imply stronger SecurityAssurance
     - final candidate Quality runs on Python 3.11/3.12/3.13 and Package clean-wheel validation passed before promotion
 remainingGates:
-  - final-head CI and Governance after reconciliation promotion
+  - final-head CI and Governance after completion-only result hardening
   - unresolved review-thread check
   - main drift check
   - explicit user authorization before merge
