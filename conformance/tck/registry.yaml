@@ -230,6 +230,11 @@ cases:
     profile: avp-mcp-interop-v0.1
     requirements: [AVP-MCP-005]
     applicability: mandatory
+  - id: AVP-TCK-MCP-TOOL-ERROR-001
+    path: conformance/tck/cases/mcp/AVP-TCK-MCP-TOOL-ERROR-001.yaml
+    profile: avp-mcp-interop-v0.1
+    requirements: [AVP-MCP-007]
+    applicability: mandatory
   - id: AVP-TCK-MCP-UPSTREAM-FAILURE-001
     path: conformance/tck/cases/mcp/AVP-TCK-MCP-UPSTREAM-FAILURE-001.yaml
     profile: avp-mcp-interop-v0.1
