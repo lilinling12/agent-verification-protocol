@@ -7,8 +7,11 @@ from avp_ref.scenario import (
     ParameterResolutionError,
     ReferenceResolutionError,
     ScenarioCompiler,
+    ScenarioIdentityError,
+    ScenarioInstance,
     scenario_instance_digest,
     validate_instance,
+    verify_scenario_instance_identity,
 )
 
 
@@ -29,9 +32,7 @@ class ScenarioCompilerTest(unittest.TestCase):
 
     def test_materialized_semantic_change_changes_identity(self):
         template = copy.deepcopy(REFERENCE_TEMPLATE)
-        template["parameters"] = {
-            "target": {"type": "string", "required": True}
-        }
+        template["parameters"] = {"target": {"type": "string", "required": True}}
         template["task"] = {"instruction": "Refund ${target}."}
         compiler = ScenarioCompiler()
         first = compiler.compile(
@@ -54,9 +55,42 @@ class ScenarioCompilerTest(unittest.TestCase):
         instance = ScenarioCompiler().compile(REFERENCE_TEMPLATE)
         document = instance.to_dict()
         validate_instance(document)
+        verify_scenario_instance_identity(document)
         self.assertEqual(document["instanceDigest"], instance.instance_digest)
         self.assertNotIn("instance_digest", document)
         self.assertNotIn("compilation", document)
+
+    def test_declared_digest_tampering_fails_closed(self):
+        instance = ScenarioCompiler().compile(REFERENCE_TEMPLATE)
+        document = instance.to_dict()
+        document["instanceDigest"] = "sha256:" + "0" * 64
+        with self.assertRaises(ScenarioIdentityError):
+            verify_scenario_instance_identity(document)
+        with self.assertRaises(ScenarioIdentityError):
+            ScenarioInstance(
+                template_digest=instance.template_digest,
+                instance_digest=instance.instance_digest,
+                document=document,
+            )
+
+    def test_manual_instance_construction_detaches_mutable_input(self):
+        compiled = ScenarioCompiler().compile(REFERENCE_TEMPLATE)
+        document = compiled.to_dict()
+        reconstructed = ScenarioInstance(
+            template_digest=compiled.template_digest,
+            instance_digest=compiled.instance_digest,
+            document=document,
+        )
+        document["task"]["instruction"] = "tampered after construction"
+        self.assertNotEqual(document["task"]["instruction"], reconstructed.document["task"]["instruction"])
+        with self.assertRaises(TypeError):
+            reconstructed.document["task"]["instruction"] = "mutate frozen instance"
+
+    def test_identity_rejects_non_string_object_member_names(self):
+        document = ScenarioCompiler().compile(REFERENCE_TEMPLATE).to_dict()
+        document[1] = "non-json-member-name"
+        with self.assertRaises(ScenarioIdentityError):
+            scenario_instance_digest(document)
 
     def test_reference_bindings_are_identity_bound(self):
         instance = ScenarioCompiler().compile(REFERENCE_TEMPLATE)
@@ -89,7 +123,10 @@ class ScenarioCompilerTest(unittest.TestCase):
 
     def test_strict_references_reject_symbolic_resolution(self):
         with self.assertRaises(ReferenceResolutionError):
-            ScenarioCompiler().compile(REFERENCE_TEMPLATE, CompileOptions(strict_references=True))
+            ScenarioCompiler().compile(
+                REFERENCE_TEMPLATE,
+                CompileOptions(strict_references=True),
+            )
 
 
 if __name__ == "__main__":
