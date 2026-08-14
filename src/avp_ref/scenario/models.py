@@ -6,21 +6,20 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from .errors import ScenarioIdentityError
 
 FrozenValue = Any
 
 
 def deep_freeze(value: Any) -> FrozenValue:
-    """Recursively freeze JSON-compatible data.
-
-    ``dataclass(frozen=True)`` only protects attribute reassignment; without a
-    recursive freeze, nested dictionaries could still mutate after a digest was
-    calculated. AVP relies on instance digests as audit identities, so deep
-    immutability is a protocol invariant rather than a style preference.
-    """
-
+    """Recursively freeze JSON-compatible data without coercing member names."""
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): deep_freeze(item) for key, item in value.items()})
+        frozen: dict[str, FrozenValue] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ScenarioIdentityError("Scenario JSON object member names must be strings")
+            frozen[key] = deep_freeze(item)
+        return MappingProxyType(frozen)
     if isinstance(value, list | tuple):
         return tuple(deep_freeze(item) for item in value)
     return value
@@ -28,7 +27,6 @@ def deep_freeze(value: Any) -> FrozenValue:
 
 def deep_thaw(value: FrozenValue) -> Any:
     """Convert frozen domain data back to plain JSON-compatible containers."""
-
     if isinstance(value, Mapping):
         return {key: deep_thaw(item) for key, item in value.items()}
     if isinstance(value, tuple):
@@ -39,7 +37,6 @@ def deep_thaw(value: FrozenValue) -> Any:
 @dataclass(frozen=True, slots=True)
 class SeedBundle:
     """Independent deterministic seeds for AVS nondeterminism dimensions."""
-
     scenario: int
     environment: int
     data: int
@@ -65,7 +62,6 @@ class SeedBundle:
 @dataclass(frozen=True, slots=True)
 class ResolvedReference:
     """Deterministic record of one AVS URI resolution."""
-
     path: str
     uri: str
     digest: str
@@ -90,7 +86,6 @@ class ResolvedReference:
 @dataclass(frozen=True, slots=True)
 class GeneratorRecord:
     """Audit record for a parameter value produced by a generator."""
-
     parameter: str
     generator_type: str
     generator_version: str
@@ -107,28 +102,28 @@ class GeneratorRecord:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioInstance:
-    """Immutable, fully materialized AVS ScenarioInstance.
-
-    The ``instance_digest`` is computed from all other serialized fields and is
-    therefore an audit identity. Consumers should use :meth:`to_dict` when a
-    mutable JSON representation is required for transport.
-    """
-
+    """Immutable, schema-valid, identity-verified materialized ScenarioInstance."""
     template_digest: str
     instance_digest: str
     document: Mapping[str, FrozenValue]
+
+    def __post_init__(self) -> None:
+        from .identity import verify_scenario_instance_identity
+        from .loader import validate_instance
+
+        plain_document = deep_thaw(self.document)
+        validate_instance(plain_document)
+        verify_scenario_instance_identity(
+            plain_document,
+            expected_digest=self.instance_digest,
+        )
+        object.__setattr__(self, "document", deep_freeze(plain_document))
 
     def to_dict(self) -> dict[str, Any]:
         return deep_thaw(self.document)
 
     def subject_projection(self, actor_id: str = "subject") -> Mapping[str, FrozenValue]:
-        """Return the conservative Agent-Plane view of this instance.
-
-        Verification conditions, faults, graders, validity rules and
-        contamination controls intentionally remain evaluator-only. The Subject
-        receives what it needs to act, not the benchmark answer key.
-        """
-
+        """Return the conservative Agent-Plane view of this instance."""
         doc = self.document
         actors = [deep_thaw(actor) for actor in doc.get("actors", ()) if actor.get("id") == actor_id]
         capabilities = doc.get("capabilities", {})

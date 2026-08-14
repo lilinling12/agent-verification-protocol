@@ -1,0 +1,90 @@
+version: "0.1"
+matrix: scenario
+status: promoted-draft
+domain: scenario-materialization
+
+authority_chain:
+  historical_source:
+    - docs/design/alpha-v0.1/04-scenario-benchmark-dsl.md
+    - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+    - docs/design/alpha-v0.1/13-reference-runtime-design.md
+  reconciliation:
+    - docs/reconciliation/v0.1/decisions/scenario-instance-001.md
+  normative:
+    - rfcs/AEP-0003-scenario-instance-contract.md
+    - spec/scenario/scenario-contract.md
+
+requirements:
+  - AVP-SCENARIO-001
+  - AVP-SCENARIO-002
+  - AVP-SCENARIO-003
+  - AVP-SCENARIO-004
+  - AVP-SCENARIO-005
+  - AVP-SCENARIO-006
+  - AVP-SCENARIO-007
+  - AVP-SCENARIO-008
+  - AVP-SCENARIO-009
+
+historical_sources:
+  - docs/design/alpha-v0.1/04-scenario-benchmark-dsl.md
+  - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+  - docs/design/alpha-v0.1/13-reference-runtime-design.md
+
+implementation_evidence:
+  - src/avp_ref/scenario/compiler.py
+  - src/avp_ref/scenario/identity.py
+  - src/avp_ref/scenario/models.py
+  - src/avp_ref/scenario/loader.py
+  - src/avp_ref/scenario/references.py
+  - src/avp_ref/scenario/seed.py
+  - src/avp_ref/tck_adapter/reference_scenario.py
+  - tests/test_scenario_compiler.py
+  - tests/test_scenario_tck.py
+  - src/avp_ref/runtime/engine.py
+  - src/avp_ref/security/capability_policy.py
+
+schema_artifacts:
+  - schemas/scenario-template.schema.json
+  - schemas/scenario-instance.schema.json
+  - schemas/scenario.schema.json
+
+tck_cases:
+  - AVP-TCK-SCENARIO-MATERIALIZATION-001
+  - AVP-TCK-SCENARIO-UNRESOLVED-001
+  - AVP-TCK-SCENARIO-IDENTITY-001
+  - AVP-TCK-SCENARIO-IMMUTABILITY-001
+  - AVP-TCK-SCENARIO-PROJECTION-001
+  - AVP-TCK-SCENARIO-REFERENCE-001
+
+decision_records:
+  - docs/reconciliation/v0.1/decisions/scenario-instance-001.md
+  - rfcs/AEP-0003-scenario-instance-contract.md
+
+identity_contract:
+  canonicalization: RFC8785-JCS
+  digest: SHA-256
+  excluded_top_level_fields: [instanceDigest, provenance]
+  declared_identity_verification: required
+  resolver_request_binding: fail-closed
+
+compatibility:
+  legacy_schema: schemas/scenario.schema.json
+  policy: exact-mirror-of-scenario-template-schema
+
+acceptance_evidence:
+  - full avp-scenario-v0.1 reference TCK profile passes all six mandatory cases
+  - ScenarioInstance construction validates schema, verifies declared identity, detaches caller input, and freezes execution semantics
+  - strict reference resolution rejects symbolic identities and resolver path/URI substitution
+  - repository and packaged ScenarioTemplate/ScenarioInstance schemas are kept in sync by CI
+  - built-wheel reference and TCK smoke tests pass in an unconstrained clean environment
+  - Security hidden-material and fault-secrecy behavior remains compatible with Scenario subject-projection semantics
+
+open_reconciliation: []
+
+note: >-
+  The Scenario v0.1 reconciliation is technically complete for this Alpha slice.
+  The matrix remains promoted-draft because pre-1.0 protocol promotion is governed
+  by the repository release/AEP process rather than by reference implementation
+  availability. Conformance is demonstrated by the dedicated Scenario TCK adapter;
+  no additional Runtime capability advertisement is required, and the reference
+  implementation remains non-normative.

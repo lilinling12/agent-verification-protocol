@@ -1,8 +1,8 @@
-"""Compilation diagnostics and typed AVS failures.
+"""Typed failures for Scenario parsing, compilation, identity, and visibility.
 
-Compilation failures belong to the verification infrastructure. They MUST NOT be
-reported as subject-Agent failures, so callers need machine-readable error types
-rather than generic ``ValueError`` exceptions.
+Scenario preparation failures belong to verification infrastructure. They MUST
+NOT be reported as Subject-Agent task failures, so callers need stable typed
+errors rather than generic exceptions.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ class CompileDiagnostic:
 
 
 class ScenarioCompileError(Exception):
-    """Base class for deterministic AVS compilation failures."""
+    """Base class for deterministic Scenario preparation failures."""
 
     def __init__(self, message: str, diagnostics: tuple[CompileDiagnostic, ...] = ()) -> None:
         super().__init__(message)
@@ -41,7 +41,11 @@ class ScenarioParseError(ScenarioCompileError):
 
 
 class ScenarioValidationError(ScenarioCompileError):
-    """The parsed ScenarioTemplate violates the AVS schema."""
+    """A ScenarioTemplate or ScenarioInstance violates its schema contract."""
+
+
+class ScenarioIdentityError(ValueError):
+    """A ScenarioInstance declared identity is missing or inconsistent with content."""
 
 
 class ParameterResolutionError(ScenarioCompileError):

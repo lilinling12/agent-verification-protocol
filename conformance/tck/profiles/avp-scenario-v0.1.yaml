@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-scenario-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-SCENARIO-001
+    - AVP-SCENARIO-002
+    - AVP-SCENARIO-003
+    - AVP-SCENARIO-004
+    - AVP-SCENARIO-005
+    - AVP-SCENARIO-006
+    - AVP-SCENARIO-007
+    - AVP-SCENARIO-008
+    - AVP-SCENARIO-009
+  conditional: []

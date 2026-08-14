@@ -1,0 +1,75 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-scenario-v0.1
+requirements:
+  - id: AVP-SCENARIO-001
+    level: MUST
+    area: materialization
+    statement: ScenarioTemplate and ScenarioInstance execution contracts are distinguished.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-001
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-MATERIALIZATION-001]
+  - id: AVP-SCENARIO-002
+    level: MUST
+    area: determinism
+    statement: Equivalent declared compilation inputs produce equivalent ScenarioInstance identity.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-002
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-MATERIALIZATION-001]
+  - id: AVP-SCENARIO-003
+    level: MUST
+    area: materialization
+    statement: Unresolved required execution inputs fail closed before Episode execution.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-003
+    schema: schemas/scenario-template.schema.json
+    conformance: [AVP-TCK-SCENARIO-UNRESOLVED-001]
+  - id: AVP-SCENARIO-004
+    level: MUST
+    area: identity
+    statement: ScenarioInstance identity is SHA-256 over RFC 8785 JCS canonical semantic content excluding top-level instanceDigest and provenance.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-004
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-IDENTITY-001]
+  - id: AVP-SCENARIO-005
+    level: MUST
+    area: immutability
+    statement: Materialized ScenarioInstance semantics do not change during Episode execution.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-005
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-IMMUTABILITY-001]
+  - id: AVP-SCENARIO-006
+    level: MUST
+    area: visibility
+    statement: Subject projection excludes evaluator-only material unless explicitly observable.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-006
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-PROJECTION-001]
+  - id: AVP-SCENARIO-007
+    level: MUST
+    area: capability
+    statement: Subject capability exposure derives from the materialized actor capability projection.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-007
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-PROJECTION-001]
+  - id: AVP-SCENARIO-008
+    level: MUST
+    area: references
+    statement: Execution-relevant external references are bound to profile-appropriate resolved identity.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-008
+    schema: schemas/scenario-instance.schema.json
+    conformance: [AVP-TCK-SCENARIO-REFERENCE-001]
+  - id: AVP-SCENARIO-009
+    level: MUST
+    area: failure-separation
+    statement: Scenario validation or compilation failure is not Agent task failure.
+    spec: spec/scenario/scenario-contract.md
+    anchor: avp-scenario-009
+    conformance: [AVP-TCK-SCENARIO-UNRESOLVED-001]

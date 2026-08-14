@@ -1,0 +1,17 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-IMMUTABILITY-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-005]
+applicability: mandatory
+type: negative
+vector:
+  mutationTarget: $.task.instruction
+  mutationValue: changed-after-start
+expect:
+  identityBoundSemanticsUnchanged: true
+  instanceDigestUnchanged: true
+  mutationRejectedOrDetached: true

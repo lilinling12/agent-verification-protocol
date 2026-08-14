@@ -17,8 +17,17 @@ def main() -> None:
         schemas[path.name] = data
         print(f"schema OK: {path.relative_to(ROOT)}")
 
-    scenario_schema = schemas.get("scenario.schema.json")
-    scenario_validator = Draft202012Validator(scenario_schema) if scenario_schema else None
+    template_schema = schemas.get("scenario-template.schema.json")
+    if template_schema is None:
+        raise SystemExit("scenario-template.schema.json is required")
+    scenario_validator = Draft202012Validator(template_schema)
+
+    legacy_schema = schemas.get("scenario.schema.json")
+    if legacy_schema is not None and legacy_schema != template_schema:
+        raise SystemExit(
+            "legacy schemas/scenario.schema.json must remain an exact semantic mirror of scenario-template.schema.json during compatibility period"
+        )
+
     yaml_count = 0
     scenario_count = 0
     for base in [ROOT / "examples", ROOT / "conformance", ROOT / "benchmarks"]:
@@ -29,19 +38,34 @@ def main() -> None:
             yaml_count += 1
             print(f"yaml OK: {path.relative_to(ROOT)}")
             if isinstance(document, dict) and document.get("kind") == "ScenarioTemplate":
-                errors = sorted(scenario_validator.iter_errors(document), key=lambda error: list(error.absolute_path)) if scenario_validator else []
+                errors = sorted(
+                    scenario_validator.iter_errors(document),
+                    key=lambda error: list(error.absolute_path),
+                )
                 if errors:
                     joined = "; ".join(error.message for error in errors)
-                    raise SystemExit(f"scenario schema FAIL: {path.relative_to(ROOT)}: {joined}")
+                    raise SystemExit(
+                        f"scenario template schema FAIL: {path.relative_to(ROOT)}: {joined}"
+                    )
                 scenario_count += 1
                 print(f"scenario OK: {path.relative_to(ROOT)}")
 
-    packaged = ROOT / "src" / "avp_ref" / "resources" / "scenario.schema.json"
-    canonical = ROOT / "schemas" / "scenario.schema.json"
-    if packaged.exists() and packaged.read_bytes() != canonical.read_bytes():
-        raise SystemExit("packaged scenario schema is out of sync with schemas/scenario.schema.json")
+    resource_root = ROOT / "src" / "avp_ref" / "resources"
+    for name in ("scenario-template.schema.json", "scenario-instance.schema.json"):
+        packaged = resource_root / name
+        canonical = ROOT / "schemas" / name
+        if not packaged.exists() or packaged.read_bytes() != canonical.read_bytes():
+            raise SystemExit(f"packaged {name} is out of sync with schemas/{name}")
 
-    print(f"validated {len(schemas)} JSON schemas, {yaml_count} YAML assets, {scenario_count} ScenarioTemplates")
+    legacy_packaged = resource_root / "scenario.schema.json"
+    legacy_canonical = ROOT / "schemas" / "scenario.schema.json"
+    if legacy_packaged.exists() and legacy_packaged.read_bytes() != legacy_canonical.read_bytes():
+        raise SystemExit("packaged legacy scenario schema is out of sync")
+
+    print(
+        f"validated {len(schemas)} JSON schemas, {yaml_count} YAML assets, "
+        f"{scenario_count} ScenarioTemplates"
+    )
 
 
 if __name__ == "__main__":

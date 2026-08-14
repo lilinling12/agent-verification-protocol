@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-PROJECTION-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-006, AVP-SCENARIO-007]
+applicability: mandatory
+type: negative
+vector:
+  actorId: subject
+  publicCapability: mcp://orders/order.get
+  hiddenSentinel: AVP_TCK_SCENARIO_HIDDEN_4f73c1
+  hiddenFields: [success, invariants, faults, security, graders, contamination, validity, extensions]
+expect:
+  publicCapabilityPresent: true
+  undeclaredEvaluatorCapabilitiesAbsent: true
+  hiddenSentinelAbsent: true
+  hiddenFieldsAbsent: true

@@ -140,3 +140,33 @@ cases:
     profile: avp-security-v0.1
     requirements: [AVP-SECURITY-006]
     applicability: mandatory
+  - id: AVP-TCK-SCENARIO-MATERIALIZATION-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-MATERIALIZATION-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-001, AVP-SCENARIO-002]
+    applicability: mandatory
+  - id: AVP-TCK-SCENARIO-UNRESOLVED-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-UNRESOLVED-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-003, AVP-SCENARIO-009]
+    applicability: mandatory
+  - id: AVP-TCK-SCENARIO-IDENTITY-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-IDENTITY-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-004]
+    applicability: mandatory
+  - id: AVP-TCK-SCENARIO-IMMUTABILITY-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-IMMUTABILITY-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-005]
+    applicability: mandatory
+  - id: AVP-TCK-SCENARIO-PROJECTION-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-PROJECTION-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-006, AVP-SCENARIO-007]
+    applicability: mandatory
+  - id: AVP-TCK-SCENARIO-REFERENCE-001
+    path: conformance/tck/cases/scenario/AVP-TCK-SCENARIO-REFERENCE-001.yaml
+    profile: avp-scenario-v0.1
+    requirements: [AVP-SCENARIO-008]
+    applicability: mandatory

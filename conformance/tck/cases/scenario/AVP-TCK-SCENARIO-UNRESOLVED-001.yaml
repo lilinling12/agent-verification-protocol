@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-UNRESOLVED-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-003, AVP-SCENARIO-009]
+applicability: mandatory
+type: negative
+vector:
+  template:
+    apiVersion: avp.spec/v0.1
+    kind: ScenarioTemplate
+    metadata: {name: unresolved-required-input, version: "1"}
+    parameters:
+      target: {type: string, required: true}
+    environment: {type: stub}
+    task: {instruction: "Act on ${target}"}
+expect:
+  compilationFails: true
+  episodeSubjectExecutionStarted: false
+  taskVerdictProduced: false

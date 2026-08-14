@@ -1,4 +1,4 @@
-"""AVS YAML/JSON loading and schema validation."""
+"""AVS YAML/JSON loading and Scenario schema validation."""
 
 from __future__ import annotations
 
@@ -40,35 +40,70 @@ def load_scenario(path: str | Path) -> dict[str, Any]:
     return value
 
 
-def load_default_template_schema() -> dict[str, Any]:
-    """Load the schema shipped with the Python reference package.
-
-    Packaging the schema with the runtime avoids a hidden dependency on the
-    repository checkout layout when ``avp`` is installed from a wheel.
-    """
-
-    text = resources.files("avp_ref.resources").joinpath("scenario.schema.json").read_text(encoding="utf-8")
+def _load_packaged_schema(name: str) -> dict[str, Any]:
+    text = resources.files("avp_ref.resources").joinpath(name).read_text(encoding="utf-8")
     return json.loads(text)
 
 
-def validate_template(template: Mapping[str, Any], schema: Mapping[str, Any] | None = None) -> None:
-    """Validate a ScenarioTemplate against JSON Schema Draft 2020-12."""
+def load_default_template_schema() -> dict[str, Any]:
+    """Load the packaged ScenarioTemplate v0.1 schema."""
 
+    return _load_packaged_schema("scenario-template.schema.json")
+
+
+def load_default_instance_schema() -> dict[str, Any]:
+    """Load the packaged ScenarioInstance v0.1 schema."""
+
+    return _load_packaged_schema("scenario-instance.schema.json")
+
+
+def _validate_document(
+    document: Mapping[str, Any],
+    schema: Mapping[str, Any],
+    *,
+    label: str,
+    diagnostic_code: str,
+) -> None:
     try:
         from jsonschema import Draft202012Validator
     except ImportError as exc:
         raise RuntimeError("jsonschema is required by the AVS compiler") from exc
 
-    active_schema = dict(schema) if schema is not None else load_default_template_schema()
+    active_schema = dict(schema)
     Draft202012Validator.check_schema(active_schema)
     validator = Draft202012Validator(active_schema)
     diagnostics: list[CompileDiagnostic] = []
-    for error in sorted(validator.iter_errors(template), key=lambda item: list(item.absolute_path)):
-        path = "$" + "".join(f"[{index}]" if isinstance(index, int) else f".{index}" for index in error.absolute_path)
-        diagnostics.append(CompileDiagnostic("AVS-SCHEMA-001", error.message, path))
+    for error in sorted(validator.iter_errors(document), key=lambda item: list(item.absolute_path)):
+        path = "$" + "".join(
+            f"[{index}]" if isinstance(index, int) else f".{index}"
+            for index in error.absolute_path
+        )
+        diagnostics.append(CompileDiagnostic(diagnostic_code, error.message, path))
 
     if diagnostics:
         raise ScenarioValidationError(
-            f"ScenarioTemplate failed schema validation ({len(diagnostics)} error(s))",
+            f"{label} failed schema validation ({len(diagnostics)} error(s))",
             tuple(diagnostics),
         )
+
+
+def validate_template(template: Mapping[str, Any], schema: Mapping[str, Any] | None = None) -> None:
+    """Validate a ScenarioTemplate against JSON Schema Draft 2020-12."""
+
+    _validate_document(
+        template,
+        dict(schema) if schema is not None else load_default_template_schema(),
+        label="ScenarioTemplate",
+        diagnostic_code="AVS-SCHEMA-001",
+    )
+
+
+def validate_instance(instance: Mapping[str, Any], schema: Mapping[str, Any] | None = None) -> None:
+    """Validate a serialized ScenarioInstance against the v0.1 schema."""
+
+    _validate_document(
+        instance,
+        dict(schema) if schema is not None else load_default_instance_schema(),
+        label="ScenarioInstance",
+        diagnostic_code="AVS-SCHEMA-002",
+    )

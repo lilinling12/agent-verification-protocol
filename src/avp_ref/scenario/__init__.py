@@ -6,11 +6,18 @@ from .errors import (
     ParameterResolutionError,
     ReferenceResolutionError,
     ScenarioCompileError,
+    ScenarioIdentityError,
     ScenarioParseError,
     ScenarioValidationError,
     VisibilityViolationError,
 )
-from .loader import load_scenario, validate_template
+from .identity import (
+    canonical_instance_bytes,
+    identity_preimage,
+    scenario_instance_digest,
+    verify_scenario_instance_identity,
+)
+from .loader import load_scenario, validate_instance, validate_template
 from .models import ScenarioInstance, SeedBundle
 from .references import StaticReferenceResolver, SymbolicReferenceResolver
 
@@ -21,6 +28,7 @@ __all__ = [
     "ReferenceResolutionError",
     "ScenarioCompileError",
     "ScenarioCompiler",
+    "ScenarioIdentityError",
     "ScenarioInstance",
     "ScenarioParseError",
     "ScenarioValidationError",
@@ -28,6 +36,11 @@ __all__ = [
     "StaticReferenceResolver",
     "SymbolicReferenceResolver",
     "VisibilityViolationError",
+    "canonical_instance_bytes",
+    "identity_preimage",
     "load_scenario",
+    "scenario_instance_digest",
+    "validate_instance",
     "validate_template",
+    "verify_scenario_instance_identity",
 ]

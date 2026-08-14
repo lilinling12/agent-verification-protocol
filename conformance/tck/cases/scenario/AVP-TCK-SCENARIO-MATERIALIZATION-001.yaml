@@ -1,0 +1,29 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-MATERIALIZATION-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-001, AVP-SCENARIO-002]
+applicability: mandatory
+type: positive
+vector:
+  template:
+    apiVersion: avp.spec/v0.1
+    kind: ScenarioTemplate
+    metadata: {name: deterministic-materialization, version: "1"}
+    parameters:
+      target: {type: string, required: true}
+    environment: {type: stub}
+    actors: [{id: subject, type: agent}]
+    capabilities: {subject: {tools: []}}
+    task: {instruction: "Act on ${target}"}
+  compilationInputs:
+    parameterOverrides: {target: order-42}
+  repetitions: 2
+expect:
+  outputKind: ScenarioInstance
+  unresolvedInputsAbsent: true
+  semanticOutputsEquivalent: true
+  instanceDigestEqual: true
