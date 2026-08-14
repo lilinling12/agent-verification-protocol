@@ -10,6 +10,7 @@ from .errors import (
 )
 from .gateway import MCPVerificationGateway
 from .models import (
+    MCPCallOutcome,
     MCPCallRecord,
     MCPGatewayDescription,
     MCPGatewayPolicy,
@@ -21,6 +22,7 @@ from .transport import HTTPMCPTransport, MCPTransport
 
 __all__ = [
     "HTTPMCPTransport",
+    "MCPCallOutcome",
     "MCPCallRecord",
     "MCPGatewayDescription",
     "MCPGatewayError",
