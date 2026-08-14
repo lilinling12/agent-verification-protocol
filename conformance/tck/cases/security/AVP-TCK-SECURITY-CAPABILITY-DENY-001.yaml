@@ -13,4 +13,4 @@ vector:
 expect:
   denied: true
   downstreamInvocationCount: 0
-  auditEvent: security.capability.denied
+  policyDenialRecord: true
