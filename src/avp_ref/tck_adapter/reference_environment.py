@@ -12,6 +12,7 @@ from avp_ref.environment import (
     InMemoryCommerceAdapter,
     RestoreEquivalence,
     SnapshotNotFoundError,
+    SnapshotRef,
     ToolExecutionError,
     ToolPermissionDenied,
     ToolRequest,
@@ -62,11 +63,7 @@ class ReferenceEnvironmentTCKAdapter:
         if evaluator is None:
             raise TCKAdapterError(f"unsupported reference Environment TCK case: {case_id}")
         passed, detail = evaluator(vector)
-        return TCKCaseResult(
-            case_id,
-            TCKStatus.PASS if passed else TCKStatus.FAIL,
-            detail,
-        )
+        return TCKCaseResult(case_id, TCKStatus.PASS if passed else TCKStatus.FAIL, detail)
 
     @staticmethod
     def _lifecycle(vector: Mapping[str, Any]) -> tuple[bool, str]:
@@ -74,7 +71,6 @@ class ReferenceEnvironmentTCKAdapter:
         scenario = reference_scenario()
         handle = adapter.provision(scenario)
         bound = handle.scenario_digest == scenario.instance_digest
-
         forged = EnvironmentHandle(
             handle_id=handle.handle_id,
             adapter_name=handle.adapter_name,
@@ -86,14 +82,12 @@ class ReferenceEnvironmentTCKAdapter:
             scenario_mismatch_rejected = False
         except UnknownEnvironmentHandle:
             scenario_mismatch_rejected = True
-
         adapter.release(handle)
         try:
             adapter.digest(handle)
             released_rejected = False
         except UnknownEnvironmentHandle:
             released_rejected = True
-
         passed = bound and scenario_mismatch_rejected and released_rejected
         return passed, (
             "environment identity remains Scenario-bound and released/stale handles fail closed"
@@ -110,13 +104,11 @@ class ReferenceEnvironmentTCKAdapter:
         adapter.execute(handle, ReferenceEnvironmentTCKAdapter._tool_request(mutation))
         mutated_digest = adapter.digest(handle)
         mutated_time = adapter.logical_time(handle)
-
         result = adapter.reset(handle)
         reset_time = adapter.logical_time(handle)
         reset_digest = adapter.digest(handle)
         adapter.execute(handle, ToolRequest("subject", "order.get", {"order_id": "ord_1"}))
         post_reset_time = adapter.logical_time(handle)
-
         passed = (
             mutated_digest != initial_digest
             and mutated_time >= initial_time
@@ -165,7 +157,6 @@ class ReferenceEnvironmentTCKAdapter:
         mutation = ReferenceEnvironmentTCKAdapter._mapping(vector.get("mutation"), "mutation")
         adapter.execute(handle, ReferenceEnvironmentTCKAdapter._tool_request(mutation))
         second_after = adapter.project(handle, projection_names[1])
-
         first_data = first.to_dict()["data"]
         second_data = second.to_dict()["data"]
         first_identity = (first.projection_id, first.digest)
@@ -201,6 +192,20 @@ class ReferenceEnvironmentTCKAdapter:
         except SnapshotNotFoundError:
             foreign_rejected = True
 
+        tampered = SnapshotRef(
+            snapshot_id=snapshot.snapshot_id,
+            handle_id=snapshot.handle_id,
+            state_digest="sha256:" + "0" * 64,
+            logical_time=snapshot.logical_time,
+            consistency=snapshot.consistency,
+            adapter_name=snapshot.adapter_name,
+        )
+        try:
+            adapter.restore(handle, tampered)
+            tampered_rejected = False
+        except SnapshotNotFoundError:
+            tampered_rejected = True
+
         allowed = str(vector.get("allowedEquivalence", "STATE_EQUIVALENT"))
         passed = (
             snapshot.handle_id == handle.handle_id
@@ -210,11 +215,12 @@ class ReferenceEnvironmentTCKAdapter:
             and restore.equivalence.value == allowed
             and restore.equivalence is not RestoreEquivalence.EXACT
             and foreign_rejected
+            and tampered_rejected
         )
         return passed, (
-            "snapshot ownership and state identity are bound and restore fidelity is not overstated"
+            "snapshot ownership, state identity and restore fidelity remain fail-closed and truthful"
             if passed
-            else "snapshot ownership or restore-equivalence honesty violated the v0.1 contract"
+            else "snapshot ownership, integrity, or restore-equivalence honesty violated the v0.1 contract"
         )
 
     @staticmethod
@@ -227,9 +233,17 @@ class ReferenceEnvironmentTCKAdapter:
         adapter.execute(handle, ReferenceEnvironmentTCKAdapter._tool_request(mutation))
         after_projection = adapter.project(handle, projection)
         after = adapter.snapshot(handle)
-
         changed = adapter.diff(handle, before, after, projection)
         no_op = adapter.diff(handle, after, after, projection)
+
+        other = adapter.provision(reference_scenario())
+        foreign = adapter.snapshot(other)
+        try:
+            adapter.diff(handle, before, foreign, projection)
+            foreign_rejected = False
+        except SnapshotNotFoundError:
+            foreign_rejected = True
+
         passed = (
             changed.projection_id == projection
             and changed.before_digest == before_projection.digest
@@ -238,11 +252,12 @@ class ReferenceEnvironmentTCKAdapter:
             and no_op.projection_id == projection
             and no_op.before_digest == no_op.after_digest
             and not no_op.changes
+            and foreign_rejected
         )
         return passed, (
-            "StateDiff binds before/after projection identities and distinguishes mutation from no-op"
+            "StateDiff binds before/after projection identities and rejects foreign snapshots"
             if passed
-            else "StateDiff binding or semantic-change reporting violated the v0.1 contract"
+            else "StateDiff binding, ownership, or semantic-change reporting violated the v0.1 contract"
         )
 
     @staticmethod
@@ -250,7 +265,6 @@ class ReferenceEnvironmentTCKAdapter:
         adapter, handle = ReferenceEnvironmentTCKAdapter._provision()
         delayed = ReferenceEnvironmentTCKAdapter._mapping(vector.get("delayedFault"), "delayedFault")
         delayed_handle = adapter.inject_fault(handle, ReferenceEnvironmentTCKAdapter._fault_spec(delayed))
-
         first = adapter.execute(handle, ToolRequest("subject", "order.get", {"order_id": "ord_1"}))
         try:
             adapter.execute(handle, ToolRequest("subject", "order.get", {"order_id": "ord_1"}))
@@ -271,7 +285,6 @@ class ReferenceEnvironmentTCKAdapter:
         except ToolExecutionError:
             clear_prevented = False
             cleared_result = None
-
         passed = (
             first.result.get("id") == "ord_1"
             and activated
