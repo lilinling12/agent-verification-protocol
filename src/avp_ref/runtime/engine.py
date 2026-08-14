@@ -119,7 +119,6 @@ class ReferenceRuntime:
             },
             "profiles": [
                 "AVP-Core",
-                "AVP-Scenario",
                 "AVP-Environment",
                 "AVP-Subject",
                 "AVP-MCP-Gateway",
@@ -134,7 +133,6 @@ class ReferenceRuntime:
             ],
             "features": {
                 "scenario_instance_required": True,
-                "scenario_profile": "avp-scenario-v0.1",
                 "environment_adapter_spi": "avp.environment/v0.1",
                 "subject_adapter_spi": "avp.subject/v0.1",
                 "oracle_runner_spi": self._oracle_runner.describe().protocol_version,
@@ -222,349 +220,517 @@ class ReferenceRuntime:
             subject_handle = subject_adapter.open(episode.agent_system)
             self._handles[episode_id] = environment_handle
             self._subject_handles[episode_id] = subject_handle
-        except Exception:
+            recorder.emit(
+                "environment.provisioned",
+                "environment",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "handle_id": environment_handle.handle_id,
+                    "adapter": environment_adapter.describe().adapter,
+                },
+            )
+            recorder.emit(
+                "subject.opened",
+                "agent",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "handle_id": subject_handle.handle_id,
+                    "adapter": subject_adapter.describe().adapter,
+                },
+            )
+            gateway = self._mcp_gateways.get(episode_id)
+            if gateway is not None:
+                gateway_description = gateway.open()
+                recorder.emit(
+                    "mcp.gateway.opened",
+                    "orchestrator",
+                    environment_adapter.logical_time(environment_handle),
+                    {
+                        "gateway_digest": gateway_description.identity_digest,
+                        "server_digest": gateway_description.server_digest,
+                        "catalog_digest": gateway_description.baseline_catalog_digest,
+                        "protocol_version": gateway_description.protocol_version,
+                    },
+                )
+            reset = environment_adapter.reset(environment_handle, ResetTarget.INITIAL)
+            recorder.emit(
+                "environment.reset.completed",
+                "environment",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "target": reset.target.value,
+                    "equivalent_to_initial": reset.equivalent_to_initial,
+                },
+                state={"before": reset.before_digest, "after": reset.after_digest},
+            )
+        except (SubjectAdapterError, MCPGatewayError) as exc:
+            episode.validity = Validity.INFRA_CONFOUND
+            episode.validity_detail = None
             episode.transition(EpisodeState.INFRA_FAILED)
+            recorder.emit(
+                "episode.provision.failed",
+                "orchestrator",
+                0,
+                {"error_type": type(exc).__name__, "error": str(exc)},
+            )
+            self._finalize_telemetry(episode, complete=False, strict=False)
             raise
-        recorder.emit("environment.provisioned", "environment", 0, {"handle_id": environment_handle.handle_id})
-        recorder.emit("subject.opened", "subject-adapter", 0, {"handle_id": subject_handle.handle_id})
+        except Exception as exc:
+            episode.validity = Validity.ENVIRONMENT_FAILURE
+            episode.validity_detail = None
+            episode.transition(EpisodeState.INFRA_FAILED)
+            recorder.emit(
+                "environment.provision.failed",
+                "environment",
+                0,
+                {"error_type": type(exc).__name__, "error": str(exc)},
+            )
+            self._finalize_telemetry(episode, complete=False, strict=False)
+            raise
+
         episode.transition(EpisodeState.READY)
         return episode
 
-    def run_subject(self, episode_id: str) -> Episode:
-        episode, _, subject_adapter = self._episode_adapters(episode_id)
+    def run_subject(self, episode_id: str) -> str:
+        (
+            episode,
+            environment_adapter,
+            environment_handle,
+            subject_adapter,
+            subject_handle,
+        ) = self._bound(episode_id)
         if episode.state is not EpisodeState.READY:
             raise InvalidEpisodeTransition(
                 f"subject execution requires READY, got {episode.state.value}"
             )
-        subject_handle = self._subject_handles[episode_id]
+
         episode.transition(EpisodeState.RUNNING)
         recorder = EventRecorder(episode)
+        recorder.emit(
+            "episode.started",
+            "orchestrator",
+            environment_adapter.logical_time(environment_handle),
+        )
+        task = episode.scenario.subject_projection().get("task", {})
+        budgets = episode.scenario.document.get("budgets", {})
         invocation = SubjectInvocation(
-            episode_id=episode_id,
-            task=episode.scenario.subject_projection().get("task", {}),
-            budgets=episode.scenario.subject_projection().get("budgets", {}),
+            episode.episode_id,
+            task,
+            int(budgets.get("max_steps", 32)),
+            float(budgets.get("timeout_seconds", 30.0)),
         )
         try:
-            result = subject_adapter.run(subject_handle, invocation, SubjectSession(self, episode_id))
-            episode.task_verdict = (
-                TaskVerdict.PASS if result.status is SubjectStatus.COMPLETED else TaskVerdict.FAIL
+            result = subject_adapter.invoke(
+                subject_handle,
+                invocation,
+                SubjectSession(self, episode_id),
             )
+            if result.status is not SubjectStatus.COMPLETED:
+                raise SubjectAdapterError(
+                    f"unexpected subject terminal status: {result.status.value}"
+                )
+            episode.agent_report = result.report
             recorder.emit(
-                "subject.completed",
-                "subject-adapter",
-                self._logical_time(episode_id),
-                {"status": result.status.value, "output": result.output},
+                "agent.invocation.completed",
+                "agent",
+                environment_adapter.logical_time(environment_handle),
+                {"status": "ok", "steps": result.steps},
             )
-            episode.transition(EpisodeState.QUIESCING)
-        except Exception as exc:
-            episode.task_verdict = TaskVerdict.FAIL
+        except SubjectAdapterError as exc:
+            episode.agent_report = (
+                f"subject infrastructure error: {type(exc).__name__}: {exc}"
+            )
+            episode.validity = Validity.INFRA_CONFOUND
+            episode.validity_detail = None
             recorder.emit(
-                "subject.failed",
-                "subject-adapter",
-                self._logical_time(episode_id),
-                {"error": type(exc).__name__},
+                "agent.invocation.completed",
+                "agent",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "status": "infra_error",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
             )
-            episode.transition(EpisodeState.QUIESCING)
-            if not isinstance(exc, (SubjectAdapterError, ToolExecutionError, MCPGatewayError)):
-                raise
-        return episode
+            episode.transition(EpisodeState.INFRA_FAILED)
+            self._finalize_telemetry(episode, complete=False, strict=False)
+            return episode.agent_report
 
-    def quiesce(self, episode_id: str) -> Episode:
-        episode = self.episodes[episode_id]
-        if episode.state is not EpisodeState.QUIESCING:
-            raise InvalidEpisodeTransition(
-                f"quiesce requires QUIESCING, got {episode.state.value}"
-            )
-        episode.transition(EpisodeState.VERIFYING)
-        return episode
+        recorder.emit(
+            "agent.stop",
+            "agent",
+            environment_adapter.logical_time(environment_handle),
+            {"report": episode.agent_report},
+        )
+        episode.transition(EpisodeState.QUIESCING)
+        return episode.agent_report or ""
 
     def verify(self, episode_id: str) -> Episode:
-        episode, environment_adapter, _ = self._episode_adapters(episode_id)
-        if episode.state is not EpisodeState.VERIFYING:
+        episode, environment_adapter, environment_handle, _, _ = self._bound(episode_id)
+        if episode.state is not EpisodeState.QUIESCING:
             raise InvalidEpisodeTransition(
-                f"verify requires VERIFYING, got {episode.state.value}"
+                f"verification requires QUIESCING, got {episode.state.value}"
             )
-        environment_handle = self._handles[episode_id]
-        package = self._oracle_packages[episode_id]
-        recorder = EventRecorder(episode)
-        try:
-            projections = tuple(
-                self._projection_snapshot(
-                    environment_adapter,
-                    environment_handle,
-                    projection_id,
-                )
-                for projection_id in package.required_projections
-            )
-            evaluation_context = OracleEvaluationContext(
-                episode_id=episode_id,
-                scenario_instance_digest=episode.scenario.instance_digest,
-                agent_system_digest=episode.agent_system.identity_digest,
-                manifest_digest=episode.manifest.manifest_digest,
-                projections=projections,
-            )
-            request = OracleRequest(package, evaluation_context)
-            execution = self._oracle_runner.evaluate(request)
-            self._record_oracle_execution(episode, recorder, execution)
-            self._apply_oracle_execution(episode, execution)
-            self._finalize_telemetry(episode)
-        except (OracleRunnerError, OracleSecurityError) as exc:
-            episode.task_verdict = TaskVerdict.INCONCLUSIVE
-            episode.validity = Validity.ORACLE_FAILURE
-            code = "security" if isinstance(exc, OracleSecurityError) else "crash"
-            episode.validity_detail = ValidityDetail(code=code, detail=str(exc))
-            episode.transition(EpisodeState.INVALID)
-            return episode
-        except ArtifactStoreError as exc:
-            episode.validity = Validity.INFRA_CONFOUND
-            episode.validity_detail = ValidityDetail(code="artifact_store", detail=str(exc))
-            episode.transition(EpisodeState.INFRA_FAILED)
-            return episode
-        except Exception:
-            episode.transition(EpisodeState.INFRA_FAILED)
-            raise
 
-        target_state = (
-            EpisodeState.COMPLETED
-            if episode.validity is Validity.VALID
-            else EpisodeState.INVALID
+        episode.transition(EpisodeState.VERIFYING)
+        recorder = EventRecorder(episode)
+        oracle_package = self._oracle_packages[episode_id]
+        runner_description = self._oracle_runner.describe()
+        recorder.emit(
+            "episode.verification.started",
+            "evaluator",
+            environment_adapter.logical_time(environment_handle),
+            {
+                "oracle_id": oracle_package.oracle_id,
+                "oracle_version": oracle_package.version,
+                "oracle_package_digest": oracle_package.identity_digest,
+                "oracle_runner_config_digest": runner_description.identity_digest,
+            },
         )
-        episode.transition(target_state)
+
+        try:
+            request = self._build_oracle_request(
+                episode,
+                environment_adapter,
+                environment_handle,
+                oracle_package,
+            )
+            recorder.emit(
+                "oracle.execution.started",
+                "evaluator",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "request_id": request.request_id,
+                    "oracle_package_digest": oracle_package.identity_digest,
+                    "input_digest": request.context.input_digest,
+                },
+            )
+            execution = self._oracle_runner.evaluate(request)
+        except OracleRunnerError as exc:
+            detail_code = (
+                "ORACLE_SECURITY_VIOLATION"
+                if isinstance(exc, OracleSecurityError)
+                else "ORACLE_PROTOCOL_ERROR"
+            )
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.ORACLE_FAILURE,
+                "Oracle runner rejected the evaluation",
+                detail=ValidityDetail(detail_code),
+            )
+        except Exception:
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.ORACLE_FAILURE,
+                "Oracle runner raised an unexpected evaluation error",
+                detail=ValidityDetail("ORACLE_RUNNER_ERROR"),
+            )
+
+        try:
+            execution_evidence = self._publish_oracle_execution_evidence(
+                episode,
+                execution,
+            )
+        except (ArtifactStoreError, TypeError, ValueError):
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.INFRA_CONFOUND,
+                "Oracle execution Artifact publication failed",
+            )
+
+        episode.evidence[execution_evidence.evidence_id] = execution_evidence
+        event_type = (
+            "oracle.execution.completed"
+            if execution.status is OracleExecutionStatus.SUCCESS
+            else "oracle.execution.failed"
+        )
+        recorder.emit(
+            event_type,
+            "evaluator",
+            environment_adapter.logical_time(environment_handle),
+            {
+                "request_id": execution.request_id,
+                "status": execution.status.value,
+                "duration_ms": execution.artifact.duration_ms,
+                "exit_code": execution.artifact.exit_code,
+                "artifact_digest": execution_evidence.artifact.digest,
+            },
+            evidence=[execution_evidence.evidence_id],
+        )
+        if execution.status is not OracleExecutionStatus.SUCCESS:
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.ORACLE_FAILURE,
+                f"Oracle execution ended with status {execution.status.value}",
+                detail=self._oracle_failure_detail(execution.status),
+            )
+
+        publication_error = self._publish_oracle_evidence(episode, execution)
+        if publication_error is not None:
+            validity, detail, reason = publication_error
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                validity,
+                reason,
+                detail=detail,
+            )
+
+        episode.verification = [
+            replace(
+                item,
+                evidence_ids=tuple(
+                    dict.fromkeys(
+                        (*item.evidence_ids, execution_evidence.evidence_id)
+                    )
+                ),
+            )
+            for item in execution.results
+        ]
+        unresolved = self._unresolved_evidence_ids(episode)
+        if unresolved:
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.ORACLE_FAILURE,
+                "Oracle result references Evidence absent from the Episode registry",
+                detail=ValidityDetail("ORACLE_PROTOCOL_ERROR"),
+            )
+
+        for result in episode.verification:
+            recorder.emit(
+                "verification.claim.evaluated",
+                "evaluator",
+                environment_adapter.logical_time(environment_handle),
+                {
+                    "claim_id": result.claim_id,
+                    "dimension": result.dimension,
+                    "verdict": result.verdict,
+                    "severity": result.severity,
+                    "method": result.method,
+                    "evaluator_version": result.evaluator_version,
+                },
+                evidence=list(result.evidence_ids),
+            )
+        episode.task_verdict = (
+            TaskVerdict.FAIL
+            if any(
+                item.verdict == "FAIL" and item.severity == "critical"
+                for item in episode.verification
+            )
+            else TaskVerdict.PASS
+        )
+        episode.validity = Validity.VALID
+        episode.validity_detail = None
+
+        try:
+            telemetry_artifact = self._finalize_telemetry(
+                episode,
+                complete=True,
+                strict=True,
+            )
+        except ArtifactStoreError:
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.INFRA_CONFOUND,
+                "Telemetry Evidence Artifact publication failed",
+            )
+        if self._required_telemetry_missing(telemetry_artifact):
+            return self._invalidate_evaluation(
+                episode,
+                recorder,
+                environment_adapter,
+                environment_handle,
+                Validity.TRACE_INCOMPLETE,
+                "required telemetry unavailable",
+            )
+
+        episode.transition(EpisodeState.COMPLETED)
+        recorder.emit(
+            "episode.completed",
+            "orchestrator",
+            environment_adapter.logical_time(environment_handle),
+            {
+                "task_verdict": episode.task_verdict.value,
+                "validity": episode.validity.value,
+            },
+        )
         return episode
 
-    def run_to_completion(self, episode_id: str) -> Episode:
-        self.provision(episode_id)
-        self.run_subject(episode_id)
-        self.quiesce(episode_id)
-        self.verify(episode_id)
-        return self.episodes[episode_id]
+    def read_evidence(self, episode_id: str, evidence_id: str) -> bytes:
+        """Dereference one Episode Evidence item through integrity-checked storage."""
+
+        try:
+            evidence = self.episodes[episode_id].evidence[evidence_id]
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown Episode/Evidence reference: {episode_id}/{evidence_id}"
+            ) from exc
+        return self._evidence_publisher.read(evidence)
 
     def snapshot(self, episode_id: str):
-        _, adapter, _ = self._episode_adapters(episode_id)
-        return adapter.snapshot(self._handles[episode_id])
+        episode, adapter, handle, _, _ = self._bound(episode_id)
+        if episode.state not in {EpisodeState.READY, EpisodeState.QUIESCING}:
+            raise InvalidEpisodeTransition(
+                f"snapshot requires READY or QUIESCING, got {episode.state.value}"
+            )
+        snapshot = adapter.snapshot(handle)
+        episode.snapshots[snapshot.snapshot_id] = snapshot
+        EventRecorder(episode).emit(
+            "environment.snapshot.created",
+            "environment",
+            adapter.logical_time(handle),
+            {"snapshot_id": snapshot.snapshot_id, "consistency": snapshot.consistency},
+            state={"after": snapshot.state_digest},
+        )
+        return snapshot
 
-    def restore(self, episode_id: str, snapshot):
-        _, adapter, _ = self._episode_adapters(episode_id)
-        return adapter.restore(self._handles[episode_id], snapshot)
-
-    def reset(self, episode_id: str):
-        _, adapter, _ = self._episode_adapters(episode_id)
-        return adapter.reset(self._handles[episode_id], ResetTarget.INITIAL)
-
-    def close(self, episode_id: str) -> None:
-        episode, environment_adapter, subject_adapter = self._episode_adapters(episode_id)
-        environment_handle = self._handles.pop(episode_id, None)
-        subject_handle = self._subject_handles.pop(episode_id, None)
-        if environment_handle is not None:
-            environment_adapter.release(environment_handle)
-        if subject_handle is not None:
-            subject_adapter.close(subject_handle)
-        self._adapters.pop(episode_id, None)
-        self._subject_adapters.pop(episode_id, None)
-        self._oracle_packages.pop(episode_id, None)
-        self._mcp_gateways.pop(episode_id, None)
-        self._faults.pop(episode_id, None)
-        if episode.telemetry is not None:
-            episode.telemetry.close()
+    def restore(self, episode_id: str, snapshot_id: str) -> str:
+        episode, adapter, handle, _, _ = self._bound(episode_id)
+        if episode.state not in {EpisodeState.READY, EpisodeState.QUIESCING}:
+            raise InvalidEpisodeTransition(
+                f"restore requires READY or QUIESCING, got {episode.state.value}"
+            )
+        result = adapter.restore(handle, episode.snapshots[snapshot_id])
+        EventRecorder(episode).emit(
+            "environment.restore.completed",
+            "environment",
+            adapter.logical_time(handle),
+            {
+                "snapshot_id": result.snapshot_id,
+                "equivalence": result.equivalence.value,
+            },
+            state={"before": result.before_digest, "after": result.after_digest},
+        )
+        return result.equivalence.value
 
     def inject_fault(self, episode_id: str, spec: FaultSpec) -> FaultHandle:
-        _, adapter, _ = self._episode_adapters(episode_id)
-        handle = self._handles[episode_id]
-        fault_handle = adapter.inject_fault(handle, spec)
-        self._faults[episode_id][fault_handle.fault_id] = fault_handle
-        EventRecorder(self.episodes[episode_id]).emit(
+        episode, adapter, handle, _, _ = self._bound(episode_id)
+        if episode.state is not EpisodeState.READY:
+            raise InvalidEpisodeTransition(
+                f"fault injection requires READY, got {episode.state.value}"
+            )
+        fault = adapter.inject_fault(handle, spec)
+        self._faults[episode_id][fault.fault_id] = fault
+        EventRecorder(episode).emit(
             "fault.scheduled",
             "evaluator",
-            self._logical_time(episode_id),
-            {"fault_id": fault_handle.fault_id, "kind": spec.kind, "target": spec.target},
+            adapter.logical_time(handle),
+            {
+                "fault_id": fault.fault_id,
+                "type": spec.kind,
+                "target": spec.target,
+                "occurrence": spec.occurrence,
+                "visibility": spec.visibility,
+            },
         )
-        return fault_handle
+        return fault
 
-    def clear_fault(self, episode_id: str, fault_id: str) -> None:
-        _, adapter, _ = self._episode_adapters(episode_id)
-        fault_handle = self._faults[episode_id].pop(fault_id)
-        adapter.clear_fault(self._handles[episode_id], fault_handle)
-        EventRecorder(self.episodes[episode_id]).emit(
-            "fault.cleared",
-            "evaluator",
-            self._logical_time(episode_id),
-            {"fault_id": fault_id},
+    def release(self, episode_id: str) -> None:
+        (
+            episode,
+            environment_adapter,
+            environment_handle,
+            subject_adapter,
+            subject_handle,
+        ) = self._bound(episode_id)
+        subject_adapter.release(subject_handle)
+        environment_adapter.release(environment_handle)
+        self._subject_handles.pop(episode_id, None)
+        self._handles.pop(episode_id, None)
+        self._oracle_packages.pop(episode_id, None)
+        self._faults.pop(episode_id, None)
+        EventRecorder(episode).emit(
+            "episode.resources.released",
+            "orchestrator",
+            0,
+            {
+                "environment_handle_id": environment_handle.handle_id,
+                "subject_handle_id": subject_handle.handle_id,
+            },
         )
 
-    def _subject_observation(self, episode_id: str) -> Mapping[str, Any]:
-        episode, adapter, _ = self._episode_adapters(episode_id)
-        handle = self._handles[episode_id]
-        return adapter.observe(handle, "subject")
-
-    def _subject_call_tool(self, episode_id: str, name: str, arguments: Mapping[str, Any]) -> Any:
-        episode, adapter, _ = self._episode_adapters(episode_id)
-        handle = self._handles[episode_id]
-        logical_time = self._logical_time(episode_id)
-        recorder = EventRecorder(episode)
-        fault_before = self._observe_faults(adapter, handle)
-        gateway = self._mcp_gateways.get(episode_id)
-        trace_headers = self._trace_headers(episode_id)
-        try:
-            if gateway is not None:
-                result = gateway.call_tool(name, arguments, headers=trace_headers)
-                recorder.emit(
-                    "tool.called",
-                    "subject",
-                    logical_time,
-                    {
-                        "tool": name,
-                        "arguments_digest": digest(arguments),
-                        "result_digest": digest(result),
-                        "transport": "mcp",
-                    },
-                )
-                return result
-            request = ToolRequest("subject", name, arguments)
-            result = adapter.execute(handle, request)
-            recorder.emit(
-                "tool.called",
-                "subject",
-                logical_time,
-                {
-                    "tool": name,
-                    "arguments_digest": digest(arguments),
-                    "result_digest": digest(result.value),
-                    "transport": "environment-adapter",
-                },
-            )
-            return result.value
-        finally:
-            fault_after = self._observe_faults(adapter, handle)
-            self._record_fault_observation_changes(episode, fault_before, fault_after)
-
-    def _trace_headers(self, episode_id: str) -> Mapping[str, str]:
-        episode = self.episodes[episode_id]
-        if episode.telemetry is None:
-            return {}
-        return episode.telemetry.inject_headers()
-
-    def _projection_snapshot(
-        self,
-        adapter: EnvironmentAdapter,
-        handle: EnvironmentHandle,
-        projection_id: str,
-    ) -> ProjectionSnapshot:
-        projection = ReadOnlyEvaluatorEnvironment(adapter, handle).project(projection_id)
-        return ProjectionSnapshot(projection.projection_id, projection.data, projection.digest)
-
-    def _record_oracle_execution(
+    def _publish_oracle_execution_evidence(
         self,
         episode: Episode,
-        recorder: EventRecorder,
         execution: OracleExecutionResult,
-    ) -> None:
-        artifact = execution.artifact
-        payload = artifact.to_dict()
-        evidence = self._evidence_publisher.publish_json(
-            episode_id=episode.episode_id,
-            type="oracle.execution",
-            producer="oracle-runner",
-            payload=payload,
-            metadata={"status": artifact.status.value},
-        )
-        episode.evidence.append(evidence)
-        recorder.emit(
-            "oracle.executed",
-            "oracle-runner",
-            self._logical_time(episode.episode_id),
-            {"status": artifact.status.value, "evidence_id": evidence.evidence_id},
+    ) -> Evidence:
+        description = self._oracle_runner.describe()
+        return self._evidence_publisher.publish_json(
+            evidence_id=f"ev_{episode.episode_id}_oracle_execution",
+            evidence_type="oracle_execution",
+            value=execution.artifact.to_dict(),
+            producer=f"oracle-runner:{description.name}@{description.version}",
         )
 
-    def _apply_oracle_execution(self, episode: Episode, execution: OracleExecutionResult) -> None:
-        if execution.status is not OracleExecutionStatus.SUCCESS:
-            episode.task_verdict = TaskVerdict.INCONCLUSIVE
-            episode.validity = Validity.ORACLE_FAILURE
-            episode.validity_detail = ValidityDetail(
-                code=execution.status.validity_code,
-                detail=execution.artifact.detail or "Oracle execution failed",
-            )
-            return
-
-        if execution.evaluation is None:
-            episode.task_verdict = TaskVerdict.INCONCLUSIVE
-            episode.validity = Validity.ORACLE_FAILURE
-            episode.validity_detail = ValidityDetail(
-                code="protocol",
-                detail="successful Oracle execution did not produce an evaluation",
-            )
-            return
-
-        episode.oracle_evaluation = execution.evaluation
-        episode.task_verdict = execution.evaluation.verdict
-        episode.validity = execution.evaluation.validity
-        episode.validity_detail = execution.evaluation.validity_detail
-
-    def _finalize_telemetry(self, episode: Episode) -> None:
-        if episode.telemetry is None:
-            return
-        telemetry_artifact = episode.telemetry.finalize()
-        evidence = self._evidence_publisher.publish_json(
-            episode_id=episode.episode_id,
-            type="telemetry.trace",
-            producer="telemetry-bridge",
-            payload=telemetry_artifact.to_dict(),
-            metadata={"completeness": telemetry_artifact.completeness.value},
-        )
-        episode.evidence.append(evidence)
-        episode.telemetry_artifact = replace(
-            telemetry_artifact,
-            artifact_ref=evidence.artifact,
-        )
-        if telemetry_artifact.completeness is TelemetryCompleteness.MISSING_REQUIRED:
-            episode.validity = Validity.INFRA_CONFOUND
-            episode.validity_detail = ValidityDetail(
-                code="telemetry_missing",
-                detail="required telemetry is incomplete",
-            )
-
-    def _observe_faults(
-        self,
-        adapter: EnvironmentAdapter,
-        handle: EnvironmentHandle,
-    ) -> dict[str, FaultObservation]:
-        result: dict[str, FaultObservation] = {}
-        for fault_id, fault_handle in self._faults.get(self._episode_id_for_handle(handle), {}).items():
-            result[fault_id] = adapter.observe_fault(handle, fault_handle)
-        return result
-
-    def _record_fault_observation_changes(
+    def _publish_oracle_evidence(
         self,
         episode: Episode,
-        before: Mapping[str, FaultObservation],
-        after: Mapping[str, FaultObservation],
-    ) -> None:
-        recorder = EventRecorder(episode)
-        for fault_id, observation in after.items():
-            previous = before.get(fault_id)
-            if previous is None or previous.phase is observation.phase:
-                continue
-            if observation.phase is FaultPhase.ACTIVE:
-                recorder.emit(
-                    "fault.activated",
-                    "evaluator",
-                    observation.activated_at or self._logical_time(episode.episode_id),
-                    {"fault_id": fault_id},
+        execution: OracleExecutionResult,
+    ) -> tuple[Validity, ValidityDetail | None, str] | None:
+        for item in execution.evidence:
+            if item.evidence_id in episode.evidence:
+                return (
+                    Validity.ORACLE_FAILURE,
+                    ValidityDetail("ORACLE_PROTOCOL_ERROR"),
+                    "Oracle output contains a duplicate Evidence identifier",
                 )
-            recorder.emit(
-                "fault.observed",
-                "environment",
-                self._logical_time(episode.episode_id),
-                {
-                    "fault_id": fault_id,
-                    "phase": observation.phase.value,
-                    "occurrences": observation.occurrences,
-                },
-            )
+            try:
+                evidence = self._evidence_publisher.publish_bytes(
+                    evidence_id=item.evidence_id,
+                    evidence_type=item.evidence_type,
+                    content=item.content,
+                    media_type=item.media_type,
+                    expected_digest=item.digest,
+                    classification=item.classification,
+                    producer=item.producer,
+                )
+            except (TypeError, ValueError):
+                return (
+                    Validity.ORACLE_FAILURE,
+                    ValidityDetail("ORACLE_PROTOCOL_ERROR"),
+                    "Oracle output contains invalid Evidence metadata or content",
+                )
+            except ArtifactStoreError:
+                return (
+                    Validity.INFRA_CONFOUND,
+                    None,
+                    "Oracle Evidence Artifact publication failed",
+                )
+            episode.evidence[evidence.evidence_id] = evidence
+        return None
 
-    def _episode_adapters(
-        self,
-        episode_id: str,
-    ) -> tuple[Episode, EnvironmentAdapter, SubjectAdapter]:
+    @staticmethod
+    def _unresolved_evidence_ids(episode: Episode) -> list[str]:
+        return sorted(
+            {
+                evidence_id
+                for result in episode.verification
+                for evidence_id in result.evidence_ids
+                if evidence_id not in episode.evidence
+            }
+        )
+
+    def _episode_adapters(self, episode_id: str):
         try:
             return (
                 self.episodes[episode_id],
@@ -572,20 +738,340 @@ class ReferenceRuntime:
                 self._subject_adapters[episode_id],
             )
         except KeyError as exc:
-            raise KeyError(f"unknown Episode or released adapters: {episode_id}") from exc
+            raise KeyError(f"unknown episode: {episode_id}") from exc
 
-    def _logical_time(self, episode_id: str) -> int:
-        adapter = self._adapters[episode_id]
-        handle = self._handles.get(episode_id)
-        if handle is None:
-            return 0
-        logical_time = getattr(adapter, "logical_time", None)
-        if callable(logical_time):
-            return int(logical_time(handle))
-        return 0
+    def _bound(self, episode_id: str):
+        episode, environment_adapter, subject_adapter = self._episode_adapters(episode_id)
+        try:
+            return (
+                episode,
+                environment_adapter,
+                self._handles[episode_id],
+                subject_adapter,
+                self._subject_handles[episode_id],
+            )
+        except KeyError as exc:
+            raise InvalidEpisodeTransition(
+                "episode resources have not been provisioned"
+            ) from exc
 
-    def _episode_id_for_handle(self, handle: EnvironmentHandle) -> str:
-        for episode_id, candidate in self._handles.items():
-            if candidate == handle:
-                return episode_id
-        raise KeyError(f"unknown environment handle: {handle.handle_id}")
+    def _build_oracle_request(
+        self,
+        episode: Episode,
+        adapter: EnvironmentAdapter,
+        handle: EnvironmentHandle,
+        package: OraclePackage,
+    ) -> OracleRequest:
+        inputs = {
+            name: resolve_json_pointer(episode.scenario.document, pointer)
+            for name, pointer in package.input_pointers.items()
+        }
+        evaluator = ReadOnlyEvaluatorEnvironment(adapter, handle)
+        projections: dict[str, ProjectionSnapshot] = {}
+        for projection_id in package.projections:
+            state = evaluator.project(projection_id)
+            projections[projection_id] = ProjectionSnapshot(
+                projection_id,
+                state.to_dict()["data"],
+                state.digest,
+            )
+        context = OracleEvaluationContext(
+            episode_id=episode.episode_id,
+            scenario_instance_digest=episode.scenario.instance_digest,
+            manifest_digest=episode.manifest.manifest_digest,
+            inputs=inputs,
+            projections=projections,
+        )
+        return OracleRequest("oracle_req_" + uuid.uuid4().hex, package, context)
+
+    @staticmethod
+    def _oracle_failure_detail(status: OracleExecutionStatus) -> ValidityDetail:
+        if status is OracleExecutionStatus.SUCCESS:
+            raise ValueError("SUCCESS does not define an Oracle failure detail")
+        detail_code = {
+            OracleExecutionStatus.TIMEOUT: "ORACLE_TIMEOUT",
+            OracleExecutionStatus.CRASHED: "ORACLE_CRASH",
+            OracleExecutionStatus.PROTOCOL_ERROR: "ORACLE_PROTOCOL_ERROR",
+            OracleExecutionStatus.SECURITY_VIOLATION: "ORACLE_SECURITY_VIOLATION",
+        }[status]
+        return ValidityDetail(detail_code)
+
+    def _invalidate_evaluation(
+        self,
+        episode: Episode,
+        recorder: EventRecorder,
+        adapter: EnvironmentAdapter,
+        handle: EnvironmentHandle,
+        validity: Validity,
+        reason: str,
+        *,
+        detail: ValidityDetail | None = None,
+    ) -> Episode:
+        if validity is Validity.VALID:
+            raise ValueError("cannot invalidate an evaluation with VALID validity")
+        if validity is Validity.ORACLE_FAILURE and detail is None:
+            raise ValueError("ORACLE_FAILURE requires a structured validity detail")
+        if not isinstance(reason, str) or not reason:
+            raise ValueError("evaluation invalidation reason must be non-empty")
+
+        episode.validity = validity
+        episode.validity_detail = detail
+        episode.task_verdict = TaskVerdict.INCONCLUSIVE
+        payload: dict[str, object] = {
+            "to": validity.value,
+            "reason": reason[:512],
+        }
+        if detail is not None:
+            payload["detail"] = detail.to_dict()
+        recorder.emit(
+            "evaluation.validity.changed",
+            "evaluator",
+            adapter.logical_time(handle),
+            payload,
+        )
+        episode.transition(EpisodeState.INVALID)
+        invalid_payload: dict[str, object] = {"validity": episode.validity.value}
+        if detail is not None:
+            invalid_payload["validity_detail"] = detail.to_dict()
+        recorder.emit(
+            "episode.invalid",
+            "orchestrator",
+            adapter.logical_time(handle),
+            invalid_payload,
+        )
+        self._finalize_telemetry(episode, complete=False, strict=False)
+        return episode
+
+    def _trace_headers(self, episode_id: str) -> Mapping[str, str]:
+        episode = self.episodes[episode_id]
+        return (
+            episode.telemetry.inject_headers()
+            if episode.telemetry is not None
+            else {}
+        )
+
+    def _subject_observation(self, episode_id: str) -> Mapping[str, Any]:
+        episode, adapter, handle, _, _ = self._bound(episode_id)
+        if episode.state is not EpisodeState.RUNNING:
+            raise InvalidEpisodeTransition(
+                "Agent observation is only allowed while RUNNING"
+            )
+        observation = adapter.observe(handle, "subject")
+        EventRecorder(episode).emit(
+            "environment.observation",
+            "environment",
+            adapter.logical_time(handle),
+            {"actor_id": "subject", "observation_digest": digest(observation)},
+        )
+        return observation
+
+    def _subject_call_tool(
+        self,
+        episode_id: str,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> Any:
+        episode, adapter, handle, _, _ = self._bound(episode_id)
+        if episode.state is not EpisodeState.RUNNING:
+            raise InvalidEpisodeTransition(
+                "Agent tool calls are only allowed while RUNNING"
+            )
+        recorder = EventRecorder(episode)
+        correlation_id = f"call_{len(episode.events) + 1}"
+        gateway = self._mcp_gateways.get(episode_id)
+        if gateway is not None and gateway.owns_tool(name):
+            recorder.emit(
+                "tool.call",
+                "agent",
+                adapter.logical_time(handle),
+                {
+                    "name": name,
+                    "arguments": arguments,
+                    "protocol": "mcp",
+                    "correlation_id": correlation_id,
+                },
+            )
+            try:
+                result = gateway.call_tool(
+                    name,
+                    arguments,
+                    correlation_id=correlation_id,
+                    trace_headers=self._trace_headers(episode_id),
+                )
+            except MCPGatewayError as exc:
+                recorder.emit(
+                    "tool.error",
+                    "environment",
+                    adapter.logical_time(handle),
+                    {
+                        "name": name,
+                        "protocol": "mcp",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                        "correlation_id": correlation_id,
+                    },
+                )
+                raise RuntimeError(str(exc)) from exc
+            record = gateway.call_records[-1]
+            recorder.emit(
+                "tool.result",
+                "environment",
+                adapter.logical_time(handle),
+                {
+                    "name": name,
+                    "protocol": "mcp",
+                    "result": result,
+                    "correlation_id": correlation_id,
+                    "schema_digest": record.schema_digest,
+                    "catalog_digest": record.catalog_digest,
+                    "result_digest": record.result_digest,
+                },
+            )
+            return result
+
+        request = ToolRequest(
+            actor_id="subject",
+            name=name,
+            arguments=arguments,
+            correlation_id=correlation_id,
+        )
+        recorder.emit(
+            "tool.call",
+            "agent",
+            adapter.logical_time(handle),
+            {
+                "name": name,
+                "arguments": arguments,
+                "protocol": "environment",
+                "correlation_id": correlation_id,
+            },
+        )
+        try:
+            result = adapter.execute(handle, request)
+        except ToolExecutionError as exc:
+            self._emit_fault_observations(
+                episode,
+                adapter,
+                handle,
+                exc.fault_observations,
+            )
+            recorder.emit(
+                "tool.error",
+                "environment",
+                adapter.logical_time(handle),
+                {
+                    "name": name,
+                    "protocol": "environment",
+                    "error": str(exc),
+                    "correlation_id": correlation_id,
+                },
+            )
+            raise RuntimeError(str(exc)) from exc
+        recorder.emit(
+            "tool.result",
+            "environment",
+            adapter.logical_time(handle),
+            {
+                "name": name,
+                "protocol": "environment",
+                "result": result.result,
+                "correlation_id": correlation_id,
+            },
+        )
+        if result.diff is not None:
+            recorder.emit(
+                "environment.state.changed",
+                "environment",
+                adapter.logical_time(handle),
+                {
+                    "cause_correlation_id": correlation_id,
+                    "changes": result.diff.to_dict()["changes"],
+                },
+                state={
+                    "before": result.before_digest,
+                    "after": result.after_digest,
+                },
+            )
+        return result.result
+
+    def _finalize_telemetry(
+        self,
+        episode: Episode,
+        *,
+        complete: bool,
+        strict: bool,
+    ) -> TelemetryArtifact | None:
+        if episode.telemetry is None:
+            return None
+        artifact = episode.telemetry.artifact or episode.telemetry.finalize(
+            complete=complete
+        )
+        evidence_id = f"ev_{episode.episode_id}_telemetry"
+        if evidence_id in episode.evidence:
+            return artifact
+
+        description = (
+            self._telemetry_bridge.describe()
+            if self._telemetry_bridge is not None
+            else None
+        )
+        producer = (
+            f"telemetry:{description.name}@{description.version}"
+            if description is not None
+            else "telemetry:unknown"
+        )
+        try:
+            evidence = self._evidence_publisher.publish_json(
+                evidence_id=evidence_id,
+                evidence_type="telemetry_artifact",
+                value=artifact.to_dict(),
+                producer=producer,
+            )
+        except (ArtifactStoreError, TypeError, ValueError):
+            if strict:
+                raise
+            return artifact
+        episode.evidence[evidence_id] = evidence
+        return artifact
+
+    def _required_telemetry_missing(
+        self,
+        artifact: TelemetryArtifact | None,
+    ) -> bool:
+        if self._telemetry_bridge is None:
+            return False
+        description = self._telemetry_bridge.describe()
+        return description.policy.required and (
+            artifact is None
+            or artifact.completeness is TelemetryCompleteness.REQUIRED_MISSING
+        )
+
+    @staticmethod
+    def _emit_fault_observations(
+        episode: Episode,
+        adapter: EnvironmentAdapter,
+        handle: EnvironmentHandle,
+        observations: tuple[FaultObservation, ...],
+    ) -> None:
+        recorder = EventRecorder(episode)
+        for observation in observations:
+            event_type = {
+                FaultPhase.ACTIVATED: "fault.activated",
+                FaultPhase.OBSERVED: "fault.observed",
+                FaultPhase.CLEARED: "fault.cleared",
+                FaultPhase.SCHEDULED: "fault.scheduled",
+            }[observation.phase]
+            recorder.emit(
+                event_type,
+                (
+                    "evaluator"
+                    if observation.phase in {FaultPhase.ACTIVATED, FaultPhase.CLEARED}
+                    else "environment"
+                ),
+                adapter.logical_time(handle),
+                {
+                    "fault_id": observation.fault_id,
+                    "type": observation.kind,
+                    "target": observation.target,
+                },
+            )
