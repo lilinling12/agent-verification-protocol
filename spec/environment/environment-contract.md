@@ -36,7 +36,11 @@ Subject observation MUST be actor-scoped. It MUST expose only information author
 
 ### AVP-ENVIRONMENT-006 — Authoritative projection and digest binding
 
-An evaluator projection MUST identify the selected projection semantics and MUST bind the returned authoritative data to a stable digest. For the same projection definition, equal digest values MUST represent equal normalized projection semantics. An implementation MUST NOT use a digest from one projection as evidence for another projection.
+An evaluator projection MUST identify the selected projection semantics and MUST bind the returned authoritative data to a stable state digest. For the same projection definition, equal state-digest values MUST represent equal normalized projection semantics.
+
+Projection evidence identity in v0.1 is the pair `(projection identifier, state digest)`. A bare state digest identifies normalized projection content only; it MUST NOT be interpreted as sufficient identity for a projection. Consumers MUST bind the projection identifier and state digest together and MUST NOT use a digest observed for one projection as evidence for another projection merely because the content digest is equal.
+
+AVP v0.1 does not require different projection definitions that happen to produce identical normalized content to have different state-digest values.
 
 ## 5. Snapshots, restore, and diff
 
