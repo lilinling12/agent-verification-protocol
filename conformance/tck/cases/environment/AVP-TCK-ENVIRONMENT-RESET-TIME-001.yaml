@@ -1,0 +1,26 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-RESET-TIME-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-003, AVP-ENVIRONMENT-004]
+applicability: mandatory
+type: positive
+vector:
+  resetTarget: INITIAL
+  mutation:
+    actorId: subject
+    tool: refund.create
+    arguments: {order_id: ord_1}
+  logicalTime:
+    compareWithinUnrevertedLineage: true
+    resetMayRewindToTargetLineage: true
+expect:
+  mutationChangesAuthoritativeDigest: true
+  logicalTimeMonotonicBeforeReset: true
+  resetBindsBeforeAfterDigest: true
+  resetEstablishesInitialState: true
+  resetRestoresInitialLogicalTime: true
+  postResetLineageMonotonic: true
