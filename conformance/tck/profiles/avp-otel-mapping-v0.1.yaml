@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-otel-mapping-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-OTEL-001
+    - AVP-OTEL-002
+    - AVP-OTEL-003
+    - AVP-OTEL-004
+    - AVP-OTEL-005
+    - AVP-OTEL-006
+    - AVP-OTEL-007
+    - AVP-OTEL-008
+  conditional: []
