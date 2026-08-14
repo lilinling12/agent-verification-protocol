@@ -2,7 +2,7 @@ apiVersion: avp.reconciliation/v0.1
 kind: ReconciliationMatrix
 metadata:
   domain: mcp
-  status: reconciliation-draft
+  status: promoted-draft
   targetVersion: "0.1"
 entries:
   - requirement: AVP-MCP-001
@@ -29,30 +29,36 @@ entries:
     implementationEvidence:
       - src/avp_ref/mcp/gateway.py
       - tests/test_mcp_gateway.py
-    notes: Input/output schema validation and claimed pre-call drift detection are verification requirements; JSON Schema semantics remain MCP-owned.
+      - tests/test_mcp_call_outcome.py
+    notes: Input and successful structured-output validation plus claimed pre-call drift detection are verification requirements. MCP tool execution errors remain distinct from successful structured output.
   - requirement: AVP-MCP-005
     decision: promote-verification-call-binding
     implementationEvidence:
       - src/avp_ref/mcp/models.py
+      - src/avp_ref/runtime/manifest.py
       - src/avp_ref/runtime/engine.py
-    notes: Correlation/tool/argument/schema/catalog/result/failure binding is normative; MCPCallRecord and runtime event names remain implementation-specific.
+    notes: Call records bind correlation, tool, arguments, schema, catalog, result identity when present, and explicit outcome. Episode manifest/gateway-open evidence bind endpoint policy, server identity, selected revision, and baseline catalog without duplicating those fields in every call record.
   - requirement: AVP-MCP-006
     decision: compose-with-mcp-wire-semantics
     implementationEvidence:
       - src/avp_ref/mcp/transport.py
       - src/avp_ref/mcp/gateway.py
       - tests/test_mcp_header_encoding.py
-    notes: MCP owns Streamable HTTP metadata and mirrored-header encoding. Reference compliance gaps must be fixed before interoperability is claimed.
+    notes: Acceptance audit fixed MCP 2026-07-28 mirrored-header Base64 sentinel encoding, static properties-chain annotation reachability, and JSON-Schema integer normalization/safe-range handling. MCP remains authoritative for the wire semantics.
   - requirement: AVP-MCP-007
-    decision: promote-failure-separation
+    decision: promote-call-outcome-separation
     implementationEvidence:
       - src/avp_ref/mcp/gateway.py
       - src/avp_ref/mcp/models.py
-    notes: Failed upstream attempts cannot become accepted successful result identities.
+      - tests/test_mcp_call_outcome.py
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-TOOL-ERROR-001.yaml
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-UPSTREAM-FAILURE-001.yaml
+    notes: Verification evidence explicitly distinguishes SUCCESS, MCP TOOL_ERROR (including isError=true with real result identity), and UPSTREAM_ERROR (no MCP result identity). Tool execution errors remain available to the Subject/model but cannot be claimed as successful completion.
   - requirement: AVP-MCP-008
     decision: promote-feature-honesty
     implementationEvidence:
       - src/avp_ref/mcp/gateway.py
+      - conformance/tck/cases/mcp/AVP-TCK-MCP-FEATURE-HONESTY-001.yaml
     notes: MRTR is not mandatory for AVP v0.1; unsupported input_required results fail closed instead of being flattened into success.
 nonNormativeImplementationDetails:
   - Python MCPVerificationGateway class/API
@@ -76,9 +82,22 @@ externalAuthority:
     - authorization
     - MRTR
     - extensions
+acceptanceAudit:
+  status: passed
+  evidence:
+    - portable MCP profile is mandatory and reference-conformant at 8/8 cases
+    - spec traceability covers 61 requirements, 48 registered TCK cases, and 7 profiles
+    - source, package, clean-wheel install, and installed-wheel TCK checks pass
+    - MCP wire compatibility gaps found during audit were corrected rather than encoded as AVP-specific wire rules
+    - verification identity composes Episode manifest gateway configuration, gateway-open server/catalog identity, and per-call schema/catalog/result/outcome binding
+    - unsupported MRTR remains explicitly unclaimed and fails closed
+  nonClaims:
+    - AVP MCP conformance is not MCP protocol certification beyond the selected verification mapping
+    - server/discover is not required by AVP
+    - MCP authorization/OAuth is not replaced by Scenario capability policy
+    - MRTR support is not claimed by the reference implementation
 nextGates:
-  - portable AVP MCP verification TCK vectors
-  - requirement index bound only to registered TCK cases
-  - reference MCP TCK adapter
-  - full profile conformance
-  - acceptance audit
+  - clean final-head CI and Governance after reconciliation promotion
+  - no unresolved review threads or base drift
+  - mark PR ready for review
+  - explicit merge authorization
