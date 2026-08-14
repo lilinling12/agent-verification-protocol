@@ -1,0 +1,67 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-subject-v0.1
+requirements:
+  - id: AVP-SUBJECT-001
+    level: MUST
+    area: adapter-identity
+    statement: Verification binds stable Subject Adapter identity to the Episode/manifest context.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-001
+    conformance: [AVP-TCK-SUBJECT-LIFECYCLE-001]
+  - id: AVP-SUBJECT-002
+    level: MUST
+    area: handle-binding
+    statement: Subject handles are opaque, owner-bound execution contexts tied to one Agent System identity.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-002
+    conformance: [AVP-TCK-SUBJECT-LIFECYCLE-001]
+  - id: AVP-SUBJECT-003
+    level: MUST
+    area: subject-projection
+    statement: Subject-visible invocation input derives from the Subject projection and excludes evaluator-only material.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-003
+    conformance: [AVP-TCK-SUBJECT-PROJECTION-001]
+  - id: AVP-SUBJECT-004
+    level: MUST
+    area: budgets
+    statement: Evaluator-owned invocation budgets are upper bounds that Subject execution cannot enlarge or silently ignore.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-004
+    conformance: [AVP-TCK-SUBJECT-BUDGET-001]
+  - id: AVP-SUBJECT-005
+    level: MUST
+    area: capability-gateway
+    statement: Subject capabilities are mediated by the Runtime and cannot bypass Security or domain authority boundaries.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-005
+    conformance: [AVP-TCK-SUBJECT-CAPABILITY-001]
+  - id: AVP-SUBJECT-006
+    level: MUST
+    area: outcome-separation
+    statement: Successful completion, Subject execution failure, and adapter infrastructure failures remain distinguishable.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-006
+    conformance: [AVP-TCK-SUBJECT-OUTCOME-001]
+  - id: AVP-SUBJECT-007
+    level: MUST
+    area: result-validation
+    statement: Invalid or contradictory terminal Subject results fail closed and are never accepted as successful completion.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-007
+    conformance: [AVP-TCK-SUBJECT-RESULT-001]
+  - id: AVP-SUBJECT-008
+    level: MUST
+    area: stale-handle
+    statement: Released, stale, foreign, or substituted Subject handles fail closed.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-008
+    conformance: [AVP-TCK-SUBJECT-LIFECYCLE-001]
+  - id: AVP-SUBJECT-009
+    level: MUST
+    area: assurance-honesty
+    statement: Subject transport and isolation claims do not exceed verified SecurityAssurance evidence.
+    spec: spec/subject/subject-adapter-contract.md
+    anchor: avp-subject-009
+    conformance: [AVP-TCK-SUBJECT-ASSURANCE-001]
