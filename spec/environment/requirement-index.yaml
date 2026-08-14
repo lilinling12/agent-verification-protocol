@@ -40,7 +40,7 @@ requirements:
   - id: AVP-ENVIRONMENT-006
     level: MUST
     area: projection
-    statement: Evaluator projections identify projection semantics and bind returned authoritative data to stable digest identity.
+    statement: Evaluator projection evidence binds the projection identifier and stable content digest as one identity pair.
     spec: spec/environment/environment-contract.md
     anchor: avp-environment-006
     conformance: [AVP-TCK-ENVIRONMENT-PROJECTION-001]
