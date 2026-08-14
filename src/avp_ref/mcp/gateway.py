@@ -359,7 +359,11 @@ class MCPVerificationGateway:
                 self._reject_external_refs(item)
 
     def _header_paths(self, schema, path=(), seen=None):
+        root_call = seen is None
         seen = {} if seen is None else seen
+        if root_call:
+            self._reject_unreachable_header_annotations(schema)
+
         found = []
         properties = schema.get("properties") or {}
         if not isinstance(properties, Mapping):
@@ -380,11 +384,47 @@ class MCPVerificationGateway:
                     raise MCPProtocolError("invalid x-mcp-header annotation")
                 seen[header.lower()] = property_path
                 found.append((property_path, header, prop.get("type")))
-            if prop.get("type") == "object":
-                found.extend(
-                    self._header_paths(prop, property_path, seen)
-                )
+            found.extend(self._header_paths(prop, property_path, seen))
         return found
+
+    def _reject_unreachable_header_annotations(
+        self,
+        value,
+        *,
+        property_chain=True,
+        annotation_allowed=False,
+    ):
+        if isinstance(value, Mapping):
+            if "x-mcp-header" in value and not annotation_allowed:
+                raise MCPProtocolError(
+                    "x-mcp-header annotation is not statically reachable through properties"
+                )
+
+            properties = value.get("properties")
+            if property_chain and isinstance(properties, Mapping):
+                for prop in properties.values():
+                    if isinstance(prop, Mapping):
+                        self._reject_unreachable_header_annotations(
+                            prop,
+                            property_chain=True,
+                            annotation_allowed=True,
+                        )
+
+            for key, item in value.items():
+                if key in {"x-mcp-header", "properties"}:
+                    continue
+                self._reject_unreachable_header_annotations(
+                    item,
+                    property_chain=False,
+                    annotation_allowed=False,
+                )
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                self._reject_unreachable_header_annotations(
+                    item,
+                    property_chain=False,
+                    annotation_allowed=False,
+                )
 
     def _extract_mcp_headers(self, schema, args):
         headers = {}
