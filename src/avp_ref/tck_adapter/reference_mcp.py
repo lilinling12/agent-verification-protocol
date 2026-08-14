@@ -8,6 +8,7 @@ from typing import Any
 from avp_ref.canonical import digest
 from avp_ref.mcp import (
     HTTPMCPTransport,
+    MCPCallOutcome,
     MCPGatewayPolicy,
     MCPPermissionDenied,
     MCPProtocolError,
@@ -27,6 +28,7 @@ class _MCPFixtureTransport:
         self.schema_version = 1
         self.ttl_ms = 1000
         self.upstream_failure = False
+        self.tool_error = False
         self.input_required = False
         self.calls: list[tuple[str, dict[str, Any], str | None, dict[str, str]]] = []
 
@@ -82,6 +84,14 @@ class _MCPFixtureTransport:
                         }
                     },
                 }
+            if self.tool_error:
+                return {
+                    "resultType": "complete",
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "order not found"},
+                    ],
+                }
             return {
                 "resultType": "complete",
                 "structuredContent": {"ok": True},
@@ -102,6 +112,7 @@ class ReferenceMCPTCKAdapter:
     _BASELINE = "AVP-TCK-MCP-BASELINE-IDENTITY-001"
     _DRIFT = "AVP-TCK-MCP-SCHEMA-DRIFT-001"
     _CALL = "AVP-TCK-MCP-CALL-BINDING-001"
+    _TOOL_ERROR = "AVP-TCK-MCP-TOOL-ERROR-001"
     _UPSTREAM_FAILURE = "AVP-TCK-MCP-UPSTREAM-FAILURE-001"
     _FEATURE_HONESTY = "AVP-TCK-MCP-FEATURE-HONESTY-001"
 
@@ -114,6 +125,7 @@ class ReferenceMCPTCKAdapter:
                 self._BASELINE,
                 self._DRIFT,
                 self._CALL,
+                self._TOOL_ERROR,
                 self._UPSTREAM_FAILURE,
                 self._FEATURE_HONESTY,
             }
@@ -128,6 +140,7 @@ class ReferenceMCPTCKAdapter:
             self._BASELINE: self._baseline_identity,
             self._DRIFT: self._schema_drift,
             self._CALL: self._call_binding,
+            self._TOOL_ERROR: self._tool_error,
             self._UPSTREAM_FAILURE: self._upstream_failure,
             self._FEATURE_HONESTY: self._feature_honesty,
         }.get(case_id)
@@ -251,12 +264,38 @@ class ReferenceMCPTCKAdapter:
             and record.schema_digest.startswith("sha256:")
             and record.catalog_digest == description.baseline_catalog_digest
             and record.result_digest == digest(result)
-            and not record.upstream_error
+            and record.outcome is MCPCallOutcome.SUCCESS
         )
         return passed, (
-            "accepted MCP call binds correlation, arguments, contract, catalog, and result identity"
+            "accepted MCP call binds correlation, arguments, contract, catalog, result identity, and success outcome"
             if passed
             else "accepted MCP verification call binding is incomplete"
+        )
+
+    @staticmethod
+    def _tool_error(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        tool = str(vector.get("tool", ""))
+        arguments = ReferenceMCPTCKAdapter._mapping(
+            vector.get("arguments", {}),
+            "arguments",
+        )
+        transport = _MCPFixtureTransport()
+        transport.tool_error = True
+        gateway = ReferenceMCPTCKAdapter._gateway(transport, frozenset({tool}))
+        description = gateway.open()
+        result = gateway.call_tool(tool, arguments, correlation_id="tool_error_1")
+        record = gateway.call_records[-1]
+        passed = (
+            result.get("isError") is True
+            and record.outcome is MCPCallOutcome.TOOL_ERROR
+            and record.result_digest == digest(result)
+            and record.arguments_digest == digest(dict(arguments))
+            and record.catalog_digest == description.baseline_catalog_digest
+        )
+        return passed, (
+            "MCP tool execution error is returned as an MCP result while remaining distinct from success"
+            if passed
+            else "MCP tool execution error was flattened into success or upstream failure"
         )
 
     @staticmethod
@@ -280,12 +319,12 @@ class ReferenceMCPTCKAdapter:
             failed
             and record is not None
             and record.result_digest is None
-            and record.upstream_error
+            and record.outcome is MCPCallOutcome.UPSTREAM_ERROR
             and record.arguments_digest == digest(dict(arguments))
             and record.catalog_digest == description.baseline_catalog_digest
         )
         return passed, (
-            "upstream failure remains distinct from an accepted successful result"
+            "upstream failure remains distinct from MCP result outcomes"
             if passed
             else "MCP upstream failure was not bound or separated correctly"
         )
