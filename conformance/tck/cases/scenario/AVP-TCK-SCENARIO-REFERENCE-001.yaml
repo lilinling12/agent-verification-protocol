@@ -18,3 +18,4 @@ expect:
   identityBoundInInstance: true
   identityMutationChangesInstanceDigest: true
   missingStrictIdentityFailsCompilation: true
+  mismatchedResolverBindingFailsCompilation: true
