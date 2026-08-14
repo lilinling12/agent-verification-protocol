@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SCENARIO-REFERENCE-001
+  domain: scenario
+  status: draft
+profile: avp-scenario-v0.1
+requirements: [AVP-SCENARIO-008]
+applicability: mandatory
+type: negative
+vector:
+  reference: artifact://fixture/order-catalog
+  strictIdentityRequired: true
+  resolvedIdentity:
+    identityType: content
+    identity: sha256:1111111111111111111111111111111111111111111111111111111111111111
+expect:
+  identityBoundInInstance: true
+  identityMutationChangesInstanceDigest: true
+  missingStrictIdentityFailsCompilation: true
