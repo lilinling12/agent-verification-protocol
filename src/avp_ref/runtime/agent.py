@@ -43,6 +43,28 @@ class AgentSystem:
             "metadata": dict(self.metadata),
         }
 
+    def subject_projection(self) -> dict[str, Any]:
+        """Return stable Agent identity safe for a remote Subject boundary.
+
+        Arbitrary AgentSystem metadata remains evaluator-side because the model
+        deliberately permits implementation-specific metadata and therefore
+        cannot prove that every metadata value is Subject-visible. Stable
+        identity/component references are sufficient for Subject-side binding.
+        """
+
+        return {
+            "identity_digest": self.identity_digest,
+            "name": self.name,
+            "version": self.version,
+            "adapter": self.adapter,
+            "config_digest": self.config_digest,
+            "model_ref": self.model_ref,
+            "prompt_digest": self.prompt_digest,
+            "toolset_digest": self.toolset_digest,
+            "memory_digest": self.memory_digest,
+            "policy_digest": self.policy_digest,
+        }
+
     @property
     def identity_digest(self) -> str:
         """Canonical identity used by EpisodeManifest and experiment pairing."""
