@@ -19,5 +19,6 @@ vector:
 expect:
   projectionDigestMatchesReturnedData: true
   equalProjectionSemanticsHaveStableDigest: true
-  unrelatedProjectionDigestNotReusable: true
+  projectionIdentityBindsIdentifierAndDigest: true
+  equalContentAcrossDifferentProjectionIdsAllowed: true
   mutationChangesAffectedProjectionDigest: true
