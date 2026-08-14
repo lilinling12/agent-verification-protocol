@@ -1,0 +1,64 @@
+version: "0.1"
+matrix: scenario
+status: reconciliation-draft
+domain: scenario-materialization
+
+authority_chain:
+  historical_source:
+    - docs/design/alpha-v0.1/04-scenario-benchmark-dsl.md
+    - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+    - docs/design/alpha-v0.1/13-reference-runtime-design.md
+  reconciliation:
+    - docs/reconciliation/v0.1/decisions/scenario-instance-001.md
+  normative:
+    - rfcs/AEP-0003-scenario-instance-contract.md
+    - spec/scenario/scenario-contract.md
+
+requirements:
+  - AVP-SCENARIO-001
+  - AVP-SCENARIO-002
+  - AVP-SCENARIO-003
+  - AVP-SCENARIO-004
+  - AVP-SCENARIO-005
+  - AVP-SCENARIO-006
+  - AVP-SCENARIO-007
+  - AVP-SCENARIO-008
+  - AVP-SCENARIO-009
+
+historical_sources:
+  - docs/design/alpha-v0.1/04-scenario-benchmark-dsl.md
+  - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+  - docs/design/alpha-v0.1/13-reference-runtime-design.md
+
+implementation_evidence:
+  - schemas/scenario.schema.json
+  - src/avp_ref/scenario/compiler.py
+  - src/avp_ref/scenario/models.py
+  - src/avp_ref/scenario/loader.py
+  - src/avp_ref/scenario/references.py
+  - src/avp_ref/scenario/seed.py
+  - tests/test_scenario_compiler.py
+  - src/avp_ref/runtime/engine.py
+  - src/avp_ref/security/capability_policy.py
+
+schema_artifacts:
+  - schemas/scenario.schema.json
+
+tck_cases: []
+
+decision_records:
+  - docs/reconciliation/v0.1/decisions/scenario-instance-001.md
+  - rfcs/AEP-0003-scenario-instance-contract.md
+
+open_reconciliation:
+  - decide whether ScenarioTemplate and ScenarioInstance require separate protocol schemas
+  - define exact language-neutral instance identity preimage and serialization boundary
+  - map each normative requirement to implementation-independent TCK vectors
+  - reconcile current authoring-only fields that are not required for execution interoperability
+  - verify Security projection requirements depend on Scenario semantics without duplicating them
+
+note: >-
+  This matrix intentionally remains reconciliation-draft. Existing Python compiler
+  behavior and the current authoring schema are implementation evidence, not
+  normative authority. Promotion requires schema reconciliation, registered TCK
+  cases, reference alignment, and an acceptance audit.
