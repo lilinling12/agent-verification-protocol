@@ -12,11 +12,29 @@ from avp_ref.scenario import (
     ReferenceResolutionError,
     ScenarioCompileError,
     ScenarioCompiler,
+    ScenarioIdentityError,
     StaticReferenceResolver,
     scenario_instance_digest,
+    verify_scenario_instance_identity,
 )
+from avp_ref.scenario.models import ResolvedReference
 
 from .models import TCKAdapterError, TCKCaseResult, TCKStatus
+
+
+class _MismatchedReferenceResolver:
+    """Negative-control resolver that attempts URI substitution."""
+
+    def __init__(self, identity: str) -> None:
+        self._identity = identity
+
+    def resolve(self, path: str, uri: str) -> ResolvedReference:
+        return ResolvedReference(
+            path=path,
+            uri=uri + "-substituted",
+            digest=self._identity,
+            mode="content",
+        )
 
 
 class ReferenceScenarioTCKAdapter:
@@ -45,15 +63,14 @@ class ReferenceScenarioTCKAdapter:
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         case_id = self._case_id(case)
         vector = self._vector(case, case_id)
-        evaluators = {
+        evaluator = {
             self._MATERIALIZATION: self._materialization,
             self._UNRESOLVED: self._unresolved,
             self._IDENTITY: self._identity,
             self._IMMUTABILITY: self._immutability,
             self._PROJECTION: self._projection,
             self._REFERENCE: self._reference,
-        }
-        evaluator = evaluators.get(case_id)
+        }.get(case_id)
         if evaluator is None:
             raise TCKAdapterError(f"unsupported reference Scenario TCK case: {case_id}")
         passed, detail = evaluator(vector)
@@ -75,6 +92,7 @@ class ReferenceScenarioTCKAdapter:
         repetitions = int(vector.get("repetitions", 2))
         if repetitions < 2:
             raise TCKAdapterError("Scenario materialization repetitions must be >= 2")
+
         compiler = ScenarioCompiler()
         instances = tuple(
             compiler.compile(template, CompileOptions(parameter_overrides=overrides))
@@ -116,6 +134,12 @@ class ReferenceScenarioTCKAdapter:
             dict(ReferenceScenarioTCKAdapter._mapping(vector.get("instance"), "instance"))
         )
         base = scenario_instance_digest(instance)
+        declared_matches = instance.get("instanceDigest") == base
+        try:
+            verify_scenario_instance_identity(instance)
+            declared_verified = True
+        except ScenarioIdentityError:
+            declared_verified = False
 
         reordered = dict(reversed(list(instance.items())))
         order_independent = scenario_instance_digest(reordered) == base
@@ -128,12 +152,35 @@ class ReferenceScenarioTCKAdapter:
         semantic_changed["task"]["instruction"] = "Return CHANGED"
         semantic_sensitive = scenario_instance_digest(semantic_changed) != base
 
-        format_valid = base.startswith("sha256:") and len(base.removeprefix("sha256:")) == 64
-        passed = order_independent and provenance_independent and semantic_sensitive and format_valid
+        tampered = copy.deepcopy(instance)
+        tampered["instanceDigest"] = "sha256:" + "0" * 64
+        try:
+            verify_scenario_instance_identity(tampered)
+            tampered_rejected = False
+        except ScenarioIdentityError:
+            tampered_rejected = True
+
+        digest_hex = base.removeprefix("sha256:")
+        format_valid = (
+            base.startswith("sha256:")
+            and len(digest_hex) == 64
+            and digest_hex == digest_hex.lower()
+        )
+        passed = all(
+            (
+                declared_matches,
+                declared_verified,
+                tampered_rejected,
+                order_independent,
+                provenance_independent,
+                semantic_sensitive,
+                format_valid,
+            )
+        )
         return passed, (
-            "RFC 8785 ScenarioInstance identity is order/provenance independent and semantic-content sensitive"
+            "ScenarioInstance declared identity matches RFC 8785 content and fails closed on tampering"
             if passed
-            else "ScenarioInstance identity violates the v0.1 canonical preimage contract"
+            else "ScenarioInstance identity integrity violates the v0.1 contract"
         )
 
     @staticmethod
@@ -169,16 +216,11 @@ class ReferenceScenarioTCKAdapter:
             actor_id: {"include": [capability]},
             "evaluator": {"include": ["mcp://control/hidden"]},
         }
-        template["success"] = {"sentinel": sentinel}
-        template["faults"] = {"future": {"sentinel": sentinel}}
-        template["security"] = {"sentinel": sentinel}
+        for field in ("success", "faults", "security", "contamination", "validity", "extensions"):
+            template[field] = {"sentinel": sentinel}
         template["graders"] = [{"sentinel": sentinel}]
-        template["contamination"] = {"sentinel": sentinel}
-        template["validity"] = {"sentinel": sentinel}
-        template["extensions"] = {"sentinel": sentinel}
 
         projection = ScenarioCompiler().compile(template).subject_projection(actor_id)
-        projection_text = repr(projection)
         capabilities = projection.get("capabilities", {})
         actor_capabilities = (
             capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
@@ -191,7 +233,7 @@ class ReferenceScenarioTCKAdapter:
         passed = (
             capability in includes
             and "evaluator" not in capabilities
-            and sentinel not in projection_text
+            and sentinel not in repr(projection)
             and all(field not in projection for field in hidden_fields)
         )
         return passed, (
@@ -219,6 +261,7 @@ class ReferenceScenarioTCKAdapter:
                 "artifacts": [reference],
             },
         }
+
         resolver = StaticReferenceResolver(records={reference: {"digest": identity}})
         bound = ScenarioCompiler(resolver=resolver).compile(
             template, CompileOptions(strict_references=True)
@@ -237,15 +280,23 @@ class ReferenceScenarioTCKAdapter:
         changed["referenceBindings"][0]["identity"] = "sha256:" + "2" * 64
         identity_sensitive = scenario_instance_digest(changed) != bound.instance_digest
 
-        strict_failed = False
         try:
             ScenarioCompiler().compile(template, CompileOptions(strict_references=True))
+            strict_failed = False
         except ReferenceResolutionError:
             strict_failed = True
 
-        passed = binding_ok and identity_sensitive and strict_failed
+        try:
+            ScenarioCompiler(
+                resolver=_MismatchedReferenceResolver(identity)
+            ).compile(template, CompileOptions(strict_references=True))
+            substitution_rejected = False
+        except ReferenceResolutionError:
+            substitution_rejected = True
+
+        passed = binding_ok and identity_sensitive and strict_failed and substitution_rejected
         return passed, (
-            "strict external reference identity is bound into ScenarioInstance and missing content identity fails closed"
+            "strict reference identity is request-bound, identity-bound, and fails closed on substitution"
             if passed
             else "reference identity binding or strict fail-closed behavior is incorrect"
         )
