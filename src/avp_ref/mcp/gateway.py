@@ -29,6 +29,7 @@ from .models import (
 from .transport import MCPTransport, encode_mcp_header_value
 
 _GATEWAY_VERSION = "0.2.0-alpha.5"
+_MAX_SAFE_INTEGER = 9007199254740991
 _TOKEN = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 
 
@@ -437,30 +438,40 @@ class MCPVerificationGateway:
                 value = value[part]
             if value is None:
                 continue
-            if kind == "integer" and (
-                not isinstance(value, int)
-                or isinstance(value, bool)
-                or abs(value) > 9007199254740991
-            ):
-                raise MCPProtocolError(
-                    "x-mcp-header integer is outside safe range"
-                )
-            if kind == "boolean" and not isinstance(value, bool):
-                raise MCPProtocolError(
-                    "x-mcp-header boolean value is invalid"
-                )
-            if kind == "string" and not isinstance(value, str):
-                raise MCPProtocolError(
-                    "x-mcp-header string value is invalid"
-                )
 
-            serialized = (
-                "true"
-                if value is True
-                else "false"
-                if value is False
-                else str(value)
-            )
+            if kind == "integer":
+                if isinstance(value, bool):
+                    raise MCPProtocolError(
+                        "x-mcp-header integer value is invalid"
+                    )
+                if isinstance(value, int):
+                    integer_value = value
+                elif isinstance(value, float) and value.is_integer():
+                    integer_value = int(value)
+                else:
+                    raise MCPProtocolError(
+                        "x-mcp-header integer value is invalid"
+                    )
+                if abs(integer_value) > _MAX_SAFE_INTEGER:
+                    raise MCPProtocolError(
+                        "x-mcp-header integer is outside safe range"
+                    )
+                serialized = str(integer_value)
+            elif kind == "boolean":
+                if not isinstance(value, bool):
+                    raise MCPProtocolError(
+                        "x-mcp-header boolean value is invalid"
+                    )
+                serialized = "true" if value else "false"
+            elif kind == "string":
+                if not isinstance(value, str):
+                    raise MCPProtocolError(
+                        "x-mcp-header string value is invalid"
+                    )
+                serialized = value
+            else:
+                raise MCPProtocolError("unsupported x-mcp-header primitive type")
+
             headers[f"Mcp-Param-{name}"] = encode_mcp_header_value(serialized)
         return headers
 
