@@ -13,10 +13,7 @@ from avp_ref.reference import (
     reference_subject_adapter,
 )
 from avp_ref.runtime import EpisodeState, ReferenceRuntime
-from avp_ref.subject import (
-    HTTPSubjectAdapter,
-    SubjectTransportError,
-)
+from avp_ref.subject import HTTPSubjectAdapter, SubjectTransportError
 from avp_ref.telemetry import OpenTelemetryBridge
 
 
@@ -180,9 +177,35 @@ class SubjectAdapterTest(unittest.TestCase):
         )
         self.assertNotIn("agent-a.example.test", repr(first_description.metadata))
 
-    def test_http_base_url_rejects_userinfo_credentials(self):
+    def test_http_secret_bearing_headers_require_opaque_configuration_digest(self):
+        with self.assertRaises(ValueError):
+            HTTPSubjectAdapter(
+                "https://agent.example.test",
+                headers={"Authorization": "Bearer secret"},
+            )
+        first = HTTPSubjectAdapter(
+            "https://agent.example.test",
+            headers={"Authorization": "Bearer secret"},
+            configuration_digest="sha256:" + "1" * 64,
+        )
+        second = HTTPSubjectAdapter(
+            "https://agent.example.test",
+            headers={"Authorization": "Bearer other-secret"},
+            configuration_digest="sha256:" + "2" * 64,
+        )
+        self.assertNotEqual(
+            first.describe().identity_digest,
+            second.describe().identity_digest,
+        )
+        self.assertNotIn("secret", repr(first.describe().metadata))
+
+    def test_http_base_url_rejects_credential_bearing_url_components(self):
         with self.assertRaises(ValueError):
             HTTPSubjectAdapter("https://user:secret@example.test")
+        with self.assertRaises(ValueError):
+            HTTPSubjectAdapter("https://example.test?token=secret")
+        with self.assertRaises(ValueError):
+            HTTPSubjectAdapter("https://example.test#secret")
 
     def test_user_cannot_spoof_trace_headers(self):
         with self.assertRaises(ValueError):
