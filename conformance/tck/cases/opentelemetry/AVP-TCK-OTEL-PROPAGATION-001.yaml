@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-PROPAGATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-005]
+applicability: mandatory
+type: mixed
+vector:
+  propagationClaimed: true
+  activeEpisodeTraceId: "0123456789abcdef0123456789abcdef"
+  activeSpanId: "0123456789abcdef"
+expect:
+  validW3CTraceparentProduced: true
+  propagatedTraceMatchesActiveEpisode: true
+  malformedCarrierNotCountedAsSuccessfulPropagation: true
