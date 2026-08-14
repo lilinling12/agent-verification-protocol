@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-LIFECYCLE-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-001, AVP-SUBJECT-002, AVP-SUBJECT-008]
+applicability: mandatory
+type: mixed
+vector:
+  bindAdapterIdentity: true
+  bindAgentSystemIdentity: true
+  attemptForeignAgentHandle: true
+  releaseThenReuse: true
+expect:
+  adapterIdentityBoundToVerificationContext: true
+  foreignAgentHandleRejectedFailClosed: true
+  releasedHandleRejectedFailClosed: true
+  handleIdentifierFormatNotRequired: true
