@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-SCHEMA-DRIFT-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-004]
+applicability: mandatory
+type: mixed
+vector:
+  tool: order.get
+  baselineSchemaVersion: 1
+  activeSchemaVersion: 2
+  arguments: {order_id: ord_1}
+expect:
+  argumentsValidatedBeforeUpstreamCall: true
+  materialDriftRejectedBeforeSideEffect: true
+  upstreamToolsCallCountAfterDrift: 0
