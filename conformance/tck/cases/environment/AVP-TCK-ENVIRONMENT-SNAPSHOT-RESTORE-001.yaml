@@ -20,5 +20,6 @@ expect:
   sameHandleRestoreSucceeds: true
   restoredDigestMatchesSnapshot: true
   foreignHandleRestoreFailsClosed: true
+  tamperedSnapshotReferenceFailsClosed: true
   reportedEquivalenceNotStrongerThanEstablished: true
   exactNotClaimedByReference: true
