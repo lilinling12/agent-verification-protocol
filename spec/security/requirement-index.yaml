@@ -1,3 +1,5 @@
+version: "0.1"
+status: draft-normative-candidate
 profile: avp-security-v0.1
 requirements:
   - id: AVP-SECURITY-001
