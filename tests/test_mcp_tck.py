@@ -12,6 +12,7 @@ _MCP_CASES = (
     "AVP-TCK-MCP-BASELINE-IDENTITY-001",
     "AVP-TCK-MCP-SCHEMA-DRIFT-001",
     "AVP-TCK-MCP-CALL-BINDING-001",
+    "AVP-TCK-MCP-TOOL-ERROR-001",
     "AVP-TCK-MCP-UPSTREAM-FAILURE-001",
     "AVP-TCK-MCP-FEATURE-HONESTY-001",
 )
@@ -26,8 +27,8 @@ class ReferenceMCPTCKTest(unittest.TestCase):
         )
 
         self.assertTrue(result.conformant)
-        self.assertEqual(7, result.report["summary"]["total"])
-        self.assertEqual(7, result.report["summary"]["passed"])
+        self.assertEqual(8, result.report["summary"]["total"])
+        self.assertEqual(8, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
         self.assertEqual(
@@ -45,8 +46,8 @@ class ReferenceMCPTCKTest(unittest.TestCase):
         )
 
         self.assertTrue(result.conformant)
-        self.assertEqual(7, result.report["summary"]["total"])
-        self.assertEqual(7, result.report["summary"]["passed"])
+        self.assertEqual(8, result.report["summary"]["total"])
+        self.assertEqual(8, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
 
