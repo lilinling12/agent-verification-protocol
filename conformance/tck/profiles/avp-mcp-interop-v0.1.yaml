@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-mcp-interop-v0.1
+  version: 0.1.0
+  status: draft
+requirements:
+  - AVP-MCP-001
+  - AVP-MCP-002
+  - AVP-MCP-003
+  - AVP-MCP-004
+  - AVP-MCP-005
+  - AVP-MCP-006
+  - AVP-MCP-007
+  - AVP-MCP-008
+mandatoryCases:
+  - AVP-TCK-MCP-REVISION-001
+  - AVP-TCK-MCP-CAPABILITY-DENY-001
+  - AVP-TCK-MCP-BASELINE-IDENTITY-001
+  - AVP-TCK-MCP-SCHEMA-DRIFT-001
+  - AVP-TCK-MCP-CALL-BINDING-001
+  - AVP-TCK-MCP-UPSTREAM-FAILURE-001
+  - AVP-TCK-MCP-FEATURE-HONESTY-001
