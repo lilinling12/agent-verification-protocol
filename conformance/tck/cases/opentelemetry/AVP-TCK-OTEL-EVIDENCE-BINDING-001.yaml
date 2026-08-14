@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-EVIDENCE-BINDING-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-008]
+applicability: mandatory
+type: mixed
+vector:
+  episodeId: ep_otel_evidence
+  telemetryArtifactDigest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  authoritativeTaskVerdict: FAIL
+  telemetrySpanStatus: OK
+expect:
+  telemetryArtifactBoundAsEvidence: true
+  episodeCorrelationBound: true
+  telemetryStatusCannotOverrideTaskVerdict: true
+  backendNotAuthoritativeForAvpVerdict: true
