@@ -1,6 +1,6 @@
 version: "0.1"
 matrix: scenario
-status: reconciliation-draft
+status: promoted-draft
 domain: scenario-materialization
 
 authority_chain:
@@ -42,23 +42,36 @@ implementation_evidence:
   - src/avp_ref/security/capability_policy.py
 
 schema_artifacts:
+  - schemas/scenario-template.schema.json
+  - schemas/scenario-instance.schema.json
   - schemas/scenario.schema.json
 
-tck_cases: []
+tck_cases:
+  - AVP-TCK-SCENARIO-MATERIALIZATION-001
+  - AVP-TCK-SCENARIO-UNRESOLVED-001
+  - AVP-TCK-SCENARIO-IDENTITY-001
+  - AVP-TCK-SCENARIO-IMMUTABILITY-001
+  - AVP-TCK-SCENARIO-PROJECTION-001
+  - AVP-TCK-SCENARIO-REFERENCE-001
 
 decision_records:
   - docs/reconciliation/v0.1/decisions/scenario-instance-001.md
   - rfcs/AEP-0003-scenario-instance-contract.md
 
+identity_contract:
+  canonicalization: RFC8785-JCS
+  digest: SHA-256
+  excluded_top_level_fields: [instanceDigest, provenance]
+
 open_reconciliation:
-  - decide whether ScenarioTemplate and ScenarioInstance require separate protocol schemas
-  - define exact language-neutral instance identity preimage and serialization boundary
-  - map each normative requirement to implementation-independent TCK vectors
-  - reconcile current authoring-only fields that are not required for execution interoperability
-  - verify Security projection requirements depend on Scenario semantics without duplicating them
+  - align the Python reference compiler with the language-neutral identity preimage without making compiler provenance semantic
+  - package and validate the reconciled ScenarioInstance schema from the built wheel
+  - execute all six Scenario TCK cases through the reference conformance adapter
+  - verify Security projection requirements depend on Scenario semantics without incompatible duplication
+  - complete Scenario acceptance audit before AEP-0003 acceptance
 
 note: >-
-  This matrix intentionally remains reconciliation-draft. Existing Python compiler
-  behavior and the current authoring schema are implementation evidence, not
-  normative authority. Promotion requires schema reconciliation, registered TCK
-  cases, reference alignment, and an acceptance audit.
+  This matrix is promoted-draft because the normative schema split and portable TCK
+  vectors now exist. The current Python compiler remains implementation evidence and
+  is not yet claimed conformant with the new identity contract until reference
+  alignment and the Scenario acceptance audit are complete.
