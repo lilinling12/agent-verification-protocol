@@ -17,8 +17,8 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 
 ### Protocol / conformance
 - [x] Scenario / ScenarioInstance contract and `avp-scenario-v0.1` TCK
-- [ ] Environment contract reconciliation and conformance profile
-- [ ] MCP verification interoperability profile
+- [x] Environment contract reconciliation and `avp-environment-v0.1` conformance profile
+- [x] MCP verification interoperability profile and `avp-mcp-interop-v0.1` TCK
 - [ ] OpenTelemetry mapping interoperability profile
 - [ ] Subject Adapter interoperability contract
 - [ ] artifact trust / signature / attestation decision
