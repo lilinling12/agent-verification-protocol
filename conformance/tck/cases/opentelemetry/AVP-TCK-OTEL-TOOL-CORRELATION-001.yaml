@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-TOOL-CORRELATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-003]
+applicability: mandatory
+type: mixed
+vector:
+  calls:
+    - {correlationId: call_1, tool: order.get}
+    - {correlationId: call_2, tool: order.get}
+  outcomes:
+    - {correlationId: call_2, kind: result}
+    - {correlationId: call_1, kind: result}
+expect:
+  eachOutcomeBindsOriginalCall: true
+  sameToolNameDoesNotCollapseCalls: true
+  correlationIdentityPreserved: true
