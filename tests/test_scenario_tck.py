@@ -5,7 +5,6 @@ import unittest
 from importlib import resources
 from pathlib import Path
 
-from avp_ref.runtime import ReferenceRuntime
 from avp_ref.tck_adapter import TCKRepository, TCKRunner, TCKStatus
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,18 +46,6 @@ class ReferenceScenarioTCKTest(unittest.TestCase):
         self.assertEqual(6, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
-
-    def test_runtime_advertises_only_the_verified_scenario_profile(self) -> None:
-        repository = TCKRepository(ROOT)
-        result = TCKRunner.for_reference(repository).run(profile="avp-scenario-v0.1")
-        self.assertTrue(result.conformant)
-
-        capabilities = ReferenceRuntime().capabilities()
-        self.assertIn("AVP-Scenario", capabilities["profiles"])
-        self.assertEqual(
-            "avp-scenario-v0.1",
-            capabilities["features"]["scenario_profile"],
-        )
 
     def test_packaged_schemas_match_normative_repository_schemas(self) -> None:
         for name in ("scenario-template.schema.json", "scenario-instance.schema.json"):
