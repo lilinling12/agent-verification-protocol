@@ -11,6 +11,7 @@ from avp_ref.canonical import digest
 
 from .errors import CompileDiagnostic, ParameterResolutionError, ReferenceResolutionError, ScenarioValidationError, VisibilityViolationError
 from .generators import GeneratorRegistry
+from .identity import scenario_instance_digest
 from .loader import validate_template
 from .models import GeneratorRecord, ScenarioInstance, deep_freeze
 from .references import ReferenceResolver, SymbolicReferenceResolver
@@ -36,9 +37,10 @@ class ScenarioCompiler:
     """Compile a validated AVS template into an immutable ScenarioInstance.
 
     Compilation is part of the evaluator trust boundary. It materializes every
-    supported source of nondeterminism before execution, records reference
-    identities and produces a canonical instance digest. Compilation failures
-    are infrastructure/configuration failures and MUST NOT count as Agent FAIL.
+    supported source of nondeterminism before execution, binds reference
+    identities and produces the AVP Scenario v0.1 content identity. Compilation
+    failures are infrastructure/configuration failures and MUST NOT count as
+    Agent FAIL.
     """
 
     def __init__(self, *, resolver: ReferenceResolver | None = None, generators: GeneratorRegistry | None = None, compiler_version: str = _COMPILER_VERSION) -> None:
@@ -64,17 +66,36 @@ class ScenarioCompiler:
         references = self._resolve_references(materialized, active.strict_references)
         self._validate_subject_visibility(materialized)
         self._reject_unresolved_placeholders(materialized)
-        materialized["compilation"] = {
+
+        if references:
+            materialized["referenceBindings"] = [
+                {
+                    "location": reference.path,
+                    "reference": reference.uri,
+                    "identity": reference.digest,
+                    "identityType": reference.mode,
+                }
+                for reference in references
+            ]
+
+        materialized["provenance"] = {
             "compiler": {"name": _COMPILER_NAME, "version": self._compiler_version},
-            "template": {"name": source["metadata"]["name"], "version": source["metadata"]["version"], "digest": template_digest},
-            "seed_bundle": seeds.to_dict(),
-            "resolved_parameters": parameters,
+            "template": {
+                "name": source["metadata"]["name"],
+                "version": source["metadata"]["version"],
+                "digest": template_digest,
+            },
+            "seedBundle": seeds.to_dict(),
+            "resolvedParameters": parameters,
             "generators": [record.to_dict() for record in generator_records],
-            "resolved_references": [reference.to_dict() for reference in references],
         }
-        instance_digest = digest(materialized)
-        materialized["instance_digest"] = instance_digest
-        return ScenarioInstance(template_digest=template_digest, instance_digest=instance_digest, document=deep_freeze(materialized))
+        instance_digest = scenario_instance_digest(materialized)
+        materialized["instanceDigest"] = instance_digest
+        return ScenarioInstance(
+            template_digest=template_digest,
+            instance_digest=instance_digest,
+            document=deep_freeze(materialized),
+        )
 
     def _validate_supported_semantics(self, template: Mapping[str, Any]) -> None:
         if template.get("generators"):
@@ -153,11 +174,13 @@ class ScenarioCompiler:
         full = _PLACEHOLDER.fullmatch(value)
         if full:
             return self._lookup_parameter(full.group(1), parameters, path)
+
         def replace(match: re.Match[str]) -> str:
             resolved = self._lookup_parameter(match.group(1), parameters, path)
             if isinstance(resolved, (dict, list)):
                 raise ParameterResolutionError("structured parameter cannot be interpolated into a string", (CompileDiagnostic("AVS-PARAM-011", "object/array parameters must occupy the entire field value", path),))
             return str(resolved)
+
         return _PLACEHOLDER.sub(replace, value)
 
     @staticmethod
