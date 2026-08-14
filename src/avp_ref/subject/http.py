@@ -66,12 +66,7 @@ class HTTPSubjectAdapter:
         self._url = normalized + endpoint
         self._headers = configured
         self._handles: dict[str, AgentSystem] = {}
-        target_digest = digest(
-            {
-                "base_url": normalized,
-                "endpoint": endpoint,
-            }
-        )
+        target_digest = digest({"base_url": normalized, "endpoint": endpoint})
         self._description = SubjectDescription(
             name="http-subject",
             version="0.1.0",
@@ -115,7 +110,7 @@ class HTTPSubjectAdapter:
                 "protocol_version": "avp.subject/v0.1",
                 "episode_id": invocation.episode_id,
                 "step": step,
-                "agent_system": agent.to_dict(),
+                "agent_system": agent.subject_projection(),
                 "task": dict(invocation.task),
                 "observation": observation,
                 "previous_tool_result": previous_tool_result,
@@ -235,9 +230,7 @@ class HTTPSubjectAdapter:
         try:
             value = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise SubjectProtocolError(
-                "subject response must be UTF-8 JSON"
-            ) from exc
+            raise SubjectProtocolError("subject response must be UTF-8 JSON") from exc
         if not isinstance(value, dict):
             raise SubjectProtocolError("subject response root must be an object")
         return value
