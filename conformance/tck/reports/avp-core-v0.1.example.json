@@ -12,7 +12,7 @@
   },
   "tck": {
     "version": "0.1.0",
-    "registryDigest": "sha256:526451ae091e65bf89d35b889f33101db38abcbfee7b673b19d5b20e90ebb6cd"
+    "registryDigest": "sha256:2e50e8d92d16d086fd31fd636c74e8a870a30bd81ac7fc021970ac8b9066c764"
   },
   "declaredCapabilities": [],
   "cases": [
