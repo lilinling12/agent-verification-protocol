@@ -11,13 +11,7 @@ FrozenValue = Any
 
 
 def deep_freeze(value: Any) -> FrozenValue:
-    """Recursively freeze JSON-compatible data.
-
-    ``dataclass(frozen=True)`` only protects attribute reassignment; without a
-    recursive freeze, nested dictionaries could still mutate after a digest was
-    calculated. AVP relies on instance digests as audit identities, so deep
-    immutability is a protocol invariant rather than a style preference.
-    """
+    """Recursively freeze JSON-compatible data."""
 
     if isinstance(value, Mapping):
         return MappingProxyType({str(key): deep_freeze(item) for key, item in value.items()})
@@ -107,32 +101,39 @@ class GeneratorRecord:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioInstance:
-    """Immutable, fully materialized AVS ScenarioInstance.
+    """Immutable, identity-verified materialized ScenarioInstance.
 
-    The ``instance_digest`` is computed from all other serialized fields and is
-    therefore an audit identity. Consumers should use :meth:`to_dict` when a
-    mutable JSON representation is required for transport.
+    Construction fails closed unless the public ``instance_digest`` attribute,
+    serialized ``instanceDigest`` field, and RFC 8785/SHA-256 recomputation all
+    agree. This protects Runtime callers that receive an instance from code
+    other than the reference compiler.
     """
 
     template_digest: str
     instance_digest: str
     document: Mapping[str, FrozenValue]
 
+    def __post_init__(self) -> None:
+        from .identity import verify_scenario_instance_identity
+
+        verify_scenario_instance_identity(self.document, expected_digest=self.instance_digest)
+
     def to_dict(self) -> dict[str, Any]:
         return deep_thaw(self.document)
 
     def subject_projection(self, actor_id: str = "subject") -> Mapping[str, FrozenValue]:
-        """Return the conservative Agent-Plane view of this instance.
-
-        Verification conditions, faults, graders, validity rules and
-        contamination controls intentionally remain evaluator-only. The Subject
-        receives what it needs to act, not the benchmark answer key.
-        """
+        """Return the conservative Agent-Plane view of this instance."""
 
         doc = self.document
-        actors = [deep_thaw(actor) for actor in doc.get("actors", ()) if actor.get("id") == actor_id]
+        actors = [
+            deep_thaw(actor)
+            for actor in doc.get("actors", ())
+            if actor.get("id") == actor_id
+        ]
         capabilities = doc.get("capabilities", {})
-        actor_capabilities = capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
+        actor_capabilities = (
+            capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
+        )
         public = {
             "apiVersion": doc["apiVersion"],
             "kind": doc["kind"],
