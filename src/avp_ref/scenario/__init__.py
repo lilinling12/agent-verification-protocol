@@ -10,7 +10,8 @@ from .errors import (
     ScenarioValidationError,
     VisibilityViolationError,
 )
-from .loader import load_scenario, validate_template
+from .identity import canonical_instance_bytes, identity_preimage, scenario_instance_digest
+from .loader import load_scenario, validate_instance, validate_template
 from .models import ScenarioInstance, SeedBundle
 from .references import StaticReferenceResolver, SymbolicReferenceResolver
 
@@ -28,6 +29,10 @@ __all__ = [
     "StaticReferenceResolver",
     "SymbolicReferenceResolver",
     "VisibilityViolationError",
+    "canonical_instance_bytes",
+    "identity_preimage",
     "load_scenario",
+    "scenario_instance_digest",
+    "validate_instance",
     "validate_template",
 ]
