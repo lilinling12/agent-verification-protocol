@@ -130,16 +130,13 @@ class ReferenceSubjectTCKAdapter:
         agent = reference_agent_system("subject-tck-lifecycle")
         description = adapter.describe()
         handle = adapter.open(agent)
-
         stable_identity = description.identity_digest == adapter.describe().identity_digest
         bound_agent = handle.agent_system_digest == agent.identity_digest
-
         try:
             adapter.release(replace(handle, adapter_name="foreign-adapter"))
             owner_rejected = False
         except SubjectTransportError:
             owner_rejected = True
-
         try:
             adapter.release(
                 replace(handle, agent_system_digest="sha256:" + "0" * 64)
@@ -147,21 +144,13 @@ class ReferenceSubjectTCKAdapter:
             agent_rejected = False
         except SubjectTransportError:
             agent_rejected = True
-
         adapter.release(handle)
         try:
             adapter.release(handle)
             stale_rejected = False
         except SubjectTransportError:
             stale_rejected = True
-
-        passed = (
-            stable_identity
-            and bound_agent
-            and owner_rejected
-            and agent_rejected
-            and stale_rejected
-        )
+        passed = stable_identity and bound_agent and owner_rejected and agent_rejected and stale_rejected
         return passed, (
             "adapter identity, Agent binding, owner identity and released handles remain fail-closed"
             if passed
@@ -179,9 +168,7 @@ class ReferenceSubjectTCKAdapter:
             reference_agent_system("projection-witness", adapter="http"),
             metadata={marker: marker for marker in protected},
         )
-        adapter = _ScriptedHTTPSubjectAdapter(
-            [{"status": "completed", "report": "ok"}]
-        )
+        adapter = _ScriptedHTTPSubjectAdapter([{"status": "completed", "report": "ok"}])
         handle = adapter.open(agent)
         try:
             result = adapter.invoke(handle, invocation, _Gateway())
@@ -210,22 +197,8 @@ class ReferenceSubjectTCKAdapter:
         max_steps = int(vector.get("maxSteps", 2))
         adapter = _ScriptedHTTPSubjectAdapter(
             [
-                {
-                    "status": "tool_call",
-                    "call": {
-                        "call_id": "c1",
-                        "name": "tool.one",
-                        "arguments": {},
-                    },
-                },
-                {
-                    "status": "tool_call",
-                    "call": {
-                        "call_id": "c2",
-                        "name": "tool.two",
-                        "arguments": {},
-                    },
-                },
+                {"status": "tool_call", "call": {"call_id": "c1", "name": "tool.one", "arguments": {}}},
+                {"status": "tool_call", "call": {"call_id": "c2", "name": "tool.two", "arguments": {}}},
                 {"status": "completed", "report": "too late"},
             ]
         )
@@ -240,11 +213,7 @@ class ReferenceSubjectTCKAdapter:
             overrun_rejected = True
         finally:
             adapter.release(handle)
-        passed = (
-            overrun_rejected
-            and invocation.max_steps == max_steps
-            and len(gateway.tool_calls) == max_steps
-        )
+        passed = overrun_rejected and invocation.max_steps == max_steps and len(gateway.tool_calls) == max_steps
         return passed, (
             "evaluator-owned step budget remains an upper bound and overrun is not completion"
             if passed
@@ -264,25 +233,24 @@ class ReferenceSubjectTCKAdapter:
             return "unexpected"
 
         guarded = CapabilityGuardedSubjectAdapter(
-            InProcessSubjectAdapter(
-                unauthorized_subject,
-                name="capability-witness",
-            ),
+            InProcessSubjectAdapter(unauthorized_subject, name="capability-witness"),
             scenario,
             policy,
         )
         handle = guarded.open(reference_agent_system("capability-witness"))
         invocation = SubjectInvocation("ep_subject_capability", {}, 1, 1.0)
+        denials = ()
         try:
             guarded.invoke(handle, invocation, downstream)
             denied = False
         except SubjectExecutionError as exc:
             denied = "SubjectExecutionDenied" in str(exc)
+            denials = policy.denial_records(invocation.episode_id)
         except SubjectExecutionDenied:
             denied = True
+            denials = policy.denial_records(invocation.episode_id)
         finally:
             guarded.release(handle)
-        denials = policy.denial_records(invocation.episode_id)
         passed = denied and not downstream.tool_calls and bool(denials)
         return passed, (
             "adapter-exposed tool capability is Runtime/Security mediated without implying process containment"
@@ -295,20 +263,12 @@ class ReferenceSubjectTCKAdapter:
         del vector
         agent = reference_agent_system("subject-tck-outcome", adapter="http")
         invocation = SubjectInvocation("ep_subject_outcome", {}, 1, 1.0)
-
-        completed = _ScriptedHTTPSubjectAdapter(
-            [{"status": "completed", "report": "done"}]
-        )
+        completed = _ScriptedHTTPSubjectAdapter([{"status": "completed", "report": "done"}])
         completed_handle = completed.open(agent)
         try:
-            completed_result = completed.invoke(
-                completed_handle,
-                invocation,
-                _Gateway(),
-            )
+            completed_result = completed.invoke(completed_handle, invocation, _Gateway())
         finally:
             completed.release(completed_handle)
-
         classifications: list[type[BaseException]] = []
         scripts: list[list[object]] = [
             [{"status": "failed", "error": "subject-declared failure"}],
@@ -325,18 +285,8 @@ class ReferenceSubjectTCKAdapter:
                 classifications.append(type(exc))
             finally:
                 adapter.release(handle)
-
         budget = _ScriptedHTTPSubjectAdapter(
-            [
-                {
-                    "status": "tool_call",
-                    "call": {
-                        "call_id": "c1",
-                        "name": "tool.one",
-                        "arguments": {},
-                    },
-                }
-            ]
+            [{"status": "tool_call", "call": {"call_id": "c1", "name": "tool.one", "arguments": {}}}]
         )
         budget_handle = budget.open(agent)
         try:
@@ -345,7 +295,6 @@ class ReferenceSubjectTCKAdapter:
             classifications.append(type(exc))
         finally:
             budget.release(budget_handle)
-
         expected = {
             SubjectExecutionError,
             SubjectTransportError,
@@ -353,11 +302,7 @@ class ReferenceSubjectTCKAdapter:
             SubjectTimeoutError,
             SubjectBudgetExceeded,
         }
-        passed = (
-            completed_result.status is SubjectStatus.COMPLETED
-            and completed_result.report == "done"
-            and set(classifications) == expected
-        )
+        passed = completed_result.status is SubjectStatus.COMPLETED and completed_result.report == "done" and set(classifications) == expected
         return passed, (
             "completion and five material Subject failure classes remain distinguishable"
             if passed
@@ -369,14 +314,9 @@ class ReferenceSubjectTCKAdapter:
         del vector
         agent = reference_agent_system("subject-tck-result", adapter="http")
         invocation = SubjectInvocation("ep_subject_result", {}, 1, 1.0)
-
         invalid_frames: list[object] = [
             {"status": "completed", "report": {"not": "a string"}},
-            {
-                "status": "completed",
-                "report": "ok",
-                "error": "contradictory",
-            },
+            {"status": "completed", "report": "ok", "error": "contradictory"},
             {"status": "failed", "error": ""},
             {"status": "unsupported"},
             ["non-object-frame"],
@@ -391,26 +331,17 @@ class ReferenceSubjectTCKAdapter:
                 rejections += 1
             finally:
                 adapter.release(handle)
-
         completion_only_model = False
         try:
             SubjectResult("FAILED", "invalid", 1)  # type: ignore[arg-type]
         except ValueError:
             completion_only_model = True
-
-        control = _ScriptedHTTPSubjectAdapter(
-            [{"status": "completed", "report": "valid"}]
-        )
+        control = _ScriptedHTTPSubjectAdapter([{"status": "completed", "report": "valid"}])
         control_handle = control.open(agent)
         try:
-            control_result = control.invoke(
-                control_handle,
-                invocation,
-                _Gateway(),
-            )
+            control_result = control.invoke(control_handle, invocation, _Gateway())
         finally:
             control.release(control_handle)
-
         passed = (
             rejections == len(invalid_frames)
             and completion_only_model
@@ -432,9 +363,7 @@ class ReferenceSubjectTCKAdapter:
         isolation = str(metadata.get("isolation", ""))
         forbidden_claims = {"process", "network", "tenant", "container", "vm"}
         serialized = repr(metadata).lower()
-        passed = isolation == "none" and all(
-            claim not in serialized for claim in forbidden_claims
-        )
+        passed = isolation == "none" and all(claim not in serialized for claim in forbidden_claims)
         return passed, (
             "in-process reference adapter truthfully claims no stronger isolation"
             if passed
