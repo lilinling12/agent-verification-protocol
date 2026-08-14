@@ -34,7 +34,9 @@ implementation_evidence:
   - src/avp_ref/subject/in_process.py
   - src/avp_ref/environment/in_memory.py
   - src/avp_ref/mcp/gateway.py
+  - src/avp_ref/isolation/environment.py
   - src/avp_ref/security/capability_policy.py
+  - src/avp_ref/security/process_context.py
   - src/avp_ref/security/subject_adapter.py
   - SECURITY.md
 
