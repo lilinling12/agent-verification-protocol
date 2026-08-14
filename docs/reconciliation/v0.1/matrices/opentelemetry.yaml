@@ -1,0 +1,105 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: opentelemetry
+  status: promoted-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-OTEL-001
+    decision: bind-episode-manifest-correlation
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - src/avp_ref/runtime/manifest.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-ROOT-CORRELATION-001.yaml
+    notes: Episode/manifest identity is AVP-owned; SpanContext representation remains OpenTelemetry-owned.
+  - requirement: AVP-OTEL-002
+    decision: promote-event-correlation
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - src/avp_ref/events.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-EVENT-CORRELATION-001.yaml
+    notes: AVP event identity and ordering remain correlatable without requiring raw event payload capture.
+  - requirement: AVP-OTEL-003
+    decision: promote-tool-correlation
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - src/avp_ref/runtime/engine.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-TOOL-CORRELATION-001.yaml
+    notes: Tool call and terminal outcome correlation is normative; exact span naming and Python SDK objects are not.
+  - requirement: AVP-OTEL-004
+    decision: promote-outcome-preservation
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - src/avp_ref/mcp/models.py
+      - tests/test_otel_mapping.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-OUTCOME-PRESERVATION-001.yaml
+    notes: Telemetry preserves SUCCESS/TOOL_ERROR/failure distinctions and must not flatten AVP or MCP outcome semantics into successful completion.
+  - requirement: AVP-OTEL-005
+    decision: compose-with-w3c-propagation
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - tests/test_otel_mapping.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-PROPAGATION-001.yaml
+    notes: W3C Trace Context is external authority; AVP only requires honest propagation claims backed by an active mapped root context.
+  - requirement: AVP-OTEL-006
+    decision: promote-data-minimization
+    implementationEvidence:
+      - src/avp_ref/telemetry/bridge.py
+      - src/avp_ref/telemetry/models.py
+      - spec/security/security-boundary-contract.md
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-DATA-MINIMIZATION-001.yaml
+    notes: Raw sensitive payloads and evaluator secrets are not required for mapping conformance and remain protected by Security composition.
+  - requirement: AVP-OTEL-007
+    decision: promote-completeness-honesty
+    implementationEvidence:
+      - src/avp_ref/telemetry/models.py
+      - src/avp_ref/runtime/engine.py
+      - tests/test_otel_mapping.py
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-COMPLETENESS-001.yaml
+    notes: COMPLETE/INCOMPLETE/REQUIRED_MISSING are AVP claim semantics; trace or root-span existence alone is insufficient to establish completeness.
+  - requirement: AVP-OTEL-008
+    decision: compose-with-evidence
+    implementationEvidence:
+      - src/avp_ref/runtime/engine.py
+      - spec/evidence/evidence-artifact-contract.md
+      - conformance/tck/cases/opentelemetry/AVP-TCK-OTEL-EVIDENCE-BINDING-001.yaml
+    notes: Telemetry may become AVP Evidence, but it does not replace Oracle/state evidence or task-verdict authority.
+nonNormativeImplementationDetails:
+  - Python OpenTelemetryBridge and TelemetrySession APIs
+  - opentelemetry-sdk package choice/version
+  - InMemorySpanExporter
+  - exact Python span names
+  - exact safe-attribute allowlist implementation
+  - exporter/collector/backend deployment
+  - sampling strategy
+  - OTLP encoding
+externalAuthority:
+  protocol: OpenTelemetry
+  semanticConventions: "1.43.0-current-at-reconciliation"
+  ownedSemantics:
+    - Span and SpanContext
+    - status model
+    - Context and propagators
+    - W3C Trace Context integration
+    - Resource/attribute/event model
+    - SDK/exporter/processor behavior
+    - semantic conventions
+    - sampling
+    - OTLP and collector behavior
+acceptanceAudit:
+  status: passed
+  evidence:
+    - avp-otel-mapping-v0.1 has 8 mandatory portable TCK cases covering all 8 indexed requirements
+    - reference implementation passes the full OpenTelemetry mapping profile 8/8 with zero failures or skips
+    - MCP TOOL_ERROR remains distinguishable as tool_error telemetry and marks the tool span as error without being rewritten as success
+    - successful tool completion does not invent OpenTelemetry OK status and remains UNSET unless OpenTelemetry semantics require otherwise
+    - root-span existence alone cannot establish COMPLETE and unmatched required tool calls produce REQUIRED_MISSING
+    - outbound trace propagation is bound to the active mapped root trace/span context and propagation accounting is explicit
+    - telemetry mapping remains data-minimized and composes with Security rather than requiring raw sensitive or evaluator-only material
+    - telemetry Evidence remains subordinate to authoritative AVP verdict, state, Oracle, and Evidence semantics
+    - final-head Quality runs on Python 3.11/3.12/3.13 and Package validation passed before promotion
+remainingGates:
+  - final-head CI and Governance after reconciliation promotion
+  - unresolved review-thread check
+  - main drift check
+  - explicit user authorization before merge

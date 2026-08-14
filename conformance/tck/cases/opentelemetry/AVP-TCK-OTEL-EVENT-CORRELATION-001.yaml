@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-EVENT-CORRELATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-002]
+applicability: mandatory
+type: positive
+vector:
+  events:
+    - {id: ev_1, type: tool.call, sequence: 10}
+    - {id: ev_2, type: tool.result, sequence: 11}
+expect:
+  eventIdentityPreserved: true
+  eventTypePreserved: true
+  episodeLocalOrderPreserved: true
+  rawEventPayloadNotRequired: true

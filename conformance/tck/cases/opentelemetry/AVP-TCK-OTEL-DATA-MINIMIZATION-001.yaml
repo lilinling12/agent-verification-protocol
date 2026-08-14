@@ -1,0 +1,22 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-DATA-MINIMIZATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-006]
+applicability: mandatory
+type: negative
+vector:
+  protectedValues:
+    - raw-subject-prompt
+    - raw-tool-arguments
+    - raw-tool-result
+    - evaluator-secret
+    - hidden-oracle-material
+    - future-fault-schedule
+expect:
+  mandatoryTelemetryContainsNoProtectedRawValues: true
+  identityAndOutcomeMetadataStillAvailable: true
+  protectedContentNotRequiredForConformance: true

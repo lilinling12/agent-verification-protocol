@@ -1,0 +1,22 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-OUTCOME-PRESERVATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-004]
+applicability: mandatory
+type: negative
+vector:
+  outcomes:
+    - {correlationId: call_success, avpOutcome: success}
+    - {correlationId: call_tool_error, avpOutcome: tool_error}
+    - {correlationId: call_upstream_error, avpOutcome: upstream_error}
+    - {correlationId: eval_invalid, avpOutcome: evaluation_invalid}
+expect:
+  successfulOutcomeDistinguishable: true
+  toolErrorNotFlattenedToSuccess: true
+  upstreamFailureNotFlattenedToSuccess: true
+  invalidEvaluationNotFlattenedToSuccess: true
+  otelStatusMappingDoesNotInventOk: true

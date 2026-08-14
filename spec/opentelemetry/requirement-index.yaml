@@ -1,0 +1,60 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-otel-mapping-v0.1
+requirements:
+  - id: AVP-OTEL-001
+    level: MUST
+    area: root-correlation
+    statement: Verification telemetry binds Episode and manifest identity to the telemetry root/correlation surface.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-001
+    conformance: [AVP-TCK-OTEL-ROOT-CORRELATION-001]
+  - id: AVP-OTEL-002
+    level: MUST
+    area: event-correlation
+    statement: Mapped telemetry preserves AVP event identity, type, and Episode-local ordering without requiring raw payload capture.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-002
+    conformance: [AVP-TCK-OTEL-EVENT-CORRELATION-001]
+  - id: AVP-OTEL-003
+    level: MUST
+    area: tool-correlation
+    statement: Telemetry preserves stable correlation between each tool call and its own terminal outcome.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-003
+    conformance: [AVP-TCK-OTEL-TOOL-CORRELATION-001]
+  - id: AVP-OTEL-004
+    level: MUST
+    area: outcome-preservation
+    statement: Telemetry preserves materially different AVP outcomes and never flattens failure into success.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-004
+    conformance: [AVP-TCK-OTEL-OUTCOME-PRESERVATION-001]
+  - id: AVP-OTEL-005
+    level: MUST
+    area: propagation
+    statement: Claimed outbound propagation uses valid W3C Trace Context correlated to the active Episode trace.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-005
+    conformance: [AVP-TCK-OTEL-PROPAGATION-001]
+  - id: AVP-OTEL-006
+    level: MUST
+    area: data-minimization
+    statement: Mandatory mapping conformance does not require protected raw payloads, credentials, or hidden evaluator material.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-006
+    conformance: [AVP-TCK-OTEL-DATA-MINIMIZATION-001]
+  - id: AVP-OTEL-007
+    level: MUST
+    area: completeness
+    statement: Telemetry completeness claims are evidence-based and fail closed when required verification telemetry is missing.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-007
+    conformance: [AVP-TCK-OTEL-COMPLETENESS-001]
+  - id: AVP-OTEL-008
+    level: MUST
+    area: evidence-composition
+    statement: Telemetry is integrity-bound as AVP Evidence and cannot override authoritative AVP verdict/evidence semantics.
+    spec: spec/opentelemetry/opentelemetry-mapping-contract.md
+    anchor: avp-otel-008
+    conformance: [AVP-TCK-OTEL-EVIDENCE-BINDING-001]

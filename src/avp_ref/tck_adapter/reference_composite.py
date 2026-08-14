@@ -17,22 +17,49 @@ from .reference_security_assurance import ReferenceSecurityAssuranceTCKAdapter
 from .reference_security_fault import ReferenceSecurityFaultTCKAdapter
 
 
+def _optional_opentelemetry_adapter() -> object | None:
+    """Load the OTel reference adapter only when its optional SDK is installed.
+
+    The base AVP wheel must remain usable without OpenTelemetry. A missing OTel
+    dependency therefore means that the optional OTel profile has no reference
+    adapter in this installation; it must never make Core/other profiles
+    unimportable. Unexpected import failures are intentionally not swallowed.
+    """
+
+    try:
+        from .reference_opentelemetry import ReferenceOpenTelemetryTCKAdapter
+    except ModuleNotFoundError as exc:
+        if exc.name != "opentelemetry":
+            raise
+        return None
+    return ReferenceOpenTelemetryTCKAdapter()
+
+
 class ReferenceConformanceAdapter:
     """Compose independent reference-domain adapters without overlapping case IDs."""
 
     def __init__(self, *, capabilities: Iterable[str] = ()) -> None:
         capability_set = frozenset(capabilities)
-        self._delegates = (
+        delegates: list[object] = [
             AlignedReferenceTCKAdapter(capabilities=capability_set),
             ReferenceEvidenceTCKAdapter(),
             ReferenceOracleTCKAdapter(),
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceMCPTCKAdapter(),
-            ReferenceSecurityTCKAdapter(),
-            ReferenceSecurityFaultTCKAdapter(),
-            ReferenceSecurityAssuranceTCKAdapter(),
+        ]
+        opentelemetry_adapter = _optional_opentelemetry_adapter()
+        if opentelemetry_adapter is not None:
+            delegates.append(opentelemetry_adapter)
+        delegates.extend(
+            (
+                ReferenceSecurityTCKAdapter(),
+                ReferenceSecurityFaultTCKAdapter(),
+                ReferenceSecurityAssuranceTCKAdapter(),
+            )
         )
+        self._delegates = tuple(delegates)
+
         owners: dict[str, object] = {}
         for delegate in self._delegates:
             for case_id in delegate.supported_case_ids:

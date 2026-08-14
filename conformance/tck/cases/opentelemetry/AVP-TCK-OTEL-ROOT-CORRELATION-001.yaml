@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-ROOT-CORRELATION-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-001]
+applicability: mandatory
+type: mixed
+vector:
+  episodeId: ep_otel_1
+  manifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  unrelatedManifestDigest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+expect:
+  episodeIdentityBound: true
+  manifestIdentityBound: true
+  unrelatedManifestNotSubstitutable: true
+  rawSubjectPayloadNotRequired: true
