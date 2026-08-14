@@ -5,6 +5,7 @@ import unittest
 from avp_ref.mcp import (
     MCPGatewayPolicy,
     MCPPermissionDenied,
+    MCPProtocolError,
     MCPVerificationGateway,
 )
 from avp_ref.mcp.transport import encode_mcp_header_value
@@ -193,6 +194,50 @@ class MCPHeaderEncodingTest(unittest.TestCase):
         )
         self.assertEqual("-7", headers["Mcp-Param-Count"])
         self.assertEqual("true", headers["Mcp-Param-Enabled"])
+
+    def test_integer_header_accepts_schema_valid_integer_float(self):
+        transport = HeaderTransport()
+        gateway = MCPVerificationGateway(
+            transport,
+            MCPGatewayPolicy(frozenset({"header.echo"})),
+            endpoint_identity="https://mcp.example.test/mcp",
+        )
+        gateway.open()
+        gateway.call_tool(
+            "header.echo",
+            {
+                "unicode": "ok",
+                "padded": "ok",
+                "sentinel": "ok",
+                "count": 42.0,
+                "enabled": False,
+            },
+        )
+        call = [item for item in transport.calls if item[0] == "tools/call"][-1]
+        self.assertEqual("42", call[3]["Mcp-Param-Count"])
+
+    def test_integer_header_rejects_unsafe_range_before_tools_call(self):
+        transport = HeaderTransport()
+        gateway = MCPVerificationGateway(
+            transport,
+            MCPGatewayPolicy(frozenset({"header.echo"})),
+            endpoint_identity="https://mcp.example.test/mcp",
+        )
+        gateway.open()
+        before = sum(1 for item in transport.calls if item[0] == "tools/call")
+        with self.assertRaises(MCPProtocolError):
+            gateway.call_tool(
+                "header.echo",
+                {
+                    "unicode": "ok",
+                    "padded": "ok",
+                    "sentinel": "ok",
+                    "count": 9007199254740992,
+                    "enabled": True,
+                },
+            )
+        after = sum(1 for item in transport.calls if item[0] == "tools/call")
+        self.assertEqual(before, after)
 
     def test_nested_properties_header_path_remains_supported(self):
         transport = NestedHeaderTransport()
