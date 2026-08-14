@@ -18,8 +18,8 @@ from .errors import (
 )
 from .generators import GeneratorRegistry
 from .identity import scenario_instance_digest
-from .loader import validate_instance, validate_template
-from .models import GeneratorRecord, ScenarioInstance, deep_freeze
+from .loader import validate_template
+from .models import GeneratorRecord, ScenarioInstance
 from .references import ReferenceResolver, SymbolicReferenceResolver
 from .seed import derive_child_seed, resolve_seed_bundle
 
@@ -78,9 +78,7 @@ class ScenarioCompiler:
         materialized.pop("generators", None)
         materialized["kind"] = "ScenarioInstance"
 
-        references = self._resolve_references(
-            materialized, active.strict_references
-        )
+        references = self._resolve_references(materialized, active.strict_references)
         self._validate_subject_visibility(materialized)
         self._reject_unresolved_placeholders(materialized)
 
@@ -112,11 +110,10 @@ class ScenarioCompiler:
 
         instance_digest = scenario_instance_digest(materialized)
         materialized["instanceDigest"] = instance_digest
-        validate_instance(materialized)
         return ScenarioInstance(
             template_digest=template_digest,
             instance_digest=instance_digest,
-            document=deep_freeze(materialized),
+            document=materialized,
         )
 
     def _validate_supported_semantics(self, template: Mapping[str, Any]) -> None:
@@ -141,11 +138,7 @@ class ScenarioCompiler:
         if not isinstance(declarations, Mapping):
             raise ParameterResolutionError(
                 "parameters must be an object",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-001", "parameters must be an object", "$.parameters"
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-001", "parameters must be an object", "$.parameters"),),
             )
 
         overrides = dict(options.parameter_overrides)
@@ -154,13 +147,7 @@ class ScenarioCompiler:
             name = unknown[0]
             raise ParameterResolutionError(
                 f"unknown parameter override '{name}'",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-002",
-                        f"unknown parameter override '{name}'",
-                        f"$.parameters.{name}",
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-002", f"unknown parameter override '{name}'", f"$.parameters.{name}"),),
             )
 
         values: dict[str, Any] = {}
@@ -170,13 +157,7 @@ class ScenarioCompiler:
             if not isinstance(spec, Mapping):
                 raise ParameterResolutionError(
                     f"parameter '{name}' declaration must be an object",
-                    (
-                        CompileDiagnostic(
-                            "AVS-PARAM-003",
-                            "parameter declaration must be an object",
-                            f"$.parameters.{name}",
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-PARAM-003", "parameter declaration must be an object", f"$.parameters.{name}"),),
                 )
 
             if name in overrides:
@@ -190,13 +171,7 @@ class ScenarioCompiler:
                 if not isinstance(generator_spec, Mapping):
                     raise ParameterResolutionError(
                         f"parameter '{name}' generator must be an object",
-                        (
-                            CompileDiagnostic(
-                                "AVS-PARAM-004",
-                                "generator must be an object",
-                                f"$.parameters.{name}.generator",
-                            ),
-                        ),
+                        (CompileDiagnostic("AVS-PARAM-004", "generator must be an object", f"$.parameters.{name}.generator"),),
                     )
                 child_seed = derive_child_seed(data_seed, f"parameter:{name}")
                 value = self._generators.generate(name, generator_spec, child_seed)
@@ -211,13 +186,7 @@ class ScenarioCompiler:
             elif spec.get("required", True):
                 raise ParameterResolutionError(
                     f"required parameter '{name}' has no value",
-                    (
-                        CompileDiagnostic(
-                            "AVS-PARAM-005",
-                            "required parameter has no value",
-                            f"$.parameters.{name}",
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-PARAM-005", "required parameter has no value", f"$.parameters.{name}"),),
                 )
             else:
                 continue
@@ -236,8 +205,7 @@ class ScenarioCompiler:
         validators = {
             "string": lambda item: isinstance(item, str),
             "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
-            "number": lambda item: isinstance(item, (int, float))
-            and not isinstance(item, bool),
+            "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
             "boolean": lambda item: isinstance(item, bool),
             "array": lambda item: isinstance(item, list),
             "object": lambda item: isinstance(item, Mapping),
@@ -245,37 +213,19 @@ class ScenarioCompiler:
         if expected is not None and expected not in validators:
             raise ParameterResolutionError(
                 f"unsupported parameter type '{expected}'",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-006",
-                        f"unsupported parameter type '{expected}'",
-                        f"$.parameters.{name}.type",
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-006", f"unsupported parameter type '{expected}'", f"$.parameters.{name}.type"),),
             )
         if expected is not None and not validators[expected](value):
             raise ParameterResolutionError(
                 f"parameter '{name}' has invalid type",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-007",
-                        f"expected {expected}",
-                        f"$.parameters.{name}",
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-007", f"expected {expected}", f"$.parameters.{name}"),),
             )
 
         enum = spec.get("enum")
         if enum is not None and value not in enum:
             raise ParameterResolutionError(
                 f"parameter '{name}' is not in enum",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-008",
-                        f"value must be one of {enum!r}",
-                        f"$.parameters.{name}",
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-008", f"value must be one of {enum!r}", f"$.parameters.{name}"),),
             )
 
         if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -284,42 +234,19 @@ class ScenarioCompiler:
             if minimum is not None and value < minimum:
                 raise ParameterResolutionError(
                     f"parameter '{name}' is below minimum",
-                    (
-                        CompileDiagnostic(
-                            "AVS-PARAM-009",
-                            f"value must be >= {minimum}",
-                            f"$.parameters.{name}",
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-PARAM-009", f"value must be >= {minimum}", f"$.parameters.{name}"),),
                 )
             if maximum is not None and value > maximum:
                 raise ParameterResolutionError(
                     f"parameter '{name}' is above maximum",
-                    (
-                        CompileDiagnostic(
-                            "AVS-PARAM-010",
-                            f"value must be <= {maximum}",
-                            f"$.parameters.{name}",
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-PARAM-010", f"value must be <= {maximum}", f"$.parameters.{name}"),),
                 )
 
-    def _substitute(
-        self,
-        value: Any,
-        parameters: Mapping[str, Any],
-        path: str = "$",
-    ) -> Any:
+    def _substitute(self, value: Any, parameters: Mapping[str, Any], path: str = "$") -> Any:
         if isinstance(value, Mapping):
-            return {
-                key: self._substitute(item, parameters, f"{path}.{key}")
-                for key, item in value.items()
-            }
+            return {key: self._substitute(item, parameters, f"{path}.{key}") for key, item in value.items()}
         if isinstance(value, list):
-            return [
-                self._substitute(item, parameters, f"{path}[{index}]")
-                for index, item in enumerate(value)
-            ]
+            return [self._substitute(item, parameters, f"{path}[{index}]") for index, item in enumerate(value)]
         if not isinstance(value, str):
             return value
 
@@ -332,32 +259,18 @@ class ScenarioCompiler:
             if isinstance(resolved, (dict, list)):
                 raise ParameterResolutionError(
                     "structured parameter cannot be interpolated into a string",
-                    (
-                        CompileDiagnostic(
-                            "AVS-PARAM-011",
-                            "object/array parameters must occupy the entire field value",
-                            path,
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-PARAM-011", "object/array parameters must occupy the entire field value", path),),
                 )
             return str(resolved)
 
         return _PLACEHOLDER.sub(replace, value)
 
     @staticmethod
-    def _lookup_parameter(
-        name: str,
-        parameters: Mapping[str, Any],
-        path: str,
-    ) -> Any:
+    def _lookup_parameter(name: str, parameters: Mapping[str, Any], path: str) -> Any:
         if name not in parameters:
             raise ParameterResolutionError(
                 f"unresolved parameter '{name}'",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-012", f"unresolved parameter '{name}'", path
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-012", f"unresolved parameter '{name}'", path),),
             )
         return copy.deepcopy(parameters[name])
 
@@ -368,34 +281,18 @@ class ScenarioCompiler:
             if resolved.path != path or resolved.uri != uri:
                 raise ReferenceResolutionError(
                     f"resolver identity binding mismatch for reference: {uri}",
-                    (
-                        CompileDiagnostic(
-                            "AVS-REF-003",
-                            "resolver response path/URI does not match the requested reference",
-                            path,
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-REF-003", "resolver response path/URI does not match the requested reference", path),),
                 )
             if strict and resolved.mode != "content":
                 raise ReferenceResolutionError(
                     f"strict compilation requires content resolution: {uri}",
-                    (
-                        CompileDiagnostic(
-                            "AVS-REF-002",
-                            "strict compilation requires a content-backed reference digest",
-                            path,
-                        ),
-                    ),
+                    (CompileDiagnostic("AVS-REF-002", "strict compilation requires a content-backed reference digest", path),),
                 )
             records.append(resolved)
         records.sort(key=lambda item: (item.path, item.uri, item.digest))
         return tuple(records)
 
-    def _collect_references(
-        self,
-        value: Any,
-        path: str = "$",
-    ) -> list[tuple[str, str]]:
+    def _collect_references(self, value: Any, path: str = "$") -> list[tuple[str, str]]:
         found: list[tuple[str, str]] = []
         if isinstance(value, Mapping):
             for key in sorted(value):
@@ -413,40 +310,22 @@ class ScenarioCompiler:
             path, classification = violation
             raise VisibilityViolationError(
                 "evaluator-confidential material is present in the Subject projection",
-                (
-                    CompileDiagnostic(
-                        "AVS-VIS-001",
-                        f"classification '{classification}' is not allowed in Agent-visible material",
-                        path,
-                    ),
-                ),
+                (CompileDiagnostic("AVS-VIS-001", f"classification '{classification}' is not allowed in Agent-visible material", path),),
             )
 
     @staticmethod
     def _subject_candidate(document: Mapping[str, Any]) -> dict[str, Any]:
-        actors = [
-            actor
-            for actor in document.get("actors", [])
-            if actor.get("id") == "subject"
-        ]
+        actors = [actor for actor in document.get("actors", []) if actor.get("id") == "subject"]
         capabilities = document.get("capabilities", {})
         return {
             "metadata": document.get("metadata", {}),
             "task": document.get("task", {}),
             "actors": actors,
-            "capabilities": {
-                "subject": capabilities.get("subject", {})
-            }
-            if isinstance(capabilities, Mapping)
-            else {},
+            "capabilities": {"subject": capabilities.get("subject", {})} if isinstance(capabilities, Mapping) else {},
             "budgets": document.get("budgets", {}),
         }
 
-    def _find_confidential(
-        self,
-        value: Any,
-        path: str = "$.subject",
-    ) -> tuple[str, str] | None:
+    def _find_confidential(self, value: Any, path: str = "$.subject") -> tuple[str, str] | None:
         if isinstance(value, Mapping):
             classification = value.get("classification")
             if classification in _CONFIDENTIAL_CLASSIFICATIONS:
@@ -462,11 +341,7 @@ class ScenarioCompiler:
                     return found
         return None
 
-    def _reject_unresolved_placeholders(
-        self,
-        value: Any,
-        path: str = "$",
-    ) -> None:
+    def _reject_unresolved_placeholders(self, value: Any, path: str = "$") -> None:
         if isinstance(value, Mapping):
             for key, item in value.items():
                 self._reject_unresolved_placeholders(item, f"{path}.{key}")
@@ -476,9 +351,5 @@ class ScenarioCompiler:
         elif isinstance(value, str) and _PLACEHOLDER.search(value):
             raise ParameterResolutionError(
                 "unresolved parameter placeholder remains after compilation",
-                (
-                    CompileDiagnostic(
-                        "AVS-PARAM-013", "unresolved placeholder", path
-                    ),
-                ),
+                (CompileDiagnostic("AVS-PARAM-013", "unresolved placeholder", path),),
             )
