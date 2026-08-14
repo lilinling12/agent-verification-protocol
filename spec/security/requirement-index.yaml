@@ -1,0 +1,53 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-security-v0.1
+requirements:
+  - id: AVP-SECURITY-001
+    level: MUST
+    area: security-boundary
+    statement: Subject and Evaluator capability planes are separated.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-001
+    conformance:
+      - AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
+  - id: AVP-SECURITY-002
+    level: MUST
+    area: security-boundary
+    statement: Undeclared Subject capabilities fail closed.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-002
+    conformance:
+      - AVP-TCK-SECURITY-CAPABILITY-DENY-001
+  - id: AVP-SECURITY-003
+    level: MUST
+    area: secret-boundary
+    statement: Evaluator credentials and secrets are absent from Subject execution context.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-003
+    conformance:
+      - AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001
+  - id: AVP-SECURITY-004
+    level: MUST
+    area: hidden-material
+    statement: Hidden evaluator material is not exposed through Subject routes.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-004
+    conformance:
+      - AVP-TCK-SECURITY-HIDDEN-MATERIAL-001
+  - id: AVP-SECURITY-005
+    level: MUST
+    area: fault-secrecy
+    statement: Future evaluator-only fault metadata remains unavailable before activation.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-005
+    conformance:
+      - AVP-TCK-SECURITY-FAULT-SECRECY-001
+  - id: AVP-SECURITY-006
+    level: MUST
+    area: assurance
+    statement: Security assurance claims identify proven isolation layers without inflation.
+    spec: spec/security/security-boundary-contract.md
+    anchor: avp-security-006
+    schema: schemas/security-assurance.schema.json
+    conformance:
+      - AVP-TCK-SECURITY-ASSURANCE-HONESTY-001

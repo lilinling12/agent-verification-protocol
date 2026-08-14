@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avp.dev/schemas/security-assurance/v0.1/security-assurance.schema.json",
+  "title": "AVP SecurityAssurance v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "isolation"],
+  "properties": {
+    "apiVersion": {
+      "const": "avp.security/v0.1"
+    },
+    "kind": {
+      "const": "SecurityAssurance"
+    },
+    "isolation": {
+      "$ref": "#/$defs/isolation"
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "string",
+      "enum": ["verified", "not-claimed"]
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "apiCapability",
+        "credentialContext",
+        "process",
+        "network",
+        "tenant",
+        "sandbox"
+      ],
+      "properties": {
+        "apiCapability": {"$ref": "#/$defs/claim"},
+        "credentialContext": {"$ref": "#/$defs/claim"},
+        "process": {"$ref": "#/$defs/claim"},
+        "network": {"$ref": "#/$defs/claim"},
+        "tenant": {"$ref": "#/$defs/claim"},
+        "sandbox": {"$ref": "#/$defs/claim"}
+      }
+    }
+  }
+}

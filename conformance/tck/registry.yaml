@@ -110,3 +110,33 @@ cases:
     profile: avp-oracle-v0.1
     requirements: [AVP-ORACLE-007]
     applicability: mandatory
+  - id: AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-001]
+    applicability: mandatory
+  - id: AVP-TCK-SECURITY-CAPABILITY-DENY-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-CAPABILITY-DENY-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-002]
+    applicability: mandatory
+  - id: AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-003]
+    applicability: mandatory
+  - id: AVP-TCK-SECURITY-HIDDEN-MATERIAL-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-HIDDEN-MATERIAL-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-004]
+    applicability: mandatory
+  - id: AVP-TCK-SECURITY-FAULT-SECRECY-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-FAULT-SECRECY-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-005]
+    applicability: mandatory
+  - id: AVP-TCK-SECURITY-ASSURANCE-HONESTY-001
+    path: conformance/tck/cases/security/AVP-TCK-SECURITY-ASSURANCE-HONESTY-001.yaml
+    profile: avp-security-v0.1
+    requirements: [AVP-SECURITY-006]
+    applicability: mandatory

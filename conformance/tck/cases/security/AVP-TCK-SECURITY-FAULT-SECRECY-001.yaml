@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SECURITY-FAULT-SECRECY-001
+  domain: security
+  status: draft
+profile: avp-security-v0.1
+requirements: [AVP-SECURITY-005]
+applicability: mandatory
+type: negative
+vector:
+  targetTool: order.get
+  occurrence: 2
+  hiddenSentinel: AVP_TCK_FUTURE_FAULT_SECRET_61d6b849
+expect:
+  firstCallSucceeds: true
+  activationBeforeDue: false
+  sentinelAbsentFromSubjectReport: true

@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SECURITY-CAPABILITY-DENY-001
+  domain: security
+  status: draft
+profile: avp-security-v0.1
+requirements: [AVP-SECURITY-002]
+applicability: mandatory
+type: negative
+vector:
+  allowedTool: order.get
+  deniedTool: refund.delete
+expect:
+  allowedDownstreamInvocationCount: 1
+  denied: true
+  deniedDownstreamInvocationCount: 0
+  policyDenialRecord: true

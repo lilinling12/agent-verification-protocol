@@ -1,10 +1,66 @@
-version: 0.1
+version: "0.1"
 matrix: security
-status: template
+status: promoted-draft
+domain: security-boundary
 
-requirements: []
-historical_sources: []
-implementation_evidence: []
-schema_artifacts: []
-tck_cases: []
-decision_records: []
+authority_chain:
+  historical_source:
+    - docs/design/alpha-v0.1/16-security-threat-model.md
+    - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+    - ADR-001-scope-and-boundaries.md
+  reconciliation:
+    - docs/reconciliation/v0.1/decisions/security-boundary-001.md
+  normative:
+    - rfcs/AEP-0002-security-boundary-contract.md
+    - spec/security/security-boundary-contract.md
+
+requirements:
+  - AVP-SECURITY-001
+  - AVP-SECURITY-002
+  - AVP-SECURITY-003
+  - AVP-SECURITY-004
+  - AVP-SECURITY-005
+  - AVP-SECURITY-006
+
+historical_sources:
+  - docs/design/alpha-v0.1/16-security-threat-model.md
+  - docs/design/alpha-v0.1/03-agent-verification-protocol.md
+  - docs/design/alpha-v0.1/ADR-001-scope-and-boundaries.md
+
+implementation_evidence:
+  - src/avp_ref/runtime/subject_policy.py
+  - src/avp_ref/scenario/models.py
+  - src/avp_ref/subject/adapter.py
+  - src/avp_ref/subject/in_process.py
+  - src/avp_ref/environment/in_memory.py
+  - src/avp_ref/mcp/gateway.py
+  - src/avp_ref/isolation/environment.py
+  - src/avp_ref/security/assurance.py
+  - src/avp_ref/security/capability_policy.py
+  - src/avp_ref/security/process_context.py
+  - src/avp_ref/security/subject_adapter.py
+  - src/avp_ref/tck_adapter/reference_security.py
+  - src/avp_ref/tck_adapter/reference_security_fault.py
+  - src/avp_ref/tck_adapter/reference_security_assurance.py
+  - SECURITY.md
+
+schema_artifacts:
+  - schemas/security-assurance.schema.json
+  - src/avp_ref/resources/security-assurance.schema.json
+
+tck_cases:
+  - AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
+  - AVP-TCK-SECURITY-CAPABILITY-DENY-001
+  - AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001
+  - AVP-TCK-SECURITY-HIDDEN-MATERIAL-001
+  - AVP-TCK-SECURITY-FAULT-SECRECY-001
+  - AVP-TCK-SECURITY-ASSURANCE-HONESTY-001
+
+decision_records:
+  - docs/reconciliation/v0.1/decisions/security-boundary-001.md
+  - rfcs/AEP-0002-security-boundary-contract.md
+
+note: >-
+  This matrix is a promoted draft, not an accepted security claim. The reference
+  implementation must pass the registered Security TCK and an acceptance audit
+  before AEP-0002 or this matrix can move to Accepted.

@@ -57,6 +57,37 @@ class EnvironmentAdapterTest(unittest.TestCase):
         result = self.adapter.execute(self.handle, ToolRequest("subject", "order.get", {"order_id": "ord_1"}))
         self.assertEqual("ord_1", result.result["id"])
 
+    def test_fault_occurrence_delays_activation_and_remains_one_shot(self):
+        fault = self.adapter.inject_fault(
+            self.handle,
+            FaultSpec(
+                "tool.error",
+                "order.get",
+                occurrence=2,
+                parameters={"error": "delayed-boom"},
+            ),
+        )
+
+        first = self.adapter.execute(
+            self.handle,
+            ToolRequest("subject", "order.get", {"order_id": "ord_1"}),
+        )
+        self.assertEqual("ord_1", first.result["id"])
+
+        with self.assertRaises(ToolExecutionError) as caught:
+            self.adapter.execute(
+                self.handle,
+                ToolRequest("subject", "order.get", {"order_id": "ord_1"}),
+            )
+        self.assertEqual(fault.fault_id, caught.exception.fault_observations[0].fault_id)
+        self.assertEqual("delayed-boom", str(caught.exception))
+
+        third = self.adapter.execute(
+            self.handle,
+            ToolRequest("subject", "order.get", {"order_id": "ord_1"}),
+        )
+        self.assertEqual("ord_1", third.result["id"])
+
     def test_release_invalidates_handle(self):
         self.adapter.release(self.handle)
         with self.assertRaises(UnknownEnvironmentHandle):
