@@ -35,13 +35,18 @@ implementation_evidence:
   - src/avp_ref/environment/in_memory.py
   - src/avp_ref/mcp/gateway.py
   - src/avp_ref/isolation/environment.py
+  - src/avp_ref/security/assurance.py
   - src/avp_ref/security/capability_policy.py
   - src/avp_ref/security/process_context.py
   - src/avp_ref/security/subject_adapter.py
+  - src/avp_ref/tck_adapter/reference_security.py
+  - src/avp_ref/tck_adapter/reference_security_fault.py
+  - src/avp_ref/tck_adapter/reference_security_assurance.py
   - SECURITY.md
 
 schema_artifacts:
   - schemas/security-assurance.schema.json
+  - src/avp_ref/resources/security-assurance.schema.json
 
 tck_cases:
   - AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001
