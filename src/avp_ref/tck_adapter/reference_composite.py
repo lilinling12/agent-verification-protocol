@@ -15,6 +15,7 @@ from .reference_scenario import ReferenceScenarioTCKAdapter
 from .reference_security import ReferenceSecurityTCKAdapter
 from .reference_security_assurance import ReferenceSecurityAssuranceTCKAdapter
 from .reference_security_fault import ReferenceSecurityFaultTCKAdapter
+from .reference_subject import ReferenceSubjectTCKAdapter
 
 
 def _optional_opentelemetry_adapter() -> object | None:
@@ -47,6 +48,7 @@ class ReferenceConformanceAdapter:
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceMCPTCKAdapter(),
+            ReferenceSubjectTCKAdapter(),
         ]
         opentelemetry_adapter = _optional_opentelemetry_adapter()
         if opentelemetry_adapter is not None:
