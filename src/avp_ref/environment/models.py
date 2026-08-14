@@ -108,7 +108,6 @@ class EnvironmentHandle:
     adapter_name: str
     adapter_version: str
     scenario_digest: str
-    generation: int = 1
 
 
 @dataclass(frozen=True, slots=True)
