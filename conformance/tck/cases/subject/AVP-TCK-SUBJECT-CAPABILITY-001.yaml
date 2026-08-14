@@ -1,0 +1,22 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-CAPABILITY-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-005]
+applicability: mandatory
+type: negative
+vector:
+  exposedCapabilities:
+    - observe
+    - call_tool
+    - trace_headers
+  attemptBypassRuntimeGateway: true
+  attemptUnauthorizedCapability: true
+expect:
+  runtimeGatewayMediatesCapabilities: true
+  unauthorizedCapabilityRejectedFailClosed: true
+  subjectCannotCreateStrongerAccess: true
+  domainAuthorityPreserved: true
