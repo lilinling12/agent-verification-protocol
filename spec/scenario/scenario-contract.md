@@ -28,6 +28,10 @@ Explicit inputs that can affect materialization, such as parameter overrides, se
 
 The subset of one ScenarioInstance that a particular Subject actor is authorized to observe before or during execution through the Scenario boundary.
 
+### Provenance
+
+Non-semantic information about how an instance was produced, such as compiler identity, source-template identity, build metadata, or audit annotations. Provenance MUST NOT change Episode execution semantics.
+
 ## Normative requirements
 
 <a id="avp-scenario-001"></a>
@@ -42,11 +46,13 @@ The distinction MAY be represented by different serialized `kind` values, differ
 <a id="avp-scenario-002"></a>
 ### AVP-SCENARIO-002 — Deterministic materialization
 
-For a selected compilation profile, equivalent compilation inputs MUST produce equivalent ScenarioInstance content identity.
+For a selected compilation profile, equivalent compilation inputs MUST produce semantically equivalent ScenarioInstance content and the same ScenarioInstance identity.
 
-Compilation inputs that can affect execution semantics MUST participate either directly in the materialized content or through an identity/provenance binding that makes the resulting instance identity change when those execution semantics change.
+Compilation inputs that can affect execution semantics MUST participate either directly in the materialized semantic content or through an identity binding represented in that semantic content.
 
 Implementations MUST NOT depend on ambient nondeterminism that is absent from the declared compilation inputs.
+
+Equivalent semantic output MUST NOT receive a different identity merely because compiler implementation identity, build metadata, template formatting, or other non-semantic provenance differs.
 
 This requirement does not mandate one pseudorandom generator, internal seed partitioning scheme, or compiler implementation.
 
@@ -62,22 +68,34 @@ Optional authoring constructs MAY remain absent when the authoring contract expl
 <a id="avp-scenario-004"></a>
 ### AVP-SCENARIO-004 — ScenarioInstance identity
 
-A ScenarioInstance MUST have a stable content identity.
+A serialized ScenarioInstance conforming to `avp-scenario-v0.1` MUST contain `instanceDigest`.
 
-The identity MUST bind all execution-relevant materialized fields except the field carrying the identity itself.
+The ScenarioInstance identity preimage is the complete serialized ScenarioInstance after removing the top-level `instanceDigest` field and the optional top-level `provenance` field. No other top-level or nested field is excluded from the identity preimage.
 
-Two instances whose execution-relevant materialized semantics differ MUST NOT intentionally share the same instance identity.
+The identity preimage MUST be representable as I-JSON and MUST be canonicalized using the JSON Canonicalization Scheme (JCS) defined by RFC 8785. The SHA-256 digest MUST be calculated over the UTF-8 bytes emitted by JCS and serialized as `sha256:` followed by 64 lowercase hexadecimal characters.
 
-AVP Scenario v0.1 does not require a particular in-memory hash API. Where the repository's canonical SHA-256 identity conventions apply, implementations SHOULD use the corresponding canonical representation defined by the applicable schema/profile rather than language-specific object serialization.
+Consequently:
+
+1. object member ordering and insignificant JSON whitespace MUST NOT affect identity;
+2. array ordering remains semantically significant;
+3. any field outside `provenance` that changes canonical bytes changes the content identity except for a cryptographic hash collision;
+4. `provenance` MUST NOT affect Episode execution semantics;
+5. if a fact recorded as provenance affects execution semantics, that fact MUST also be represented in identity-bound semantic content outside `provenance`.
+
+This canonicalization contract is language-neutral. An implementation MUST NOT substitute language-specific object serialization for the RFC 8785 preimage.
+
+Normative external reference: RFC 8785, JSON Canonicalization Scheme (JCS).
 
 <a id="avp-scenario-005"></a>
 ### AVP-SCENARIO-005 — Immutable execution semantics
 
-After Episode execution begins, the materialized semantics represented by a ScenarioInstance MUST NOT change for that Episode.
+After Episode execution begins, the identity-bound materialized semantics represented by a ScenarioInstance MUST NOT change for that Episode.
 
 Implementations MAY enforce this with immutable data structures, defensive copies, content-addressed storage, or equivalent mechanisms.
 
 Mutation of environment state during execution does not mutate the ScenarioInstance.
+
+Changing non-semantic `provenance` does not change ScenarioInstance identity, but such provenance MUST remain audit-honest and MUST NOT be consulted as hidden execution configuration.
 
 <a id="avp-scenario-006"></a>
 ### AVP-SCENARIO-006 — Subject projection confidentiality
@@ -115,7 +133,7 @@ A profile MAY permit symbolic/version identity, content identity, or another exp
 
 A profile that requires content-backed/strict reference identity MUST fail compilation when that identity cannot be established.
 
-AVP Scenario v0.1 does not standardize one URI resolver implementation or transport.
+An implementation MAY expose reference bindings in a dedicated field, materialize referenced content directly, or use another schema-valid identity-bound representation. Resolver implementation classes and transport mechanisms are not standardized by AVP Scenario v0.1.
 
 <a id="avp-scenario-009"></a>
 ### AVP-SCENARIO-009 — Compilation failure separation
@@ -126,25 +144,33 @@ If an Episode has not begun, the failure remains a pre-execution configuration/i
 
 If a surrounding orchestration system creates an Episode record before compilation completes, it MUST classify the resulting invalidity separately from a Subject task verdict.
 
+## Machine-readable contracts
+
+`schemas/scenario-template.schema.json` defines the v0.1 ScenarioTemplate authoring/input shape used by this profile.
+
+`schemas/scenario-instance.schema.json` defines the serialized ScenarioInstance shape, including the `instanceDigest` identity field and optional non-semantic `provenance`.
+
+The historical `schemas/scenario.schema.json` filename remains a compatibility surface for the current reference package during Alpha reconciliation. Its existence does not override the Template/Instance distinction defined here.
+
 ## ScenarioTemplate authoring boundary
 
-The repository MAY provide YAML/JSON schemas and authoring utilities for ScenarioTemplate documents. Those authoring conveniences are not automatically normative AVP execution semantics.
+The repository MAY provide YAML/JSON schemas and authoring utilities for ScenarioTemplate documents. Authoring conveniences are not automatically normative execution semantics.
 
 An AVS or benchmark DSL MAY introduce richer authoring constructs provided that they compile into a ScenarioInstance satisfying this specification and the selected conformance profile.
 
 ## ScenarioInstance provenance
 
-An implementation MAY attach compilation provenance such as compiler identity, template identity, resolved parameters, seed records, generator records, and reference records.
+An implementation MAY attach non-semantic `provenance` such as compiler identity, template identity, source location, build metadata, generator audit records, or diagnostic metadata.
 
-Such provenance becomes protocol-required only when another normative requirement or profile explicitly requires the corresponding interoperable fact.
-
-In particular, AVP Scenario v0.1 does not require:
+AVP Scenario v0.1 does not require:
 
 - the reference compiler name `avp-reference-avs`;
 - a fixed compiler version field format;
 - a fixed eight-stream seed bundle;
 - Python generator registry/version fields;
 - Python resolver class or record shapes.
+
+Execution-relevant material MUST NOT be hidden solely in `provenance`, because `provenance` is excluded from `instanceDigest`.
 
 ## Security composition
 
@@ -154,6 +180,6 @@ Conformance with Scenario projection requirements does not by itself prove proce
 
 ## Conformance boundary
 
-`avp-scenario-v0.1` conformance is expected to test the nine requirements above through implementation-independent vectors.
+`avp-scenario-v0.1` conformance tests the nine requirements above through implementation-independent vectors.
 
 TCK cases MUST validate observable semantics and MUST NOT require Python-specific compiler metadata, internal seed stream names, mapping-proxy behavior, tuple conversion, or implementation-private resolver APIs.
