@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-REVISION-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-001, AVP-MCP-006]
+applicability: mandatory
+type: mixed
+vector:
+  selectedRevision: "2026-07-28"
+  transport: streamable-http
+  avpTraceMetadata:
+    traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
+expect:
+  selectedRevisionBound: true
+  mcpReservedMetadataPreserved: true
+  avpMetadataDoesNotOverwriteMcpMetadata: true
+  serverDiscoverNotRequiredByAvp: true
