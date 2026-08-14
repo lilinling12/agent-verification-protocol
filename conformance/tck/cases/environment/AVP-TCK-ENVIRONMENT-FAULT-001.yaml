@@ -1,0 +1,28 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-FAULT-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-010]
+applicability: mandatory
+type: mixed
+vector:
+  delayedFault:
+    kind: tool.error
+    target: order.get
+    occurrence: 2
+    parameters: {error: delayed-boom}
+  clearBeforeActivation:
+    kind: tool.error
+    target: order.get
+    occurrence: 2
+expect:
+  firstCallSucceeds: true
+  secondCallActivatesFault: true
+  thirdCallSucceeds: true
+  activationNotEarly: true
+  oneShotAfterActivation: true
+  clearPreventsLaterActivation: true
+  faultIdentityBoundToEnvironment: true
