@@ -58,6 +58,7 @@ class _ScriptedHTTPSubjectAdapter(HTTPSubjectAdapter):
     def __init__(self, frames: list[object]) -> None:
         super().__init__("https://subject-tck.invalid")
         self._frames = list(frames)
+        self.payloads: list[dict[str, Any]] = []
 
     def _post(
         self,
@@ -66,6 +67,7 @@ class _ScriptedHTTPSubjectAdapter(HTTPSubjectAdapter):
         timeout: float,
         trace_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
+        self.payloads.append(dict(payload))
         if not self._frames:
             raise SubjectTransportError("scripted Subject transport exhausted")
         frame = self._frames.pop(0)
@@ -168,7 +170,13 @@ class ReferenceSubjectTCKAdapter:
         except SubjectTransportError:
             stale_rejected = True
 
-        passed = stable_identity and bound_agent and owner_rejected and agent_rejected and stale_rejected
+        passed = (
+            stable_identity
+            and bound_agent
+            and owner_rejected
+            and agent_rejected
+            and stale_rejected
+        )
         return passed, (
             "adapter identity, Agent binding, owner identity and released handles remain fail-closed"
             if passed
@@ -181,28 +189,31 @@ class ReferenceSubjectTCKAdapter:
         projection = scenario.subject_projection()
         protected = tuple(str(value) for value in vector.get("protectedMaterial", ()))
         task = projection.get("task", {})
-        invocation = SubjectInvocation("ep_subject_projection", task, 2, 1.0)
-        captured: dict[str, Any] = {}
-
-        def subject(gateway: Any, visible_task: Mapping[str, Any]) -> str:
-            captured.update(dict(visible_task))
-            return "ok"
-
-        adapter = InProcessSubjectAdapter(subject, name="projection-witness")
-        handle = adapter.open(reference_agent_system("projection-witness"))
-        result = adapter.invoke(handle, invocation, _Gateway())
-        serialized = repr(captured)
+        invocation = SubjectInvocation("ep_subject_projection", task, 1, 1.0)
+        agent = replace(
+            reference_agent_system("projection-witness", adapter="http"),
+            metadata={marker: marker for marker in protected},
+        )
+        adapter = _ScriptedHTTPSubjectAdapter(
+            [{"status": "completed", "report": "ok"}]
+        )
+        result = adapter.invoke(adapter.open(agent), invocation, _Gateway())
+        payload = adapter.payloads[0]
+        serialized = repr(payload)
+        agent_projection = payload.get("agent_system", {})
         passed = (
             result.status is SubjectStatus.COMPLETED
-            and captured == dict(task)
+            and payload.get("task") == dict(task)
+            and isinstance(agent_projection, Mapping)
+            and "metadata" not in agent_projection
             and all(marker not in serialized for marker in protected)
-            and "oracle" not in captured
-            and "evaluator" not in captured
+            and "oracle" not in payload.get("task", {})
+            and "evaluator" not in payload.get("task", {})
         )
         return passed, (
-            "Subject invocation receives only the Scenario Subject task projection"
+            "remote Subject invocation receives Subject-projected task and sanitized Agent identity"
             if passed
-            else "Subject invocation exposed material outside the Subject projection"
+            else "Subject invocation exposed evaluator-only Scenario or Agent metadata"
         )
 
     @staticmethod
@@ -281,7 +292,9 @@ class ReferenceSubjectTCKAdapter:
         completed = _ScriptedHTTPSubjectAdapter(
             [{"status": "completed", "report": "done"}]
         )
-        completed_result = completed.invoke(completed.open(agent), invocation, _Gateway())
+        completed_result = completed.invoke(
+            completed.open(agent), invocation, _Gateway()
+        )
 
         classifications: list[type[BaseException]] = []
         scripts: list[list[object]] = [
@@ -342,12 +355,7 @@ class ReferenceSubjectTCKAdapter:
         for frame in invalid_frames:
             adapter = _ScriptedHTTPSubjectAdapter([frame])
             try:
-                result = adapter.invoke(adapter.open(agent), invocation, _Gateway())
-                # Extra transport fields are not normative; a syntactically valid
-                # completion is acceptable unless its terminal data contradicts
-                # the portable SubjectResult. Only count malformed/unsupported.
-                if frame.get("error") is not None and result.status is SubjectStatus.COMPLETED:
-                    frame_rejections += 1
+                adapter.invoke(adapter.open(agent), invocation, _Gateway())
             except SubjectProtocolError:
                 frame_rejections += 1
 
@@ -366,7 +374,7 @@ class ReferenceSubjectTCKAdapter:
 
         passed = frame_rejections == len(invalid_frames) and non_completed_rejected
         return passed, (
-            "malformed/unsupported transport results and non-completed SubjectResult states fail closed"
+            "malformed/contradictory/unsupported transport results and non-completed SubjectResult states fail closed"
             if passed
             else "invalid Subject terminal result was accepted as successful completion"
         )
