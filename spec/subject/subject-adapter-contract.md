@@ -42,9 +42,11 @@ The exact clock source and scheduler are implementation-specific unless governed
 
 ### AVP-SUBJECT-005 — Controlled Capability Gateway
 
-Subject-side access to Runtime observation, tool invocation, trace propagation, or other evaluator-controlled capabilities MUST occur only through capabilities explicitly exposed by the Runtime for that Episode and actor.
+Capabilities exposed by the Subject Adapter API for Runtime observation, tool invocation, trace propagation, or other evaluator-controlled operations MUST be mediated by capabilities explicitly exposed by the Runtime for that Episode and actor.
 
-The Subject Adapter MUST NOT bypass Security policy, directly mutate Environment state outside authorized Environment/MCP paths, or independently manufacture stronger capability access.
+The Subject Adapter MUST NOT provide a direct evaluator capability that bypasses Security policy, directly mutate Environment state outside authorized Environment/MCP paths, or independently manufacture stronger capability access through its adapter API.
+
+This requirement is an API-boundary guarantee. It does not by itself claim that arbitrary same-process Subject code is contained from ambient process globals, operating-system resources, or other channels. Stronger containment claims remain governed by AVP SecurityAssurance.
 
 The semantics of observation, tool execution, and propagation remain owned by Environment, MCP, Security, and OpenTelemetry as applicable.
 
@@ -92,7 +94,7 @@ The portable lifecycle is abstract:
 1. describe adapter identity and claims;
 2. open a Subject execution context bound to one Agent System;
 3. invoke with Subject-visible task/context and evaluator-owned budgets;
-4. exercise only Runtime-exposed capabilities during execution;
+4. exercise only Runtime-exposed adapter capabilities during execution;
 5. produce a valid terminal outcome or explicit failure;
 6. release the execution context;
 7. reject subsequent stale-handle use.
@@ -105,4 +107,4 @@ The Python reference implementation currently exposes `SubjectAdapter.describe/o
 
 ## 5. Conformance
 
-A Subject v0.1 TCK profile MUST test real behavior and include negative controls for identity substitution, hidden-material leakage, budget overrun, capability bypass, invalid terminal results, stale handles, and false isolation claims.
+A Subject v0.1 TCK profile MUST test real behavior and include negative controls for identity substitution, hidden-material leakage, budget overrun, unauthorized gateway capability use, invalid terminal results, stale handles, and false isolation claims. Conformance to this profile MUST NOT be presented as proof of stronger process or operating-system containment.
