@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import socket
 import time
 import urllib.error
@@ -32,6 +33,7 @@ from .models import (
 
 _RESERVED_TRACE_HEADERS = frozenset({"traceparent", "tracestate", "baggage"})
 _TERMINAL_FIELDS = frozenset({"report", "error", "call"})
+_DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 class HTTPSubjectAdapter:
@@ -41,6 +43,7 @@ class HTTPSubjectAdapter:
         *,
         endpoint: str = "/v1/avp/invoke",
         headers: Mapping[str, str] | None = None,
+        configuration_digest: str | None = None,
     ) -> None:
         normalized = base_url.rstrip("/")
         parsed = urlsplit(normalized)
@@ -48,6 +51,8 @@ class HTTPSubjectAdapter:
             raise ValueError("HTTP subject base_url must be an absolute http(s) URL")
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("HTTP subject base_url must not contain userinfo credentials")
+        if parsed.query or parsed.fragment:
+            raise ValueError("HTTP subject base_url must not contain query or fragment")
         if not endpoint.startswith("/"):
             raise ValueError("HTTP subject endpoint must be an absolute path")
 
@@ -62,21 +67,32 @@ class HTTPSubjectAdapter:
                 "HTTP subject trace propagation headers are Runtime-owned: "
                 f"{forbidden}"
             )
+        if configured and configuration_digest is None:
+            raise ValueError(
+                "custom HTTP subject headers require a non-secret configuration_digest"
+            )
+        if configuration_digest is not None and not _DIGEST_PATTERN.fullmatch(
+            configuration_digest
+        ):
+            raise ValueError("configuration_digest must be sha256:<64 lowercase hex>")
 
         self._url = normalized + endpoint
         self._headers = configured
         self._handles: dict[str, AgentSystem] = {}
         target_digest = digest({"base_url": normalized, "endpoint": endpoint})
+        metadata: dict[str, Any] = {
+            "endpoint": endpoint,
+            "targetDigest": target_digest,
+            "automatic_retry": False,
+        }
+        if configuration_digest is not None:
+            metadata["configurationDigest"] = configuration_digest
         self._description = SubjectDescription(
             name="http-subject",
             version="0.1.0",
             adapter="http",
             transport="http-json",
-            metadata={
-                "endpoint": endpoint,
-                "targetDigest": target_digest,
-                "automatic_retry": False,
-            },
+            metadata=metadata,
         )
 
     def describe(self) -> SubjectDescription:
