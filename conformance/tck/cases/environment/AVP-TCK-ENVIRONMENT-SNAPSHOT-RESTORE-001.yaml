@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-SNAPSHOT-RESTORE-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-007, AVP-ENVIRONMENT-008]
+applicability: mandatory
+type: mixed
+vector:
+  mutation:
+    actorId: subject
+    tool: refund.create
+    arguments: {order_id: ord_1}
+  allowedEquivalence: STATE_EQUIVALENT
+expect:
+  snapshotBindsOwningHandle: true
+  snapshotBindsStateDigest: true
+  sameHandleRestoreSucceeds: true
+  restoredDigestMatchesSnapshot: true
+  foreignHandleRestoreFailsClosed: true
+  reportedEquivalenceNotStrongerThanEstablished: true
+  exactNotClaimedByReference: true
