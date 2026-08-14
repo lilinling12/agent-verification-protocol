@@ -15,6 +15,7 @@ _SECURITY_IMPLEMENTED_CASES = (
     "AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001",
     "AVP-TCK-SECURITY-CAPABILITY-DENY-001",
     "AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001",
+    "AVP-TCK-SECURITY-HIDDEN-MATERIAL-001",
 )
 
 
@@ -27,8 +28,8 @@ class ReferenceSecurityTCKTest(unittest.TestCase):
         )
 
         self.assertTrue(result.conformant)
-        self.assertEqual(3, result.report["summary"]["total"])
-        self.assertEqual(3, result.report["summary"]["passed"])
+        self.assertEqual(4, result.report["summary"]["total"])
+        self.assertEqual(4, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
         self.assertTrue(
@@ -43,8 +44,10 @@ class ReferenceSecurityTCKTest(unittest.TestCase):
 
         message = str(error.exception)
         self.assertIn("does not support registered TCK cases", message)
+        self.assertNotIn("AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001", message)
+        self.assertNotIn("AVP-TCK-SECURITY-CAPABILITY-DENY-001", message)
         self.assertNotIn("AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001", message)
-        self.assertIn("AVP-TCK-SECURITY-HIDDEN-MATERIAL-001", message)
+        self.assertNotIn("AVP-TCK-SECURITY-HIDDEN-MATERIAL-001", message)
         self.assertIn("AVP-TCK-SECURITY-FAULT-SECRECY-001", message)
         self.assertIn("AVP-TCK-SECURITY-ASSURANCE-HONESTY-001", message)
 
