@@ -6,15 +6,12 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
-from avp_ref.environment import InMemoryCommerceAdapter
 from avp_ref.reference import (
     correct_subject,
     reference_agent_system,
-    reference_oracle_package,
     reference_scenario,
     reference_subject_adapter,
 )
-from avp_ref.runtime import EpisodeState, ReferenceRuntime
 from avp_ref.runtime.subject_policy import SubjectExecutionDenied
 from avp_ref.security import CapabilityGuardPolicy, CapabilityGuardedSubjectAdapter
 from avp_ref.subject import (
@@ -23,7 +20,6 @@ from avp_ref.subject import (
     SubjectAdapterError,
     SubjectBudgetExceeded,
     SubjectExecutionError,
-    SubjectHandle,
     SubjectInvocation,
     SubjectProtocolError,
     SubjectResult,
@@ -67,6 +63,7 @@ class _ScriptedHTTPSubjectAdapter(HTTPSubjectAdapter):
         timeout: float,
         trace_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
+        del timeout, trace_headers
         self.payloads.append(dict(payload))
         if not self._frames:
             raise SubjectTransportError("scripted Subject transport exhausted")
@@ -76,19 +73,6 @@ class _ScriptedHTTPSubjectAdapter(HTTPSubjectAdapter):
         if not isinstance(frame, dict):
             raise SubjectProtocolError("scripted Subject frame must be an object")
         return frame
-
-
-class _FailedTerminalAdapter(InProcessSubjectAdapter):
-    """Witness a contradictory adapter returning a non-completed result."""
-
-    def invoke(
-        self,
-        handle: SubjectHandle,
-        invocation: SubjectInvocation,
-        gateway: Any,
-    ) -> SubjectResult:
-        self._assert_handle(handle)
-        return SubjectResult(SubjectStatus.FAILED, "not a valid completion", 1)
 
 
 class ReferenceSubjectTCKAdapter:
@@ -141,6 +125,7 @@ class ReferenceSubjectTCKAdapter:
 
     @staticmethod
     def _lifecycle(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         adapter = reference_subject_adapter(correct_subject)
         agent = reference_agent_system("subject-tck-lifecycle")
         description = adapter.describe()
@@ -197,7 +182,11 @@ class ReferenceSubjectTCKAdapter:
         adapter = _ScriptedHTTPSubjectAdapter(
             [{"status": "completed", "report": "ok"}]
         )
-        result = adapter.invoke(adapter.open(agent), invocation, _Gateway())
+        handle = adapter.open(agent)
+        try:
+            result = adapter.invoke(handle, invocation, _Gateway())
+        finally:
+            adapter.release(handle)
         payload = adapter.payloads[0]
         serialized = repr(payload)
         agent_projection = payload.get("agent_system", {})
@@ -223,11 +212,19 @@ class ReferenceSubjectTCKAdapter:
             [
                 {
                     "status": "tool_call",
-                    "call": {"call_id": "c1", "name": "tool.one", "arguments": {}},
+                    "call": {
+                        "call_id": "c1",
+                        "name": "tool.one",
+                        "arguments": {},
+                    },
                 },
                 {
                     "status": "tool_call",
-                    "call": {"call_id": "c2", "name": "tool.two", "arguments": {}},
+                    "call": {
+                        "call_id": "c2",
+                        "name": "tool.two",
+                        "arguments": {},
+                    },
                 },
                 {"status": "completed", "report": "too late"},
             ]
@@ -241,6 +238,8 @@ class ReferenceSubjectTCKAdapter:
             overrun_rejected = False
         except SubjectBudgetExceeded:
             overrun_rejected = True
+        finally:
+            adapter.release(handle)
         passed = (
             overrun_rejected
             and invocation.max_steps == max_steps
@@ -254,16 +253,21 @@ class ReferenceSubjectTCKAdapter:
 
     @staticmethod
     def _capability(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         scenario = reference_scenario()
         policy = CapabilityGuardPolicy()
         downstream = _Gateway()
 
         def unauthorized_subject(gateway: Any, task: Mapping[str, Any]) -> str:
+            del task
             gateway.call_tool("forbidden.capability", {})
             return "unexpected"
 
         guarded = CapabilityGuardedSubjectAdapter(
-            InProcessSubjectAdapter(unauthorized_subject, name="capability-witness"),
+            InProcessSubjectAdapter(
+                unauthorized_subject,
+                name="capability-witness",
+            ),
             scenario,
             policy,
         )
@@ -276,6 +280,8 @@ class ReferenceSubjectTCKAdapter:
             denied = "SubjectExecutionDenied" in str(exc)
         except SubjectExecutionDenied:
             denied = True
+        finally:
+            guarded.release(handle)
         denials = policy.denial_records(invocation.episode_id)
         passed = denied and not downstream.tool_calls and bool(denials)
         return passed, (
@@ -286,15 +292,22 @@ class ReferenceSubjectTCKAdapter:
 
     @staticmethod
     def _outcome(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         agent = reference_agent_system("subject-tck-outcome", adapter="http")
         invocation = SubjectInvocation("ep_subject_outcome", {}, 1, 1.0)
 
         completed = _ScriptedHTTPSubjectAdapter(
             [{"status": "completed", "report": "done"}]
         )
-        completed_result = completed.invoke(
-            completed.open(agent), invocation, _Gateway()
-        )
+        completed_handle = completed.open(agent)
+        try:
+            completed_result = completed.invoke(
+                completed_handle,
+                invocation,
+                _Gateway(),
+            )
+        finally:
+            completed.release(completed_handle)
 
         classifications: list[type[BaseException]] = []
         scripts: list[list[object]] = [
@@ -305,23 +318,33 @@ class ReferenceSubjectTCKAdapter:
         ]
         for frames in scripts:
             adapter = _ScriptedHTTPSubjectAdapter(frames)
+            handle = adapter.open(agent)
             try:
-                adapter.invoke(adapter.open(agent), invocation, _Gateway())
+                adapter.invoke(handle, invocation, _Gateway())
             except SubjectAdapterError as exc:
                 classifications.append(type(exc))
+            finally:
+                adapter.release(handle)
 
         budget = _ScriptedHTTPSubjectAdapter(
             [
                 {
                     "status": "tool_call",
-                    "call": {"call_id": "c1", "name": "tool.one", "arguments": {}},
+                    "call": {
+                        "call_id": "c1",
+                        "name": "tool.one",
+                        "arguments": {},
+                    },
                 }
             ]
         )
+        budget_handle = budget.open(agent)
         try:
-            budget.invoke(budget.open(agent), invocation, _Gateway())
+            budget.invoke(budget_handle, invocation, _Gateway())
         except SubjectAdapterError as exc:
             classifications.append(type(exc))
+        finally:
+            budget.release(budget_handle)
 
         expected = {
             SubjectExecutionError,
@@ -343,44 +366,66 @@ class ReferenceSubjectTCKAdapter:
 
     @staticmethod
     def _result(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         agent = reference_agent_system("subject-tck-result", adapter="http")
         invocation = SubjectInvocation("ep_subject_result", {}, 1, 1.0)
 
-        invalid_frames = [
+        invalid_frames: list[object] = [
             {"status": "completed", "report": {"not": "a string"}},
-            {"status": "completed", "report": "ok", "error": "contradictory"},
+            {
+                "status": "completed",
+                "report": "ok",
+                "error": "contradictory",
+            },
+            {"status": "failed", "error": ""},
             {"status": "unsupported"},
+            ["non-object-frame"],
         ]
-        frame_rejections = 0
+        rejections = 0
         for frame in invalid_frames:
             adapter = _ScriptedHTTPSubjectAdapter([frame])
+            handle = adapter.open(agent)
             try:
-                adapter.invoke(adapter.open(agent), invocation, _Gateway())
+                adapter.invoke(handle, invocation, _Gateway())
             except SubjectProtocolError:
-                frame_rejections += 1
+                rejections += 1
+            finally:
+                adapter.release(handle)
 
-        runtime = ReferenceRuntime()
-        failed_adapter = _FailedTerminalAdapter(lambda gateway, task: "unused")
-        episode = runtime.create_episode(
-            scenario=reference_scenario(),
-            agent_system=reference_agent_system("failed-result"),
-            environment_adapter=InMemoryCommerceAdapter(),
-            subject_adapter=failed_adapter,
-            oracle_package=reference_oracle_package(),
+        completion_only_model = False
+        try:
+            SubjectResult("FAILED", "invalid", 1)  # type: ignore[arg-type]
+        except ValueError:
+            completion_only_model = True
+
+        control = _ScriptedHTTPSubjectAdapter(
+            [{"status": "completed", "report": "valid"}]
         )
-        runtime.provision(episode.episode_id)
-        runtime.run_subject(episode.episode_id)
-        non_completed_rejected = episode.state is EpisodeState.INFRA_FAILED
+        control_handle = control.open(agent)
+        try:
+            control_result = control.invoke(
+                control_handle,
+                invocation,
+                _Gateway(),
+            )
+        finally:
+            control.release(control_handle)
 
-        passed = frame_rejections == len(invalid_frames) and non_completed_rejected
+        passed = (
+            rejections == len(invalid_frames)
+            and completion_only_model
+            and control_result.status is SubjectStatus.COMPLETED
+            and control_result.report == "valid"
+        )
         return passed, (
-            "malformed/contradictory/unsupported transport results and non-completed SubjectResult states fail closed"
+            "malformed, contradictory and unsupported terminal results fail closed while valid completion remains accepted"
             if passed
             else "invalid Subject terminal result was accepted as successful completion"
         )
 
     @staticmethod
     def _assurance(vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         adapter = reference_subject_adapter(correct_subject)
         description = adapter.describe()
         metadata = dict(description.metadata)
