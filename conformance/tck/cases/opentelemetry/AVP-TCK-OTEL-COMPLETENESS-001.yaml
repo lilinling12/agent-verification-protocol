@@ -1,0 +1,18 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-OTEL-COMPLETENESS-001
+  domain: opentelemetry
+  status: draft
+profile: avp-otel-mapping-v0.1
+requirements: [AVP-OTEL-007]
+applicability: mandatory
+type: negative
+vector:
+  requiredTelemetry: true
+  rootTracePresent: true
+  requiredVerificationMappingMissing: true
+expect:
+  traceExistenceAloneDoesNotEstablishComplete: true
+  requiredMissingReportedFailClosed: true
+  validEvaluationNotSilentlyPreservedWhenTelemetryRequired: true
