@@ -21,23 +21,30 @@ _EXCLUDED_TOP_LEVEL_FIELDS = frozenset({"instanceDigest", "provenance"})
 
 
 def identity_preimage(document: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the semantic ScenarioInstance document covered by identity.
+    """Return the semantic ScenarioInstance document covered by identity."""
 
-    The returned mapping is detached from the top-level input mapping. Nested
-    values are not mutated by this function; RFC 8785 serialization is read-only.
-    """
-
-    return {
-        str(key): value
-        for key, value in document.items()
-        if str(key) not in _EXCLUDED_TOP_LEVEL_FIELDS
-    }
+    preimage: dict[str, Any] = {}
+    for key, value in document.items():
+        if not isinstance(key, str):
+            raise ScenarioIdentityError(
+                "ScenarioInstance JSON object member names must be strings"
+            )
+        if key not in _EXCLUDED_TOP_LEVEL_FIELDS:
+            preimage[key] = value
+    return preimage
 
 
 def canonical_instance_bytes(document: Mapping[str, Any]) -> bytes:
     """Serialize the ScenarioInstance identity preimage using RFC 8785 JCS."""
 
-    return rfc8785.dumps(identity_preimage(document))
+    try:
+        return rfc8785.dumps(identity_preimage(document))
+    except ScenarioIdentityError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise ScenarioIdentityError(
+            "ScenarioInstance identity preimage is not RFC 8785/I-JSON compatible"
+        ) from exc
 
 
 def scenario_instance_digest(document: Mapping[str, Any]) -> str:
