@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-MCP-UPSTREAM-FAILURE-001
+  domain: mcp
+  status: draft
+profile: avp-mcp-interop-v0.1
+requirements: [AVP-MCP-007]
+applicability: mandatory
+type: negative
+vector:
+  tool: order.get
+  arguments: {order_id: ord_1}
+  upstreamFailure:
+    category: protocol-error
+expect:
+  successfulResultNotAccepted: true
+  acceptedResultIdentityAbsent: true
+  upstreamFailureRecorded: true
+  argumentsSchemaAndCatalogRemainBound: true
