@@ -46,7 +46,9 @@ AVP does not prescribe one digest algorithm for MCP's own protocol objects. If a
 
 Tool arguments MUST be validated against the baseline MCP input schema before upstream execution.
 
-When an MCP tool declares an output schema, structured output MUST satisfy that schema before it is accepted as a successful AVP tool result.
+When an MCP tool declares an output schema, structured output accepted as a successful AVP tool result MUST satisfy that schema.
+
+An MCP tool execution error represented according to the selected MCP revision MUST remain distinguishable from a successful result. AVP MUST NOT require a tool execution error to masquerade as successful structured output merely to satisfy the normal success output schema.
 
 An implementation that claims pre-call schema/catalog drift detection MUST compare the active material tool contract against the baseline before upstream execution. Material drift MUST fail closed before the side-effecting tool invocation is issued.
 
@@ -63,8 +65,8 @@ Each MCP tool interaction accepted as AVP verification evidence MUST bind, direc
 - normalized argument identity;
 - bound tool-schema identity;
 - bound baseline catalog/tool-set identity;
-- normalized accepted-result identity, when one exists;
-- whether upstream execution failed before an accepted result existed.
+- normalized MCP result identity, when an MCP result exists;
+- an outcome that distinguishes successful completion, MCP tool execution error, and failure before an MCP result existed.
 
 The binding MUST make it possible to distinguish calls that use different tool contracts or different arguments even when their human-readable tool names are equal.
 
@@ -84,13 +86,15 @@ A gateway that mirrors tool parameters into MCP HTTP headers MUST follow the sel
 
 ## 8. Failure separation
 
-### AVP-MCP-007 — Upstream failure separation
+### AVP-MCP-007 — Call outcome separation
 
-Transport errors, MCP protocol errors, authorization failures, and upstream tool failures MUST NOT be represented as successful accepted tool results.
+A successful MCP tool result, an MCP tool execution error such as a `tools/call` result carrying `isError=true`, and a failure before an MCP result exists MUST remain explicitly distinguishable in AVP verification evidence.
 
-If the evaluator records a failed upstream attempt, the record MUST distinguish that failure from an interaction with an accepted result identity.
+A tool execution error is an MCP result and MAY retain a normalized result identity for reproducibility, but MUST NOT be represented as successful tool completion.
 
-An absent accepted result MUST NOT be assigned a fabricated success digest.
+Transport errors, JSON-RPC/MCP protocol errors, authorization failures, and comparable failures that occur before an MCP result exists MUST NOT be assigned a fabricated result identity or represented as successful tool completion.
+
+If the evaluator records a failed upstream attempt, its evidence MUST remain distinguishable from both successful completion and MCP tool execution error.
 
 ## 9. Unsupported feature honesty
 
