@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-BUDGET-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-004]
+applicability: mandatory
+type: negative
+vector:
+  maxSteps: 2
+  timeoutBound: true
+  subjectRequestsBudgetExtension: true
+  subjectAttemptsThirdStep: true
+expect:
+  evaluatorBudgetRemainsAuthoritative: true
+  budgetCannotBeExtendedBySubject: true
+  overrunNotReportedAsSuccessfulCompletion: true
