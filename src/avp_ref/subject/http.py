@@ -31,6 +31,7 @@ from .models import (
 )
 
 _RESERVED_TRACE_HEADERS = frozenset({"traceparent", "tracestate", "baggage"})
+_TERMINAL_FIELDS = frozenset({"report", "error", "call"})
 
 
 class HTTPSubjectAdapter:
@@ -125,6 +126,7 @@ class HTTPSubjectAdapter:
                 trace_headers=gateway.trace_headers(),
             )
             status = frame.get("status")
+            self._validate_frame_shape(status, frame)
             if status == "completed":
                 report = frame.get("report")
                 if report is not None and not isinstance(report, str):
@@ -239,6 +241,27 @@ class HTTPSubjectAdapter:
         if not isinstance(value, dict):
             raise SubjectProtocolError("subject response root must be an object")
         return value
+
+    @staticmethod
+    def _validate_frame_shape(status: Any, frame: Mapping[str, Any]) -> None:
+        allowed_by_status = {
+            "completed": frozenset({"report"}),
+            "failed": frozenset({"error"}),
+            "tool_call": frozenset({"call"}),
+        }
+        allowed_terminal = allowed_by_status.get(status)
+        if allowed_terminal is None:
+            return
+        contradictory = sorted(
+            key
+            for key in _TERMINAL_FIELDS
+            if key in frame and key not in allowed_terminal
+        )
+        if contradictory:
+            raise SubjectProtocolError(
+                f"{status} response contains contradictory terminal fields: "
+                f"{contradictory}"
+            )
 
     @staticmethod
     def _parse_tool_call(value: Any) -> ToolCall:
