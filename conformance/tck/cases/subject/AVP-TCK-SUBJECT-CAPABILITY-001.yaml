@@ -13,10 +13,10 @@ vector:
     - observe
     - call_tool
     - trace_headers
-  attemptBypassRuntimeGateway: true
-  attemptUnauthorizedCapability: true
+  attemptUnauthorizedGatewayCapability: true
 expect:
-  runtimeGatewayMediatesCapabilities: true
-  unauthorizedCapabilityRejectedFailClosed: true
-  subjectCannotCreateStrongerAccess: true
+  runtimeGatewayMediatesExposedCapabilities: true
+  unauthorizedGatewayCapabilityRejectedFailClosed: true
+  adapterApiExposesNoDirectEvaluatorCapability: true
   domainAuthorityPreserved: true
+  noAmbientProcessIsolationClaimImplied: true
