@@ -143,13 +143,22 @@ class NoopTelemetryBridge:
 
 
 class _OpenTelemetrySession:
-    def __init__(self, episode_id, manifest_digest, tracer, exporter, policy) -> None:
+    def __init__(
+        self,
+        episode_id: str,
+        manifest_digest: str,
+        tracer: Any,
+        exporter: Any,
+        policy: TelemetryPolicy,
+        propagator: Any,
+    ) -> None:
         from opentelemetry import trace
 
         self._episode_id = episode_id
         self._tracer = tracer
         self._exporter = exporter
         self._policy = policy
+        self._propagator = propagator
         self._root = tracer.start_span(
             "avp.episode",
             attributes={
@@ -195,11 +204,9 @@ class _OpenTelemetrySession:
     def _tool_outcome(event: AVPEvent) -> str:
         if event.event_type == "tool.error":
             return "upstream_error"
-
         declared = event.payload.get("outcome")
         if isinstance(declared, str) and declared:
             return declared.lower()
-
         result = event.payload.get("result")
         if isinstance(result, Mapping) and result.get("isError") is True:
             return "tool_error"
@@ -211,8 +218,7 @@ class _OpenTelemetrySession:
 
         self._events += 1
         self._seen_event_types.add(event.event_type)
-        attributes = self._attrs(event)
-        self._root.add_event(f"avp.{event.event_type}", attributes)
+        self._root.add_event(f"avp.{event.event_type}", self._attrs(event))
         correlation_id = str(event.payload.get("correlation_id") or "")
 
         if event.event_type == "tool.call" and correlation_id:
@@ -250,10 +256,8 @@ class _OpenTelemetrySession:
             self.finalize(complete=True)
 
     def inject_headers(self) -> Mapping[str, str]:
-        from opentelemetry.propagate import inject
-
         carrier: dict[str, str] = {}
-        inject(carrier, context=self._context)
+        self._propagator.inject(carrier, context=self._context)
 
         traceparent = carrier.get("traceparent", "")
         match = _TRACEPARENT.fullmatch(traceparent)
@@ -293,7 +297,9 @@ class _OpenTelemetrySession:
             span for span in all_spans if span.context.trace_id == context.trace_id
         )
 
-        missing_required_events = set(self._policy.required_event_types) - self._seen_event_types
+        missing_required_events = (
+            set(self._policy.required_event_types) - self._seen_event_types
+        )
         complete_mapping = (
             complete
             and not self._mapping_incomplete
@@ -324,9 +330,15 @@ class _OpenTelemetrySession:
 
 
 class OpenTelemetryBridge:
-    def __init__(self, policy: TelemetryPolicy | None = None) -> None:
+    def __init__(
+        self,
+        policy: TelemetryPolicy | None = None,
+        *,
+        propagator: Any | None = None,
+    ) -> None:
         self._policy = policy or TelemetryPolicy()
         try:
+            from opentelemetry.propagate import get_global_textmap
             from opentelemetry.sdk.resources import Resource
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -338,6 +350,7 @@ class OpenTelemetryBridge:
                 "Install avp-reference[otel] to use OpenTelemetryBridge"
             ) from exc
 
+        self._propagator = propagator or get_global_textmap()
         self._exporter = InMemorySpanExporter()
         self._provider = TracerProvider(
             resource=Resource.create({"service.name": "avp-reference"})
@@ -361,6 +374,7 @@ class OpenTelemetryBridge:
             self._tracer,
             self._exporter,
             self._policy,
+            self._propagator,
         )
 
     def finished_spans(self) -> tuple[Any, ...]:
