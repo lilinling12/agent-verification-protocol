@@ -42,10 +42,3 @@ class SubjectExecutionPolicy(Protocol):
 
     def authorize(self, request: SubjectCapabilityRequest) -> None:
         """Return for allow; raise SubjectExecutionDenied for deny."""
-
-
-class AllowAllSubjectExecutionPolicy:
-    """Core default preserving pre-Security runtime behavior."""
-
-    def authorize(self, request: SubjectCapabilityRequest) -> None:
-        del request
