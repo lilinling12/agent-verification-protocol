@@ -9,8 +9,10 @@ requirements: [AVP-SECURITY-002]
 applicability: mandatory
 type: negative
 vector:
+  allowedTool: order.get
   deniedTool: refund.delete
 expect:
+  allowedDownstreamInvocationCount: 1
   denied: true
-  downstreamInvocationCount: 0
+  deniedDownstreamInvocationCount: 0
   policyDenialRecord: true
