@@ -82,13 +82,18 @@ class ReferenceScenarioTCKAdapter:
         )
         documents = [instance.to_dict() for instance in instances]
         unresolved = any(
-            key in document for document in documents for key in ("parameters", "seeds", "generators")
+            key in document
+            for document in documents
+            for key in ("parameters", "seeds", "generators")
         )
         passed = (
             all(document.get("kind") == "ScenarioInstance" for document in documents)
             and not unresolved
             and all(document == documents[0] for document in documents[1:])
-            and all(instance.instance_digest == instances[0].instance_digest for instance in instances[1:])
+            and all(
+                instance.instance_digest == instances[0].instance_digest
+                for instance in instances[1:]
+            )
         )
         return passed, (
             "ScenarioTemplate materializes deterministically into one resolved ScenarioInstance identity"
@@ -107,7 +112,9 @@ class ReferenceScenarioTCKAdapter:
 
     @staticmethod
     def _identity(vector: Mapping[str, Any]) -> tuple[bool, str]:
-        instance = copy.deepcopy(dict(ReferenceScenarioTCKAdapter._mapping(vector.get("instance"), "instance")))
+        instance = copy.deepcopy(
+            dict(ReferenceScenarioTCKAdapter._mapping(vector.get("instance"), "instance"))
+        )
         base = scenario_instance_digest(instance)
 
         reordered = dict(reversed(list(instance.items())))
@@ -173,8 +180,14 @@ class ReferenceScenarioTCKAdapter:
         projection = ScenarioCompiler().compile(template).subject_projection(actor_id)
         projection_text = repr(projection)
         capabilities = projection.get("capabilities", {})
-        actor_capabilities = capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
-        includes = actor_capabilities.get("include", ()) if isinstance(actor_capabilities, Mapping) else ()
+        actor_capabilities = (
+            capabilities.get(actor_id, {}) if isinstance(capabilities, Mapping) else {}
+        )
+        includes = (
+            actor_capabilities.get("include", ())
+            if isinstance(actor_capabilities, Mapping)
+            else ()
+        )
         passed = (
             capability in includes
             and "evaluator" not in capabilities
@@ -194,10 +207,17 @@ class ReferenceScenarioTCKAdapter:
             vector.get("resolvedIdentity"), "resolvedIdentity"
         )
         identity = str(resolved.get("identity", ""))
-        template = copy.deepcopy(REFERENCE_TEMPLATE)
-        template["task"] = {
-            "instruction": "Use the declared fixture.",
-            "artifacts": [reference],
+        template: dict[str, Any] = {
+            "apiVersion": "avp.spec/v0.1",
+            "kind": "ScenarioTemplate",
+            "metadata": {"name": "strict-reference-vector", "version": "1"},
+            "environment": {"type": "stub"},
+            "actors": [{"id": "subject", "type": "agent"}],
+            "capabilities": {"subject": {"tools": []}},
+            "task": {
+                "instruction": "Use the declared fixture.",
+                "artifacts": [reference],
+            },
         }
         resolver = StaticReferenceResolver(records={reference: {"digest": identity}})
         bound = ScenarioCompiler(resolver=resolver).compile(
