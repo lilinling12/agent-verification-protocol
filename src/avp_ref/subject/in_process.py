@@ -8,7 +8,13 @@ from typing import Any, Callable, Mapping
 from avp_ref.runtime.agent import AgentSystem
 
 from .errors import SubjectExecutionError, SubjectTransportError
-from .models import SubjectDescription, SubjectHandle, SubjectInvocation, SubjectResult, SubjectStatus
+from .models import (
+    SubjectDescription,
+    SubjectHandle,
+    SubjectInvocation,
+    SubjectResult,
+    SubjectStatus,
+)
 
 SubjectCallable = Callable[[Any, Mapping[str, Any]], str]
 
@@ -41,21 +47,43 @@ class InProcessSubjectAdapter:
         self._handles[handle.handle_id] = agent_system.identity_digest
         return handle
 
-    def invoke(self, handle: SubjectHandle, invocation: SubjectInvocation, gateway) -> SubjectResult:
+    def invoke(
+        self,
+        handle: SubjectHandle,
+        invocation: SubjectInvocation,
+        gateway: Any,
+    ) -> SubjectResult:
         self._assert_handle(handle)
         try:
             report = self._subject(gateway, invocation.task)
         except SubjectExecutionError:
             raise
         except Exception as exc:
-            raise SubjectExecutionError(f"in-process subject failed: {type(exc).__name__}: {exc}") from exc
-        return SubjectResult(SubjectStatus.COMPLETED, str(report), 1, {"adapter": "in-process"})
+            raise SubjectExecutionError(
+                f"in-process subject failed: {type(exc).__name__}: {exc}"
+            ) from exc
+        return SubjectResult(
+            SubjectStatus.COMPLETED,
+            str(report),
+            1,
+            {"adapter": "in-process"},
+        )
 
     def release(self, handle: SubjectHandle) -> None:
         self._assert_handle(handle)
         del self._handles[handle.handle_id]
 
     def _assert_handle(self, handle: SubjectHandle) -> None:
-        digest = self._handles.get(handle.handle_id)
-        if digest is None or digest != handle.agent_system_digest:
-            raise SubjectTransportError(f"unknown subject handle: {handle.handle_id}")
+        agent_digest = self._handles.get(handle.handle_id)
+        owner_matches = (
+            handle.adapter_name == self._description.name
+            and handle.adapter_version == self._description.version
+        )
+        if (
+            agent_digest is None
+            or agent_digest != handle.agent_system_digest
+            or not owner_matches
+        ):
+            raise SubjectTransportError(
+                f"unknown or mismatched subject handle: {handle.handle_id}"
+            )
