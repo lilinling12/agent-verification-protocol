@@ -170,3 +170,38 @@ cases:
     profile: avp-scenario-v0.1
     requirements: [AVP-SCENARIO-008]
     applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-LIFECYCLE-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-LIFECYCLE-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-001, AVP-ENVIRONMENT-002, AVP-ENVIRONMENT-011]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-RESET-TIME-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-RESET-TIME-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-003, AVP-ENVIRONMENT-004]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-OBSERVATION-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-OBSERVATION-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-005]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-PROJECTION-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-PROJECTION-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-006]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-SNAPSHOT-RESTORE-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-SNAPSHOT-RESTORE-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-007, AVP-ENVIRONMENT-008]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-DIFF-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-DIFF-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-009]
+    applicability: mandatory
+  - id: AVP-TCK-ENVIRONMENT-FAULT-001
+    path: conformance/tck/cases/environment/AVP-TCK-ENVIRONMENT-FAULT-001.yaml
+    profile: avp-environment-v0.1
+    requirements: [AVP-ENVIRONMENT-010]
+    applicability: mandatory
