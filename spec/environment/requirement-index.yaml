@@ -1,0 +1,81 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-environment-v0.1
+requirements:
+  - id: AVP-ENVIRONMENT-001
+    level: MUST
+    area: ownership
+    statement: Environment mutable authoritative resources remain evaluator-owned behind opaque instance identity.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-001
+    conformance: [AVP-TCK-ENVIRONMENT-LIFECYCLE-001]
+  - id: AVP-ENVIRONMENT-002
+    level: MUST
+    area: provisioning
+    statement: Provisioned environment identity is bound to the ScenarioInstance identity used to create it.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-002
+    conformance: [AVP-TCK-ENVIRONMENT-LIFECYCLE-001]
+  - id: AVP-ENVIRONMENT-003
+    level: MUST
+    area: reset
+    statement: Supported reset targets establish declared semantics or fail closed, with before and after state identity bound.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-003
+    conformance: [AVP-TCK-ENVIRONMENT-RESET-TIME-001]
+  - id: AVP-ENVIRONMENT-004
+    level: MUST
+    area: logical-time
+    statement: Exposed logical time is deterministic and monotonic within an unreverted environment lineage.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-004
+    conformance: [AVP-TCK-ENVIRONMENT-RESET-TIME-001]
+  - id: AVP-ENVIRONMENT-005
+    level: MUST
+    area: observation
+    statement: Subject observation is actor-scoped and excludes evaluator-only or hidden material.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-005
+    conformance: [AVP-TCK-ENVIRONMENT-OBSERVATION-001]
+  - id: AVP-ENVIRONMENT-006
+    level: MUST
+    area: projection
+    statement: Evaluator projection evidence binds the projection identifier and stable content digest as one identity pair.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-006
+    conformance: [AVP-TCK-ENVIRONMENT-PROJECTION-001]
+  - id: AVP-ENVIRONMENT-007
+    level: MUST
+    area: snapshot
+    statement: Snapshot references bind owning environment identity and represented authoritative state identity.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-007
+    conformance: [AVP-TCK-ENVIRONMENT-SNAPSHOT-RESTORE-001]
+  - id: AVP-ENVIRONMENT-008
+    level: MUST
+    area: restore
+    statement: Restore equivalence claims are no stronger than the implementation establishes.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-008
+    conformance: [AVP-TCK-ENVIRONMENT-SNAPSHOT-RESTORE-001]
+  - id: AVP-ENVIRONMENT-009
+    level: MUST
+    area: diff
+    statement: StateDiff binds before state, after state, and selected projection semantics.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-009
+    conformance: [AVP-TCK-ENVIRONMENT-DIFF-001]
+  - id: AVP-ENVIRONMENT-010
+    level: MUST
+    area: fault
+    statement: Fault identity, target, activation condition, and clear semantics remain evaluator-controlled and fail closed.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-010
+    conformance: [AVP-TCK-ENVIRONMENT-FAULT-001]
+  - id: AVP-ENVIRONMENT-011
+    level: MUST
+    area: lifecycle
+    statement: Released or stale environment handles fail closed and never silently recreate authoritative resources.
+    spec: spec/environment/environment-contract.md
+    anchor: avp-environment-011
+    conformance: [AVP-TCK-ENVIRONMENT-LIFECYCLE-001]

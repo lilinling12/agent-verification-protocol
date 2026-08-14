@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-DIFF-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-009]
+applicability: mandatory
+type: mixed
+vector:
+  projection: commerce.refunds
+  mutation:
+    actorId: subject
+    tool: refund.create
+    arguments: {order_id: ord_1}
+expect:
+  beforeDigestMatchesBeforeSnapshot: true
+  afterDigestMatchesAfterSnapshot: true
+  projectionIdentityBound: true
+  mutationProducesSemanticChange: true
+  sameSnapshotDiffProducesNoChanges: true
+  foreignSnapshotDiffFailsClosed: true

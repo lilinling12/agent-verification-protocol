@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-PROJECTION-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-006]
+applicability: mandatory
+type: mixed
+vector:
+  projections:
+    - commerce.orders
+    - commerce.refunds
+  mutation:
+    actorId: subject
+    tool: refund.create
+    arguments: {order_id: ord_1}
+expect:
+  projectionDigestMatchesReturnedData: true
+  equalProjectionSemanticsHaveStableDigest: true
+  projectionIdentityBindsIdentifierAndDigest: true
+  equalContentAcrossDifferentProjectionIdsAllowed: true
+  mutationChangesAffectedProjectionDigest: true

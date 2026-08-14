@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from .models import TCKAdapterError, TCKCaseResult
 from .reference_aligned import AlignedReferenceTCKAdapter
+from .reference_environment import ReferenceEnvironmentTCKAdapter
 from .reference_evidence import ReferenceEvidenceTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
@@ -25,6 +26,7 @@ class ReferenceConformanceAdapter:
             ReferenceEvidenceTCKAdapter(),
             ReferenceOracleTCKAdapter(),
             ReferenceScenarioTCKAdapter(),
+            ReferenceEnvironmentTCKAdapter(),
             ReferenceSecurityTCKAdapter(),
             ReferenceSecurityFaultTCKAdapter(),
             ReferenceSecurityAssuranceTCKAdapter(),

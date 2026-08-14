@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-ENVIRONMENT-OBSERVATION-001
+  domain: environment
+  status: draft
+profile: avp-environment-v0.1
+requirements: [AVP-ENVIRONMENT-005]
+applicability: mandatory
+type: negative
+vector:
+  actorId: subject
+  unknownActorId: evaluator-only
+  forbiddenMarkers:
+    - permissions
+    - futureFaults
+    - hiddenGrader
+expect:
+  declaredActorObservationSucceeds: true
+  unknownActorFailsClosed: true
+  forbiddenMarkersAbsent: true
