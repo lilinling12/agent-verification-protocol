@@ -1,0 +1,89 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: environment
+  status: reconciliation-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-ENVIRONMENT-001
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/adapter.py
+      - src/avp_ref/environment/models.py
+    notes: Environment owns mutable resources; Python Protocol/handle dataclass shapes remain non-normative.
+  - requirement: AVP-ENVIRONMENT-002
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Provisioned handle binds ScenarioInstance digest; identifier format remains implementation-specific.
+  - requirement: AVP-ENVIRONMENT-003
+    decision: promote-with-conformance-required
+    implementationEvidence:
+      - src/avp_ref/environment/adapter.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Reset equivalence must be proven by TCK rather than inferred from in-memory behavior.
+  - requirement: AVP-ENVIRONMENT-004
+    decision: promote-abstract-semantics-only
+    implementationEvidence:
+      - src/avp_ref/environment/adapter.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Monotonic deterministic logical time is normative; tick units and clock implementation are not.
+  - requirement: AVP-ENVIRONMENT-005
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/adapter.py
+      - src/avp_ref/environment/in_memory.py
+      - spec/security/security-boundary-contract.md
+    notes: Actor-scoped observation composes with Security hidden-material requirements.
+  - requirement: AVP-ENVIRONMENT-006
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Projection identity and digest binding are normative; Python canonical helper is implementation evidence.
+  - requirement: AVP-ENVIRONMENT-007
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Snapshot ownership and state identity are normative; storage representation is not.
+  - requirement: AVP-ENVIRONMENT-008
+    decision: promote-honesty-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+    notes: EXACT/STATE_EQUIVALENT/NON_EQUIVALENT semantic levels are promoted; implementation mechanism remains free.
+  - requirement: AVP-ENVIRONMENT-009
+    decision: promote-language-neutral-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Diff must bind before/after/projection identities; patch algorithm is non-normative.
+  - requirement: AVP-ENVIRONMENT-010
+    decision: promote-with-security-composition
+    implementationEvidence:
+      - src/avp_ref/environment/models.py
+      - src/avp_ref/environment/in_memory.py
+      - spec/security/security-boundary-contract.md
+    notes: Occurrence semantics and evaluator control are normative; scheduler internals and fault parameter schema are not.
+  - requirement: AVP-ENVIRONMENT-011
+    decision: promote-fail-closed-semantics
+    implementationEvidence:
+      - src/avp_ref/environment/adapter.py
+      - src/avp_ref/environment/in_memory.py
+    notes: Released/stale handles must fail closed; resource teardown mechanics remain implementation-specific.
+nonNormativeImplementationDetails:
+  - Python Protocol/dataclass/enum shapes
+  - handle and snapshot identifier formats
+  - in-memory world representation
+  - snapshot serialization/storage
+  - state-diff algorithm
+  - logical-time units
+  - fault scheduler data structure
+  - database/browser/container/VM adapter implementation
+nextGates:
+  - language-neutral Environment TCK vectors
+  - requirement index bound only to registered TCK cases
+  - reference adapter conformance implementation
+  - acceptance audit
