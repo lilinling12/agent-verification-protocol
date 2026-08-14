@@ -85,6 +85,6 @@ note: >-
   The Scenario v0.1 reconciliation is technically complete for this Alpha slice.
   The matrix remains promoted-draft because pre-1.0 protocol promotion is governed
   by the repository release/AEP process rather than by reference implementation
-  availability. The Python reference implementation advertises AVP-Scenario only
-  after passing the complete avp-scenario-v0.1 profile; that implementation remains
-  non-normative.
+  availability. Conformance is demonstrated by the dedicated Scenario TCK adapter;
+  no additional Runtime capability advertisement is required, and the reference
+  implementation remains non-normative.
