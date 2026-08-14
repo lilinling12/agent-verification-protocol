@@ -16,7 +16,7 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 ## Alpha 2 — Interop Contract Stabilization
 
 ### Protocol / conformance
-- [ ] Scenario / ScenarioInstance contract and `avp-scenario-v0.1` TCK
+- [x] Scenario / ScenarioInstance contract and `avp-scenario-v0.1` TCK
 - [ ] Environment contract reconciliation and conformance profile
 - [ ] MCP verification interoperability profile
 - [ ] OpenTelemetry mapping interoperability profile
