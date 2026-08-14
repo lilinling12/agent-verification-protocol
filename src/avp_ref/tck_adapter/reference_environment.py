@@ -167,9 +167,11 @@ class ReferenceEnvironmentTCKAdapter:
         adapter.execute(handle, ReferenceEnvironmentTCKAdapter._tool_request(mutation))
         second_after = adapter.project(handle, projection_names[1])
 
+        first_data = first.to_dict()["data"]
+        second_data = second.to_dict()["data"]
         passed = (
-            first.digest == digest(first.data)
-            and second.digest == digest(second.data)
+            first.digest == digest(first_data)
+            and second.digest == digest(second_data)
             and first.digest == first_repeat.digest
             and first.projection_id == projection_names[0]
             and second.projection_id == projection_names[1]
