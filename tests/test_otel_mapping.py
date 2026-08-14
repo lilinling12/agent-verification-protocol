@@ -61,7 +61,16 @@ class OpenTelemetryMappingInvariantTest(unittest.TestCase):
                 },
             )
         )
-        artifact = session.finalize()
+        session.record_event(
+            _event(
+                "ev_completed",
+                "episode.completed",
+                3,
+                {"task_verdict": "FAIL", "validity": "VALID"},
+            )
+        )
+        artifact = session.artifact
+        self.assertIsNotNone(artifact)
 
         spans = [
             span
@@ -114,6 +123,17 @@ class OpenTelemetryMappingInvariantTest(unittest.TestCase):
         )
         self.assertEqual("success", span.attributes["avp.tool.outcome"])
         self.assertIs(StatusCode.UNSET, span.status.status_code)
+        self.assertIs(TelemetryCompleteness.INCOMPLETE, artifact.completeness)
+
+    def test_root_span_alone_cannot_establish_complete(self) -> None:
+        bridge = OpenTelemetryBridge()
+        artifact = bridge.start_episode(
+            "ep_otel_mapping",
+            "sha256:" + "e" * 64,
+        ).finalize(complete=True)
+        self.assertIs(TelemetryCompleteness.INCOMPLETE, artifact.completeness)
+        self.assertIsNotNone(artifact.trace_id)
+        self.assertGreaterEqual(artifact.span_count, 1)
 
     def test_unmatched_required_tool_call_cannot_claim_complete(self) -> None:
         bridge = OpenTelemetryBridge(TelemetryPolicy(required=True))
