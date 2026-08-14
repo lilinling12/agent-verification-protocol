@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from avp_ref.reference import (
     reference_agent_system,
@@ -11,10 +13,28 @@ from avp_ref.reference import (
     reference_subject_adapter,
 )
 from avp_ref.runtime.subject_policy import SubjectExecutionDenied
-from avp_ref.security import CapabilityGuardedSubjectAdapter, CapabilityGuardPolicy
+from avp_ref.security import (
+    CapabilityGuardedSubjectAdapter,
+    CapabilityGuardPolicy,
+    ManagedSubjectProcessContext,
+)
 from avp_ref.subject import SubjectInvocation
 
 from .models import TCKAdapterError, TCKCaseResult, TCKStatus
+
+
+@contextmanager
+def _temporary_environment(values: Mapping[str, str]) -> Iterator[None]:
+    previous = {name: os.environ.get(name) for name in values}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 class _RecordingGateway:
@@ -47,6 +67,7 @@ class ReferenceSecurityTCKAdapter:
         {
             "AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001",
             "AVP-TCK-SECURITY-CAPABILITY-DENY-001",
+            "AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001",
         }
     )
 
@@ -59,6 +80,7 @@ class ReferenceSecurityTCKAdapter:
         evaluator = {
             "AVP-TCK-SECURITY-CAPABILITY-SEPARATION-001": self._capability_separation,
             "AVP-TCK-SECURITY-CAPABILITY-DENY-001": self._capability_deny,
+            "AVP-TCK-SECURITY-CREDENTIAL-CONTEXT-001": self._credential_context,
         }.get(case_id)
         if evaluator is None:
             raise TCKAdapterError(
@@ -138,8 +160,6 @@ class ReferenceSecurityTCKAdapter:
             except SubjectExecutionDenied:
                 return "DENIED"
             except RuntimeError:
-                # Other SubjectAdapter implementations may normalize the typed
-                # policy denial while preserving the no-downstream side effect.
                 return "DENIED"
             return "UNEXPECTED_ALLOW"
 
@@ -185,6 +205,41 @@ class ReferenceSecurityTCKAdapter:
             valid,
             "declared capability reached downstream while undeclared capability was denied before side effect",
             "capability policy allowed an undeclared side effect or rejected the declared control capability",
+        )
+
+    def _credential_context(self, case: Mapping[str, Any]) -> TCKCaseResult:
+        case_id = self._case_id(case)
+        vector = self._vector(case, case_id)
+        secret_name = self._string(
+            vector.get("evaluatorSecretName"),
+            f"{case_id} evaluatorSecretName",
+        )
+        allowed_name = self._string(
+            vector.get("allowedContextName"),
+            f"{case_id} allowedContextName",
+        )
+        if secret_name == allowed_name:
+            raise TCKAdapterError(
+                f"{case_id} secret and allowed context names must differ"
+            )
+
+        with _temporary_environment(
+            {
+                secret_name: "avp-tck-evaluator-secret-value",
+                allowed_name: "avp-tck-public-context-value",
+            }
+        ):
+            result = ManagedSubjectProcessContext(
+                inherited_environment=(allowed_name,)
+            ).probe_environment_presence((secret_name, allowed_name))
+
+        presence = result.environment_presence
+        valid = presence[secret_name] is False and presence[allowed_name] is True
+        return self._result(
+            case_id,
+            valid,
+            "managed Subject process inherits allowlisted public context without evaluator secret",
+            "managed Subject process leaked evaluator secret or lost allowlisted public context",
         )
 
     @staticmethod
