@@ -111,9 +111,13 @@ class ScenarioInstance:
         from .identity import verify_scenario_instance_identity
         from .loader import validate_instance
 
-        validate_instance(self.document)
-        verify_scenario_instance_identity(self.document, expected_digest=self.instance_digest)
-        object.__setattr__(self, "document", deep_freeze(self.document))
+        plain_document = deep_thaw(self.document)
+        validate_instance(plain_document)
+        verify_scenario_instance_identity(
+            plain_document,
+            expected_digest=self.instance_digest,
+        )
+        object.__setattr__(self, "document", deep_freeze(plain_document))
 
     def to_dict(self) -> dict[str, Any]:
         return deep_thaw(self.document)
