@@ -11,10 +11,10 @@ type: mixed
 vector:
   selectedRevision: "2026-07-28"
   transport: streamable-http
-  avpTraceMetadata:
-    traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
+  conflictingExtraHeader:
+    name: Mcp-Method
+    value: avp/override
 expect:
   selectedRevisionBound: true
   mcpReservedMetadataPreserved: true
-  avpMetadataDoesNotOverwriteMcpMetadata: true
-  serverDiscoverNotRequiredByAvp: true
+  conflictingAvpMetadataRejectedBeforeNetwork: true
