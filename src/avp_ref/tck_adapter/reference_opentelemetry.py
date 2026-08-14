@@ -34,7 +34,7 @@ _TRACEPARENT = re.compile(
 
 
 class _MalformedPropagator:
-    """Test propagator that deliberately emits an invalid traceparent."""
+    """Instance-local propagator used to exercise fail-closed propagation."""
 
     @property
     def fields(self) -> set[str]:
@@ -77,7 +77,7 @@ class _DroppingOutcomeSession:
 
 
 class _DroppingOutcomeBridge:
-    """Real OpenTelemetry bridge with deterministic telemetry loss injection."""
+    """Real OTel bridge with deterministic telemetry-loss injection."""
 
     def __init__(self) -> None:
         self._inner = OpenTelemetryBridge(TelemetryPolicy(required=True))
@@ -90,12 +90,9 @@ class _DroppingOutcomeBridge:
             self._inner.start_episode(episode_id, manifest_digest)
         )
 
-    def finished_spans(self):
-        return self._inner.finished_spans()
-
 
 class ReferenceOpenTelemetryTCKAdapter:
-    """Execute AVP-owned OTel mapping requirements against the reference bridge."""
+    """Execute AVP-owned OTel mappings against real reference telemetry behavior."""
 
     _ROOT = "AVP-TCK-OTEL-ROOT-CORRELATION-001"
     _EVENT = "AVP-TCK-OTEL-EVENT-CORRELATION-001"
@@ -124,7 +121,7 @@ class ReferenceOpenTelemetryTCKAdapter:
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         case_id = self._case_id(case)
         vector = self._vector(case, case_id)
-        evaluator = {
+        evaluators = {
             self._ROOT: self._root_correlation,
             self._EVENT: self._event_correlation,
             self._TOOL: self._tool_correlation,
@@ -133,10 +130,10 @@ class ReferenceOpenTelemetryTCKAdapter:
             self._MINIMIZATION: self._data_minimization,
             self._COMPLETENESS: self._completeness,
             self._EVIDENCE: self._evidence_binding,
-        }.get(case_id)
+        }
+        evaluator = evaluators.get(case_id)
         if evaluator is None:
             raise TCKAdapterError(f"unsupported reference OTel TCK case: {case_id}")
-
         passed, detail = evaluator(vector)
         return TCKCaseResult(
             case_id,
@@ -150,20 +147,19 @@ class ReferenceOpenTelemetryTCKAdapter:
         manifest_digest = str(vector.get("manifestDigest", ""))
         unrelated = str(vector.get("unrelatedManifestDigest", ""))
         bridge = OpenTelemetryBridge()
-        session = bridge.start_episode(episode_id, manifest_digest)
-        artifact = session.finalize()
+        artifact = bridge.start_episode(episode_id, manifest_digest).finalize()
         root = ReferenceOpenTelemetryTCKAdapter._root_span(bridge, artifact.trace_id)
-        attrs = dict(root.attributes)
+        attributes = dict(root.attributes)
         passed = (
-            attrs.get("avp.episode.id") == episode_id
-            and attrs.get("avp.manifest.digest") == manifest_digest
-            and attrs.get("avp.manifest.digest") != unrelated
+            attributes.get("avp.episode.id") == episode_id
+            and attributes.get("avp.manifest.digest") == manifest_digest
+            and attributes.get("avp.manifest.digest") != unrelated
             and artifact.episode_id == episode_id
         )
-        return passed, (
-            "Episode and immutable manifest identity are bound to the telemetry root"
-            if passed
-            else "telemetry root did not preserve Episode/manifest correlation"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "Episode and manifest identity are bound to the telemetry root",
+            "telemetry root lost Episode/manifest correlation",
         )
 
     @staticmethod
@@ -173,20 +169,21 @@ class ReferenceOpenTelemetryTCKAdapter:
         expected: list[tuple[str, str, int]] = []
         for raw in vector.get("events", ()):
             item = ReferenceOpenTelemetryTCKAdapter._mapping(raw, "events[]")
-            event_id = str(item.get("id", ""))
-            event_type = str(item.get("type", ""))
-            sequence = int(item.get("sequence", 0))
-            expected.append((event_id, event_type, sequence))
+            identity = (
+                str(item.get("id", "")),
+                str(item.get("type", "")),
+                int(item.get("sequence", 0)),
+            )
+            expected.append(identity)
             session.record_event(
                 ReferenceOpenTelemetryTCKAdapter._event(
-                    event_id,
-                    event_type,
-                    sequence,
+                    *identity,
                     {"raw_payload": "must-not-be-required"},
                 )
             )
         artifact = session.finalize()
         root = ReferenceOpenTelemetryTCKAdapter._root_span(bridge, artifact.trace_id)
+        expected_ids = {item[0] for item in expected}
         actual = [
             (
                 event.attributes.get("avp.event.id"),
@@ -194,16 +191,16 @@ class ReferenceOpenTelemetryTCKAdapter:
                 event.attributes.get("avp.event.sequence"),
             )
             for event in root.events
-            if event.attributes.get("avp.event.id") in {item[0] for item in expected}
+            if event.attributes.get("avp.event.id") in expected_ids
         ]
-        exported_text = repr(
+        exported = repr(
             [(event.name, dict(event.attributes)) for event in root.events]
         )
-        passed = actual == expected and "must-not-be-required" not in exported_text
-        return passed, (
-            "AVP event identity/type/order survive telemetry mapping without raw payloads"
-            if passed
-            else "AVP event correlation or data minimization was lost"
+        passed = actual == expected and "must-not-be-required" not in exported
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "AVP event identity/type/order survive mapping without raw payloads",
+            "event correlation or minimization was lost",
         )
 
     @staticmethod
@@ -218,7 +215,9 @@ class ReferenceOpenTelemetryTCKAdapter:
             ReferenceOpenTelemetryTCKAdapter._mapping(item, "outcomes[]")
             for item in vector.get("outcomes", ())
         ]
-        for sequence, call in enumerate(calls, start=1):
+        sequence = 0
+        for call in calls:
+            sequence += 1
             session.record_event(
                 ReferenceOpenTelemetryTCKAdapter._event(
                     f"ev_call_{sequence}",
@@ -231,12 +230,13 @@ class ReferenceOpenTelemetryTCKAdapter:
                     },
                 )
             )
-        for offset, outcome in enumerate(outcomes, start=len(calls) + 1):
+        for outcome in outcomes:
+            sequence += 1
             session.record_event(
                 ReferenceOpenTelemetryTCKAdapter._event(
-                    f"ev_outcome_{offset}",
+                    f"ev_result_{sequence}",
                     "tool.result",
-                    offset,
+                    sequence,
                     {
                         "name": "order.get",
                         "protocol": "mcp",
@@ -247,18 +247,18 @@ class ReferenceOpenTelemetryTCKAdapter:
             )
         artifact = session.finalize()
         spans = ReferenceOpenTelemetryTCKAdapter._tool_spans(bridge, artifact.trace_id)
-        actual_ids = [str(span.attributes.get("avp.correlation_id")) for span in spans]
-        expected_ids = {str(item.get("correlationId", "")) for item in calls}
+        actual = [str(span.attributes.get("avp.correlation_id")) for span in spans]
+        expected = {str(call.get("correlationId", "")) for call in calls}
         passed = (
             len(spans) == len(calls)
-            and set(actual_ids) == expected_ids
-            and len(actual_ids) == len(set(actual_ids))
+            and set(actual) == expected
+            and len(actual) == len(set(actual))
             and all(span.attributes.get("avp.tool.name") == "order.get" for span in spans)
         )
-        return passed, (
-            "same-name tool calls remain independently correlated to terminal outcomes"
-            if passed
-            else "tool telemetry collapsed or rebound distinct correlation identities"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "same-name tool calls remain independently correlated",
+            "tool telemetry collapsed or rebound correlation identities",
         )
 
     @staticmethod
@@ -268,7 +268,7 @@ class ReferenceOpenTelemetryTCKAdapter:
         session = bridge.start_episode("ep_otel_outcomes", "sha256:" + "3" * 64)
         sequence = 0
 
-        def emit(event_type: str, correlation: str, payload: dict[str, Any]) -> None:
+        def emit(event_type: str, correlation: str, **payload: Any) -> None:
             nonlocal sequence
             sequence += 1
             session.record_event(
@@ -285,12 +285,12 @@ class ReferenceOpenTelemetryTCKAdapter:
                 )
             )
 
-        emit("tool.call", "call_success", {})
-        emit("tool.result", "call_success", {"result": {"isError": False}})
-        emit("tool.call", "call_tool_error", {})
-        emit("tool.result", "call_tool_error", {"result": {"isError": True}})
-        emit("tool.call", "call_upstream_error", {})
-        emit("tool.error", "call_upstream_error", {"error_type": "MCPUpstreamError"})
+        emit("tool.call", "call_success")
+        emit("tool.result", "call_success", result={"isError": False})
+        emit("tool.call", "call_tool_error")
+        emit("tool.result", "call_tool_error", result={"isError": True})
+        emit("tool.call", "call_upstream_error")
+        emit("tool.error", "call_upstream_error", error_type="MCPUpstreamError")
         session.record_event(
             ReferenceOpenTelemetryTCKAdapter._event(
                 "ev_invalid",
@@ -301,7 +301,7 @@ class ReferenceOpenTelemetryTCKAdapter:
         )
         artifact = session.artifact
         if artifact is None:
-            return False, "terminal Episode event did not finalize telemetry"
+            return False, "invalid Episode did not finalize telemetry"
 
         spans = {
             str(span.attributes.get("avp.correlation_id")): span
@@ -310,9 +310,7 @@ class ReferenceOpenTelemetryTCKAdapter:
             )
         }
         root = ReferenceOpenTelemetryTCKAdapter._root_span(bridge, artifact.trace_id)
-        root_event_types = {
-            event.attributes.get("avp.event.type") for event in root.events
-        }
+        event_types = {event.attributes.get("avp.event.type") for event in root.events}
         passed = (
             spans["call_success"].attributes.get("avp.tool.outcome") == "success"
             and spans["call_success"].status.status_code is StatusCode.UNSET
@@ -322,12 +320,12 @@ class ReferenceOpenTelemetryTCKAdapter:
             and spans["call_upstream_error"].attributes.get("avp.tool.outcome")
             == "upstream_error"
             and spans["call_upstream_error"].status.status_code is StatusCode.ERROR
-            and "episode.invalid" in root_event_types
+            and "episode.invalid" in event_types
         )
-        return passed, (
-            "success, tool error, upstream error, and invalid evaluation stay distinct"
-            if passed
-            else "telemetry flattened materially different AVP outcomes"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "success, tool error, upstream error, and invalid evaluation stay distinct",
+            "telemetry flattened materially different AVP outcomes",
         )
 
     @staticmethod
@@ -347,36 +345,23 @@ class ReferenceOpenTelemetryTCKAdapter:
             and artifact.propagated_requests == 1
         )
 
-        from opentelemetry.propagate import (
-            get_global_textmap,
-            set_global_textmap,
+        malformed_bridge = OpenTelemetryBridge(propagator=_MalformedPropagator())
+        malformed_session = malformed_bridge.start_episode(
+            "ep_otel_malformed",
+            "sha256:" + "5" * 64,
         )
-
-        original = get_global_textmap()
         malformed_rejected = False
-        malformed_counted = True
-        malformed_session = None
         try:
-            set_global_textmap(_MalformedPropagator())
-            malformed_bridge = OpenTelemetryBridge()
-            malformed_session = malformed_bridge.start_episode(
-                "ep_otel_malformed",
-                "sha256:" + "5" * 64,
-            )
-            try:
-                malformed_session.inject_headers()
-            except RuntimeError:
-                malformed_rejected = True
-            malformed_artifact = malformed_session.finalize()
-            malformed_counted = malformed_artifact.propagated_requests != 0
-        finally:
-            set_global_textmap(original)
+            malformed_session.inject_headers()
+        except RuntimeError:
+            malformed_rejected = True
+        malformed = malformed_session.finalize()
 
-        passed = valid and malformed_rejected and not malformed_counted
-        return passed, (
-            "claimed W3C propagation is valid, Episode-bound, and fail-closed"
-            if passed
-            else "trace propagation claim was malformed, unbound, or falsely counted"
+        passed = valid and malformed_rejected and malformed.propagated_requests == 0
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "W3C propagation is Episode-bound and malformed carriers fail closed",
+            "propagation was malformed, unbound, or falsely counted",
         )
 
     @staticmethod
@@ -384,23 +369,23 @@ class ReferenceOpenTelemetryTCKAdapter:
         protected = [str(item) for item in vector.get("protectedValues", ())]
         bridge = OpenTelemetryBridge()
         session = bridge.start_episode("ep_otel_min", "sha256:" + "6" * 64)
-        payload = {
-            "correlation_id": "call_min",
-            "name": "order.get",
-            "protocol": "mcp",
-            "raw_prompt": protected[0] if protected else "raw",
-            "arguments": protected[1] if len(protected) > 1 else "raw",
-            "result": protected[2] if len(protected) > 2 else "raw",
-            "credential": protected[3] if len(protected) > 3 else "raw",
-            "oracle_material": protected[4] if len(protected) > 4 else "raw",
-            "fault_schedule": protected[5] if len(protected) > 5 else "raw",
-        }
+        values = protected + ["raw"] * max(0, 6 - len(protected))
         session.record_event(
             ReferenceOpenTelemetryTCKAdapter._event(
                 "ev_min",
                 "tool.call",
                 1,
-                payload,
+                {
+                    "correlation_id": "call_min",
+                    "name": "order.get",
+                    "protocol": "mcp",
+                    "raw_prompt": values[0],
+                    "arguments": values[1],
+                    "result": values[2],
+                    "credential": values[3],
+                    "oracle_material": values[4],
+                    "fault_schedule": values[5],
+                },
             )
         )
         session.record_event(
@@ -432,10 +417,10 @@ class ReferenceOpenTelemetryTCKAdapter:
             event.attributes.get("avp.event.id") == "ev_min" for event in root.events
         )
         passed = identity_present and all(item not in exported for item in protected)
-        return passed, (
-            "mandatory telemetry preserves verification identity without protected raw values"
-            if passed
-            else "protected content leaked or required verification identity disappeared"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "verification identity survives without protected raw values",
+            "protected content leaked or required identity disappeared",
         )
 
     @staticmethod
@@ -443,8 +428,7 @@ class ReferenceOpenTelemetryTCKAdapter:
         if vector.get("requiredTelemetry") is not True:
             return False, "portable completeness vector must require telemetry"
 
-        bridge = _DroppingOutcomeBridge()
-        runtime = ReferenceRuntime(bridge)
+        runtime = ReferenceRuntime(_DroppingOutcomeBridge())
         episode = runtime.create_episode(
             scenario=reference_scenario(),
             agent_system=reference_agent_system("otel-required-loss"),
@@ -463,17 +447,16 @@ class ReferenceOpenTelemetryTCKAdapter:
             and episode.state is EpisodeState.INVALID
             and episode.task_verdict is TaskVerdict.INCONCLUSIVE
         )
-        return passed, (
-            "trace existence cannot hide missing required mappings or preserve valid evaluation"
-            if passed
-            else "required missing telemetry was incorrectly represented as complete/valid"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "required mapping loss cannot hide behind trace existence",
+            "missing required telemetry was represented as complete/valid",
         )
 
     @staticmethod
     def _evidence_binding(vector: Mapping[str, Any]) -> tuple[bool, str]:
         del vector
-        bridge = OpenTelemetryBridge()
-        runtime = ReferenceRuntime(bridge)
+        runtime = ReferenceRuntime(OpenTelemetryBridge())
         episode = runtime.create_episode(
             scenario=reference_scenario(),
             agent_system=reference_agent_system("otel-evidence"),
@@ -495,10 +478,10 @@ class ReferenceOpenTelemetryTCKAdapter:
             and episode.task_verdict is TaskVerdict.FAIL
             and episode.state is EpisodeState.COMPLETED
         )
-        return passed, (
-            "telemetry is integrity-bound Evidence while Oracle/task verdict remains authoritative"
-            if passed
-            else "telemetry Evidence binding or verdict-authority separation failed"
+        return passed, ReferenceOpenTelemetryTCKAdapter._detail(
+            passed,
+            "telemetry is integrity-bound while task verdict remains authoritative",
+            "telemetry Evidence binding or verdict separation failed",
         )
 
     @staticmethod
@@ -567,3 +550,7 @@ class ReferenceOpenTelemetryTCKAdapter:
         if not isinstance(value, Mapping):
             raise TCKAdapterError(f"OpenTelemetry TCK {name} must be an object")
         return value
+
+    @staticmethod
+    def _detail(passed: bool, success: str, failure: str) -> str:
+        return success if passed else failure
