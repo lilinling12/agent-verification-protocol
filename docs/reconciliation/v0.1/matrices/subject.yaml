@@ -1,0 +1,85 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: subject
+  status: reconciliation-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-SUBJECT-001
+    decision: promote-identity-binding
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/runtime/engine.py
+      - src/avp_ref/runtime/manifest.py
+    notes: Adapter description identity is verification-relevant; Python dataclass shape is non-normative.
+  - requirement: AVP-SUBJECT-002
+    decision: promote-handle-ownership
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/http.py
+    notes: Handle binds one Agent System and owner context; handle format remains implementation-specific.
+  - requirement: AVP-SUBJECT-003
+    decision: compose-with-scenario-and-security
+    implementationEvidence:
+      - src/avp_ref/runtime/engine.py
+      - spec/scenario/scenario-contract.md
+      - spec/security/security-boundary-contract.md
+    notes: Subject input is derived from Subject projection; hidden evaluator material remains forbidden.
+  - requirement: AVP-SUBJECT-004
+    decision: promote-budget-upper-bounds
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+    notes: max_steps and timeout are evaluator-owned ceilings; exact scheduling mechanics are non-normative.
+  - requirement: AVP-SUBJECT-005
+    decision: promote-controlled-runtime-gateway
+    implementationEvidence:
+      - src/avp_ref/subject/adapter.py
+      - src/avp_ref/runtime/engine.py
+      - src/avp_ref/runtime/subject_policy.py
+    notes: Gateway exposes controlled capabilities only; Environment/MCP/Security/OpenTelemetry retain domain authority.
+  - requirement: AVP-SUBJECT-006
+    decision: promote-failure-separation
+    implementationEvidence:
+      - src/avp_ref/subject/errors.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+    notes: Completion, execution failure, transport/protocol/timeout/budget failures remain distinguishable and infrastructure failure is not task failure.
+  - requirement: AVP-SUBJECT-007
+    decision: promote-fail-closed-result-validation
+    implementationEvidence:
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+    notes: Invalid terminal states fail closed; concrete HTTP frame schema remains non-normative.
+  - requirement: AVP-SUBJECT-008
+    decision: promote-stale-handle-fail-closed
+    implementationEvidence:
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/http.py
+    notes: Released or substituted handles cannot be reused; identifier format remains implementation-specific.
+  - requirement: AVP-SUBJECT-009
+    decision: promote-assurance-honesty
+    implementationEvidence:
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/models.py
+      - spec/security/security-boundary-contract.md
+    notes: In-process reference transport declares no isolation; stronger claims require SecurityAssurance evidence.
+nonNormativeImplementationDetails:
+  - Python Protocol/dataclass/enum/exception shapes
+  - Python callable Subject
+  - synchronous HTTP loop
+  - /v1/avp/invoke
+  - X-AVP-Subject-Version
+  - tool_call/completed/failed HTTP frames
+  - urllib transport
+  - handle UUID format
+  - exact trace header plumbing
+nextGates:
+  - portable Subject Adapter TCK vectors
+  - requirement index bound only to registered TCK cases
+  - reference Subject TCK adapter
+  - lifecycle, hidden-material, budget, failure-separation, stale-handle and assurance-honesty hardening
+  - full profile conformance
+  - acceptance audit
