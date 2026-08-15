@@ -1,6 +1,6 @@
 # Alpha 2 v0.3.0-rc.1 Preparation Record
 
-Status: **IN PROGRESS — NOT AUTHORIZED FOR TAG OR RELEASE**
+Status: **READY FOR REVIEW — NOT AUTHORIZED FOR MERGE, TAG, OR RELEASE**
 
 ## 1. Candidate identity
 
@@ -12,7 +12,7 @@ Status: **IN PROGRESS — NOT AUTHORIZED FOR TAG OR RELEASE**
 
 The release branch was created directly from the integrated `main` baseline after PR #33 was squash-merged. Post-merge main CI #363 completed successfully before RC preparation began.
 
-This record authorizes no tag, GitHub Release, package publication, AEP `Final` transition, or Alpha 3 work.
+This record authorizes no merge, tag, GitHub Release, package publication, AEP `Final` transition, or Alpha 3 work.
 
 ## 2. Preconditions already satisfied
 
@@ -111,9 +111,30 @@ Before this preparation PR may be considered ready for merge, all of the followi
 13. There are zero unresolved review threads.
 14. No new release-blocking issue has appeared.
 
-The RC preparation PR remains Draft while these gates are being established. Squash merge requires separate explicit maintainer authorization.
+Squash merge requires separate explicit maintainer authorization even after all gates are green.
 
-## 7. Post-merge release-commit rule
+## 7. Pre-readiness validation evidence
+
+The implementation-complete candidate at `90dc28d8eec73bcc724d8d891420b68752d9978b` passed the full preparation gate before this readiness status was recorded:
+
+- CI #373: **success**;
+- Governance #401: **success**;
+- Quality / Python 3.11: **success**;
+- Quality / Python 3.12: **success**;
+- Quality / Python 3.13: **success**;
+- Package / Python 3.13: **success**;
+- source/wheel build and release metadata validation: **success**;
+- base wheel clean unconstrained consumer install and `pip check`: **success**;
+- base installed-wheel identity and reference smoke: **success**;
+- separate wheel `[conformance]` install and `pip check`: **success**;
+- installed-wheel full TCK conformance across all 10 registered profiles: **success**;
+- comparison with `main@e534de7ae2c763ac66062bb8ff8e6920b4f2cd75`: `behind_by=0`;
+- unresolved PR #34 review threads: `0`;
+- open issue review: only #23 (`chore(repo): delete superseded Alpha branches`), classified as repository hygiene and non-release-blocking.
+
+This document update changes the tracked candidate HEAD, so the evidence above is not used as a substitute for final exact-head validation. The new final document-state HEAD must pass the same CI/Governance, drift, thread, and issue gates before PR #34 is promoted from Draft to Ready for review.
+
+## 8. Post-merge release-commit rule
 
 Even a successful merge of the RC preparation PR does not create a release.
 
@@ -130,11 +151,11 @@ After that merge, the selected release candidate commit must be the resulting ex
 
 Artifact digests are intentionally not invented during this branch-preparation step because the authoritative release artifacts must be built from the selected post-merge `main` release commit.
 
-## 8. Governance boundary
+## 9. Governance boundary
 
-This preparation record does **not** authorize:
+`READY FOR REVIEW` means the RC preparation change set is eligible for maintainer merge review. It does **not** authorize:
 
-- merging the RC preparation PR;
+- merging PR #34;
 - creating `v0.3.0-rc.1`;
 - creating a GitHub Release;
 - publishing `avp-reference` to a package index;
