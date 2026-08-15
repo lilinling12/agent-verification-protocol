@@ -63,8 +63,30 @@ jobs:
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct HEAD)" >> "${GITHUB_ENV}"
       - name: Build source and wheel distributions
         run: python -m build
+      - name: Canonicalize source distribution gzip metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if (( ${#sdists[@]} != 1 )); then
+            echo "expected exactly one source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/normalize_sdist.py "${sdists[0]}" --mtime "${SOURCE_DATE_EPOCH}"
       - name: Rebuild distributions for reproducibility
         run: python -m build --outdir dist-repro
+      - name: Canonicalize rebuilt source distribution gzip metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sdists=(dist-repro/*.tar.gz)
+          if (( ${#sdists[@]} != 1 )); then
+            echo "expected exactly one rebuilt source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/normalize_sdist.py "${sdists[0]}" --mtime "${SOURCE_DATE_EPOCH}"
       - name: Verify reproducible distribution bytes
         shell: bash
         run: |
