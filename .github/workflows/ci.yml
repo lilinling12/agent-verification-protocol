@@ -62,10 +62,17 @@ jobs:
         run: python -m build
       - name: Validate built-wheel metadata
         run: python scripts/validate_release_metadata.py --wheel dist/*.whl
-      - name: Install wheel in an unconstrained clean environment
+      - name: Install wheel with conformance extras in an unconstrained clean environment
+        shell: bash
         run: |
+          set -euo pipefail
+          wheels=(dist/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
           python -m venv .wheel-venv
-          .wheel-venv/bin/python -m pip install dist/*.whl
+          .wheel-venv/bin/python -m pip install "${wheels[0]}[conformance]"
           .wheel-venv/bin/python -m pip check
       - name: Verify installed-wheel identity
         run: |
