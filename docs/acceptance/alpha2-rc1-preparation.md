@@ -60,7 +60,7 @@ A disagreement is a release-blocking validation failure; it must not be papered 
 
 The pre-RC Package job already performed clean wheel build/install and identity validation, but its portable TCK execution was only a four-case smoke subset. In addition, `avp conformance` is explicitly a legacy Python reference smoke suite.
 
-RC preparation strengthens the Package gate so the clean-installed wheel executable runs every profile discovered under `conformance/tck/profiles/*.yaml`.
+RC preparation strengthens the Package gate so a wheel-backed conformance environment runs every profile discovered under `conformance/tck/profiles/*.yaml`.
 
 This distinction is important:
 
@@ -71,9 +71,18 @@ This distinction is important:
 
 The profile loop fails closed if no profiles are discovered or if any selected profile is non-conformant.
 
+### Evidence-driven hardening during preparation
+
 The first full-profile run, CI #364, correctly exposed a packaging-boundary gap instead of being weakened: Artifact Trust, Core, Environment, Evidence, MCP, and Oracle profiles passed from the clean-installed wheel, but the OpenTelemetry profile could not register its reference adapter because the clean environment contained only mandatory package dependencies. The failure was an implementation-adapter availability failure, not a normative TCK failure.
 
-The remediation keeps OpenTelemetry optional for ordinary package consumers and adds an explicit non-normative `conformance` extra to `avp-reference`. The clean release-validation environment installs the built wheel as `wheel[conformance]`; this supplies reference-validation dependencies such as the OpenTelemetry SDK without making those dependencies mandatory runtime requirements or AVP protocol requirements. Full-profile TCK execution remains mandatory for the RC gate.
+The first remediation added an explicit non-normative `conformance` extra and installed the built wheel with that extra. CI #369 then proved that the Package job, including all ten profiles, passed, but the repository dependency policy rejected replacing the required base-wheel consumer installation with an extras-enabled installation. That rejection was correct: release evidence must separately prove that an ordinary consumer can install the base wheel without release-validation extras.
+
+The final validation design therefore uses two independent fresh environments from the same built wheel:
+
+1. `.wheel-venv` installs `dist/*.whl` with no extras and no repository constraints, runs `pip check`, verifies package/runtime identity, and executes the legacy reference smoke suite.
+2. `.conformance-venv` installs the same wheel with `[conformance]`, runs `pip check`, and executes all registered TCK profiles.
+
+The `conformance` extra supplies reference-validation dependencies such as the OpenTelemetry SDK without making them mandatory runtime dependencies or AVP protocol requirements. This preserves both the minimal consumer contract and the complete reference conformance gate.
 
 ## 5. Changelog and release notes policy
 
@@ -92,14 +101,15 @@ Before this preparation PR may be considered ready for merge, all of the followi
 3. Quality / Python 3.13 succeeds.
 4. Package / Python 3.13 succeeds.
 5. Built source and wheel distributions pass release metadata validation.
-6. The built wheel with its declared `conformance` extra installs in a fresh unconstrained environment and `pip check` succeeds.
-7. Installed-wheel distribution/runtime identity matches `0.3.0rc1`.
-8. Installed-wheel reference smoke succeeds.
-9. Installed-wheel full-profile TCK conformance succeeds for all registered profiles.
-10. Governance succeeds on the exact PR HEAD and current PR metadata.
-11. `main` has not drifted from the reviewed base, or the release branch is explicitly reconciled and fully revalidated.
-12. There are zero unresolved review threads.
-13. No new release-blocking issue has appeared.
+6. The base wheel installs without extras in a fresh unconstrained consumer environment and `pip check` succeeds.
+7. Base installed-wheel distribution/runtime identity matches `0.3.0rc1`.
+8. Base installed-wheel reference smoke succeeds.
+9. The same built wheel with its declared `conformance` extra installs in a separate fresh unconstrained conformance environment and `pip check` succeeds.
+10. Full-profile TCK conformance succeeds for all registered profiles from that wheel-backed conformance environment.
+11. Governance succeeds on the exact PR HEAD and current PR metadata.
+12. `main` has not drifted from the reviewed base, or the release branch is explicitly reconciled and fully revalidated.
+13. There are zero unresolved review threads.
+14. No new release-blocking issue has appeared.
 
 The RC preparation PR remains Draft while these gates are being established. Squash merge requires separate explicit maintainer authorization.
 
@@ -111,7 +121,7 @@ After that merge, the selected release candidate commit must be the resulting ex
 
 1. re-run/verify exact-main CI and release gates;
 2. build source and wheel artifacts from that exact commit in a clean environment;
-3. verify full installed-wheel conformance using the declared conformance dependencies;
+3. verify both base-consumer installation and full wheel-backed conformance;
 4. compute and record reproducible artifact SHA-256 digests from the exact release artifacts;
 5. verify tag name, package version, candidate notes, changelog state, AEP references, security review, issues, and repository drift;
 6. obtain explicit maintainer authorization for the tag / GitHub Release / any package publication;
