@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:artifact-attestation:0.1",
+  "title": "AVP Artifact Attestation",
+  "description": "Reference to immutable attestation bytes evaluated against one AVP Artifact content identity.",
+  "type": "object",
+  "required": ["artifactDigest", "attestation", "bindingProfile"],
+  "properties": {
+    "artifactDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "attestation": {
+      "$ref": "artifact-ref.schema.json"
+    },
+    "bindingProfile": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$"
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

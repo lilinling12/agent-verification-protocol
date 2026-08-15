@@ -1,0 +1,26 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-TRUST-POLICY-001
+  domain: trust
+  status: draft
+profile: avp-artifact-trust-v0.1
+requirements: [AVP-TRUST-004, AVP-TRUST-005]
+applicability: mandatory
+type: negative
+vector:
+  policy:
+    policyId: release-policy
+    allowedSignerIdentities: [identity:trusted-builder]
+  observations:
+    - authenticated: true
+      signerIdentity: identity:trusted-builder
+      signerHint: key-untrusted-label
+      expectedOutcome: accepted
+    - authenticated: true
+      signerIdentity: identity:untrusted-builder
+      signerHint: identity:trusted-builder
+      expectedOutcome: identity-rejected
+expect:
+  validAuthenticationAloneDoesNotAccept: true
+  signerHintCannotOverrideAuthenticatedIdentity: true

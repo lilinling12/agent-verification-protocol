@@ -320,3 +320,44 @@ cases:
     profile: avp-subject-v0.1
     requirements: [AVP-SUBJECT-009]
     applicability: mandatory
+  - id: AVP-TCK-TRUST-IDENTITY-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-IDENTITY-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-001]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-SUBJECT-BINDING-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-SUBJECT-BINDING-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-002]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-AUTHENTICATION-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-AUTHENTICATION-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-003]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-POLICY-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-POLICY-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-004, AVP-TRUST-005]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-FAIL-CLOSED-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-FAIL-CLOSED-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-006]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-OUTCOME-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-OUTCOME-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-007]
+    applicability: mandatory
+  - id: AVP-TCK-TRUST-PUBLICATION-AUTHORITY-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-PUBLICATION-AUTHORITY-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-008]
+    applicability: conditional
+    when: artifact-attestation-publication
+  - id: AVP-TCK-TRUST-CLAIM-HONESTY-001
+    path: conformance/tck/cases/trust/AVP-TCK-TRUST-CLAIM-HONESTY-001.yaml
+    profile: avp-artifact-trust-v0.1
+    requirements: [AVP-TRUST-009]
+    applicability: mandatory

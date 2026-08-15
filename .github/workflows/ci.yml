@@ -86,3 +86,8 @@ jobs:
             --repository-root . \
             --case AVP-TCK-LIFECYCLE-NORMAL-001 \
             --case AVP-TCK-LIFECYCLE-PAUSE-001
+          .wheel-venv/bin/avp tck run \
+            --repository-root . \
+            --profile avp-artifact-trust-v0.1 \
+            --case AVP-TCK-TRUST-AUTHENTICATION-001 \
+            --case AVP-TCK-TRUST-FAIL-CLOSED-001

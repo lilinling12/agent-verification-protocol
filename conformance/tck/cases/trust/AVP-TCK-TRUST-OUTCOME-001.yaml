@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-TRUST-OUTCOME-001
+  domain: trust
+  status: draft
+profile: avp-artifact-trust-v0.1
+requirements: [AVP-TRUST-007]
+applicability: mandatory
+type: semantic
+vector:
+  requiredOutcomes:
+    - accepted
+    - integrity-failed
+    - malformed
+    - unsupported
+    - authentication-failed
+    - subject-mismatch
+    - identity-rejected
+    - policy-rejected
+expect:
+  outcomesAreMachineDistinct: true
+  acceptedRequiresSignerIdentity: true
+  failureDiagnosticsCannotChangeTerminalOutcome: true
