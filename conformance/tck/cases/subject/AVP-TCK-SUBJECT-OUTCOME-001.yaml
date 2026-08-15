@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-OUTCOME-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-006]
+applicability: mandatory
+type: mixed
+vector:
+  outcomes:
+    - completed
+    - execution_failure
+    - transport_failure
+    - protocol_failure
+    - timeout
+    - budget_exceeded
+expect:
+  successfulCompletionDistinct: true
+  executionFailureDistinctFromInfrastructure: true
+  infrastructureFailuresNotTaskFailures: true
+  subjectReportNotAuthoritativeTaskVerdict: true

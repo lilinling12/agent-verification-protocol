@@ -285,3 +285,38 @@ cases:
     profile: avp-otel-mapping-v0.1
     requirements: [AVP-OTEL-008]
     applicability: mandatory
+  - id: AVP-TCK-SUBJECT-LIFECYCLE-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-LIFECYCLE-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-001, AVP-SUBJECT-002, AVP-SUBJECT-008]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-PROJECTION-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-PROJECTION-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-003]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-BUDGET-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-BUDGET-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-004]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-CAPABILITY-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-CAPABILITY-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-005]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-OUTCOME-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-OUTCOME-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-006]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-RESULT-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-RESULT-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-007]
+    applicability: mandatory
+  - id: AVP-TCK-SUBJECT-ASSURANCE-001
+    path: conformance/tck/cases/subject/AVP-TCK-SUBJECT-ASSURANCE-001.yaml
+    profile: avp-subject-v0.1
+    requirements: [AVP-SUBJECT-009]
+    applicability: mandatory

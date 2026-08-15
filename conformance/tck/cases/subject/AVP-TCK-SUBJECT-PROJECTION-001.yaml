@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-PROJECTION-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-003]
+applicability: mandatory
+type: negative
+vector:
+  subjectVisibleTask: true
+  protectedMaterial:
+    - evaluator-secret
+    - hidden-oracle-material
+    - future-fault-schedule
+    - hidden-reference-answer
+expect:
+  subjectTaskDerivedFromSubjectProjection: true
+  protectedMaterialNotExposed: true
+  evaluatorOnlyMaterialNotRequiredForExecution: true

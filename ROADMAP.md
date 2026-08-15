@@ -19,8 +19,8 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] Scenario / ScenarioInstance contract and `avp-scenario-v0.1` TCK
 - [x] Environment contract reconciliation and `avp-environment-v0.1` conformance profile
 - [x] MCP verification interoperability profile and `avp-mcp-interop-v0.1` TCK
-- [ ] OpenTelemetry mapping interoperability profile
-- [ ] Subject Adapter interoperability contract
+- [x] OpenTelemetry mapping interoperability profile and `avp-otel-mapping-v0.1` TCK
+- [x] Subject Adapter interoperability contract and `avp-subject-v0.1` TCK
 - [ ] artifact trust / signature / attestation decision
 - [ ] Alpha 2 acceptance audit and release-candidate readiness review
 
@@ -42,20 +42,3 @@ Reference implementation availability above is evidence for reconciliation, not 
 - [ ] virtual clock service
 - [ ] container runtime
 - [ ] microVM experiment
-
-## Alpha 4 — Reliability Intelligence
-- [ ] paired A/B experiment planner
-- [ ] Wilson/bootstrap intervals
-- [ ] failure clustering
-- [ ] counterfactual replay runner
-- [ ] regression synthesis
-- [ ] release gate
-
-## Alpha 5 — Ecosystem
-- [ ] Python SDK stabilization
-- [ ] Java SDK
-- [ ] TypeScript SDK
-- [ ] Go SDK
-- [ ] CUBE adapter
-- [ ] public package registry prototype
-- [ ] second independent AVP-Core implementation

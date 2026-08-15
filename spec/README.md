@@ -15,7 +15,8 @@ When semantics conflict, resolution order is: `spec/` -> `schemas/` -> `conforma
 - `oracle/` — Oracle execution/evaluation separation, failure validity, result binding, and audit semantics;
 - `security/` — Subject/Evaluator trust boundary and machine-readable assurance semantics;
 - `mcp/` — AVP verification mappings around MCP tool execution while MCP remains the external protocol authority;
-- `opentelemetry/` — AVP verification-correlation, outcome, completeness, minimization, and Evidence mappings when OpenTelemetry-compatible telemetry is used.
+- `opentelemetry/` — AVP verification-correlation, outcome, completeness, minimization, and Evidence mappings when OpenTelemetry-compatible telemetry is used;
+- `subject/` — Subject Adapter identity, Agent System binding, invocation budgets, controlled capability gateway, outcome separation, stale-handle behavior, and transport/isolation claim honesty.
 
 Normative-candidate status is tracked by each domain's requirement index and reconciliation assets; presence under `spec/` does not by itself imply an accepted stable standard.
 

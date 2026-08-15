@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-subject-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-SUBJECT-001
+    - AVP-SUBJECT-002
+    - AVP-SUBJECT-003
+    - AVP-SUBJECT-004
+    - AVP-SUBJECT-005
+    - AVP-SUBJECT-006
+    - AVP-SUBJECT-007
+    - AVP-SUBJECT-008
+    - AVP-SUBJECT-009
+  conditional: []

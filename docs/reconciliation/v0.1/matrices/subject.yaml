@@ -1,0 +1,113 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: subject
+  status: promoted-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-SUBJECT-001
+    decision: promote-identity-binding
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+      - src/avp_ref/runtime/manifest.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-LIFECYCLE-001.yaml
+    notes: Adapter identity is verification-relevant; HTTP target and caller-supplied opaque configuration digests bind execution-relevant transport configuration without publishing credentials.
+  - requirement: AVP-SUBJECT-002
+    decision: promote-handle-ownership
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/http.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-LIFECYCLE-001.yaml
+    notes: Handle validation binds Agent System digest plus adapter owner identity; forged owner/Agent metadata and released handles fail closed.
+  - requirement: AVP-SUBJECT-003
+    decision: compose-with-scenario-and-security
+    implementationEvidence:
+      - src/avp_ref/runtime/agent.py
+      - src/avp_ref/runtime/engine.py
+      - src/avp_ref/subject/http.py
+      - spec/scenario/scenario-contract.md
+      - spec/security/security-boundary-contract.md
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-PROJECTION-001.yaml
+    notes: Subject task derives from Scenario Subject projection; arbitrary evaluator-side AgentSystem metadata is removed from remote Subject payloads while stable Agent identity remains available.
+  - requirement: AVP-SUBJECT-004
+    decision: promote-budget-upper-bounds
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-BUDGET-001.yaml
+    notes: Evaluator max_steps/timeout remain ceilings; scripted execution proves a completion beyond the step ceiling is rejected as budget exhaustion rather than accepted.
+  - requirement: AVP-SUBJECT-005
+    decision: promote-controlled-runtime-gateway
+    implementationEvidence:
+      - src/avp_ref/subject/adapter.py
+      - src/avp_ref/runtime/engine.py
+      - src/avp_ref/runtime/subject_policy.py
+      - src/avp_ref/security/subject_adapter.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-CAPABILITY-001.yaml
+    notes: Adapter-exposed capabilities are Runtime/Security mediated and unauthorized gateway capability use fails closed. This is an API-boundary guarantee and does not imply same-process ambient-resource containment.
+  - requirement: AVP-SUBJECT-006
+    decision: promote-failure-separation
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/errors.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-OUTCOME-001.yaml
+    notes: SubjectResult represents successful completion only; explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion use typed failure channels and remain distinguishable from task verdict semantics.
+  - requirement: AVP-SUBJECT-007
+    decision: promote-fail-closed-result-validation
+    implementationEvidence:
+      - src/avp_ref/subject/models.py
+      - src/avp_ref/subject/http.py
+      - src/avp_ref/runtime/engine.py
+      - tests/test_subject_models.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-RESULT-001.yaml
+    notes: SubjectResult rejects non-completion states and malformed reports at the model boundary; malformed, contradictory, or unsupported transport terminals also fail closed while concrete HTTP frame syntax remains non-normative.
+  - requirement: AVP-SUBJECT-008
+    decision: promote-stale-handle-fail-closed
+    implementationEvidence:
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/http.py
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-LIFECYCLE-001.yaml
+    notes: Released, foreign-owner, Agent-mismatched, or substituted handles cannot be reused; handle identifier format remains implementation-specific.
+  - requirement: AVP-SUBJECT-009
+    decision: promote-assurance-honesty
+    implementationEvidence:
+      - src/avp_ref/subject/in_process.py
+      - src/avp_ref/subject/models.py
+      - spec/security/security-boundary-contract.md
+      - conformance/tck/cases/subject/AVP-TCK-SUBJECT-ASSURANCE-001.yaml
+    notes: In-process reference transport explicitly declares isolation none; stronger process/network/tenant/container/VM claims remain SecurityAssurance-governed.
+nonNormativeImplementationDetails:
+  - Python Protocol/dataclass/enum/exception shapes
+  - Python callable Subject
+  - synchronous HTTP loop
+  - /v1/avp/invoke
+  - X-AVP-Subject-Version
+  - tool_call/completed/failed HTTP frames
+  - urllib transport
+  - handle UUID format
+  - exact trace header plumbing
+acceptanceAudit:
+  status: passed
+  evidence:
+    - avp-subject-v0.1 has 7 mandatory portable TCK cases covering all 9 indexed requirements
+    - reference implementation passes the full Subject profile with 7/7 PASS and zero failures or skips
+    - Subject Adapter description identity binds the concrete HTTP target and opaque execution configuration identity without publishing secret-bearing headers or URL credentials
+    - Subject handles validate Agent System identity and adapter owner fields; forged and released handles fail closed
+    - remote Subject payloads use Scenario Subject task projection and sanitized Agent identity, excluding arbitrary evaluator AgentSystem metadata
+    - evaluator-owned step budgets reject late completion rather than being enlarged or silently ignored
+    - unauthorized adapter-API tool capability use is denied before downstream routing without claiming process sandbox containment
+    - SubjectResult is completion-only; explicit Subject execution failure, transport, protocol, timeout, and budget exhaustion remain typed and distinguishable from successful completion
+    - malformed reports, contradictory/unsupported transport terminals, and attempted non-completion result construction fail closed
+    - in-process reference adapter truthfully claims isolation none and does not imply stronger SecurityAssurance
+    - final candidate Quality runs on Python 3.11/3.12/3.13 and Package clean-wheel validation passed before promotion
+remainingGates:
+  - final-head CI and Governance after completion-only result hardening
+  - unresolved review-thread check
+  - main drift check
+  - explicit user authorization before merge

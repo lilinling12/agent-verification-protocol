@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-SUBJECT-RESULT-001
+  domain: subject
+  status: draft
+profile: avp-subject-v0.1
+requirements: [AVP-SUBJECT-007]
+applicability: mandatory
+type: negative
+vector:
+  invalidResults:
+    - malformed_terminal_result
+    - contradictory_terminal_state
+    - unsupported_terminal_state
+    - foreign_execution_result
+expect:
+  invalidResultRejectedFailClosed: true
+  invalidResultNeverAcceptedAsCompletion: true
+  transportSpecificFrameNamesNotRequired: true
