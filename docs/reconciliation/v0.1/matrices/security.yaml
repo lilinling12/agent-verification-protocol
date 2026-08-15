@@ -60,7 +60,30 @@ decision_records:
   - docs/reconciliation/v0.1/decisions/security-boundary-001.md
   - rfcs/AEP-0002-security-boundary-contract.md
 
+acceptanceAudit:
+  status: passed
+  evidence:
+    - avp-security-v0.1 makes all six indexed Security requirements mandatory and has no conditional escape hatch
+    - the reference Security TCK exercises capability-plane separation, deny-before-side-effect behavior, evaluator credential-context separation, hidden-material secrecy, future-fault secrecy, and assurance honesty
+    - the reference runtime preserves deny-by-default Subject capability mediation and does not fall back to privileged evaluator/control routes when access is undeclared
+    - evaluator credentials, signing authority, hidden Oracle material, answer material, and future fault schedules remain outside the managed Subject-visible contract
+    - SecurityAssurance keeps apiCapability and credentialContext distinct from process, network, tenant, and sandbox claims so weaker evidence cannot inflate stronger isolation claims
+    - same-process/in-process reference behavior is not treated as proof of adversarial process or operating-system containment
+    - the Alpha 2 cross-profile Security Composition Review found no release-blocking authority or security contradiction across Scenario, Environment, Subject Adapter, MCP, OpenTelemetry, Evidence, Oracle, Core lifecycle, and Artifact Trust
+    - current stacked quality/package gates validate the registered Security profile together with repository schema, traceability, registry, clean-wheel, and installed-wheel checks
+  nonClaims:
+    - baseline Security conformance is not proof of hardened process isolation
+    - baseline Security conformance is not proof of network, tenant, container, VM, or sandbox isolation
+    - AVP does not standardize one secret manager, identity protocol, network policy, container runtime, or microVM mechanism
+
+remainingGates:
+  - explicit maintainer decision before AEP-0002 moves from Proposed to Accepted
+  - integrated-main CI and Governance before release-candidate readiness
+  - AEP-0002 must not become Final until normative text and required conformance coverage are merged and released
+
 note: >-
-  This matrix is a promoted draft, not an accepted security claim. The reference
-  implementation must pass the registered Security TCK and an acceptance audit
-  before AEP-0002 or this matrix can move to Accepted.
+  The Security v0.1 reconciliation is technically complete for Alpha 2 and the
+  acceptance audit has passed. The matrix remains promoted-draft because AEP
+  lifecycle promotion is a governance decision. Accepted means approved protocol
+  direction; Final remains reserved for normative text/conformance that has been
+  merged and released.
