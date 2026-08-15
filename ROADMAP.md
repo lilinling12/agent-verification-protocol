@@ -22,7 +22,7 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] OpenTelemetry mapping interoperability profile and `avp-otel-mapping-v0.1` TCK
 - [x] Subject Adapter interoperability contract and `avp-subject-v0.1` TCK
 - [x] artifact trust / signature / attestation decision
-- [ ] Alpha 2 acceptance audit and release-candidate readiness review
+- [x] Alpha 2 acceptance audit and release-candidate readiness review
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
