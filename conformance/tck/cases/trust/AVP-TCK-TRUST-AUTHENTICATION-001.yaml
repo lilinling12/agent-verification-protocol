@@ -1,0 +1,19 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-TRUST-AUTHENTICATION-001
+  domain: trust
+  status: draft
+profile: avp-artifact-trust-v0.1
+requirements: [AVP-TRUST-003]
+applicability: mandatory
+type: negative
+vector:
+  bindingScenario: implementation-native-authenticated-envelope
+  mutations:
+    - payload-bytes
+    - authenticated-type
+expect:
+  unmodifiedAuthenticationAcceptedForPolicyEvaluation: true
+  eachMutationOutcome: authentication-failed
+  unauthenticatedParallelCopyIgnored: true

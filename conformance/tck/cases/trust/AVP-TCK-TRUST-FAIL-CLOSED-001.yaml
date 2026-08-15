@@ -1,0 +1,32 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-TRUST-FAIL-CLOSED-001
+  domain: trust
+  status: draft
+profile: avp-artifact-trust-v0.1
+requirements: [AVP-TRUST-006]
+applicability: mandatory
+type: negative
+vector:
+  failures:
+    - condition: attestation-integrity-failure
+      expectedOutcome: integrity-failed
+    - condition: malformed-attestation
+      expectedOutcome: malformed
+    - condition: unsupported-binding
+      expectedOutcome: unsupported
+    - condition: authentication-failure
+      expectedOutcome: authentication-failed
+    - condition: subject-mismatch
+      expectedOutcome: subject-mismatch
+    - condition: missing-authenticated-identity
+      expectedOutcome: identity-rejected
+    - condition: unauthorized-identity
+      expectedOutcome: identity-rejected
+    - condition: required-policy-condition-fails
+      expectedOutcome: policy-rejected
+expect:
+  noFailureCanProduceAccepted: true
+  integrityFailureStopsBeforeAuthentication: true
+  failuresRemainTerminal: true

@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-artifact-trust-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-TRUST-001
+    - AVP-TRUST-002
+    - AVP-TRUST-003
+    - AVP-TRUST-004
+    - AVP-TRUST-005
+    - AVP-TRUST-006
+    - AVP-TRUST-007
+    - AVP-TRUST-009
+  conditional:
+    - id: AVP-TRUST-008
+      when: artifact-attestation-publication

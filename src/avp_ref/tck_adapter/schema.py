@@ -68,8 +68,13 @@ def validate_report(
 
     if report["tck"]["version"] != repository.version:
         raise TCKAdapterError("ConformanceReport TCK version does not match registry")
-    if report["tck"]["registryDigest"] != repository.registry_digest:
-        raise TCKAdapterError("ConformanceReport registry digest does not match loaded registry")
+    actual_registry_digest = report["tck"]["registryDigest"]
+    expected_registry_digest = repository.registry_digest
+    if actual_registry_digest != expected_registry_digest:
+        raise TCKAdapterError(
+            "ConformanceReport registry digest does not match loaded registry: "
+            f"expected {expected_registry_digest}, got {actual_registry_digest}"
+        )
 
     implementation = report["implementation"]
     expected_identity = digest(

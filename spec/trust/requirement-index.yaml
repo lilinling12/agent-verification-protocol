@@ -1,0 +1,75 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-artifact-trust-v0.1
+requirements:
+  - id: AVP-TRUST-001
+    level: MUST_NOT
+    area: trust.artifact.identity
+    statement: Attestation and trust metadata MUST NOT redefine target Artifact content identity or mutate published bytes.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-001
+    schema: schemas/artifact-attestation.schema.json
+    conformance: [AVP-TCK-TRUST-IDENTITY-001]
+  - id: AVP-TRUST-002
+    level: MUST
+    area: trust.subject.binding
+    statement: Accepted trust MUST be bound from authenticated attestation content to the exact requested Artifact digest.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-002
+    schema: schemas/artifact-trust-result.schema.json
+    conformance: [AVP-TCK-TRUST-SUBJECT-BINDING-001]
+  - id: AVP-TRUST-003
+    level: MUST
+    area: trust.attestation.authentication
+    statement: The selected binding MUST authenticate payload bytes and authenticated type and fail closed on tampering.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-003
+    conformance: [AVP-TCK-TRUST-AUTHENTICATION-001]
+  - id: AVP-TRUST-004
+    level: MUST_NOT
+    area: trust.policy.acceptance
+    statement: Cryptographic authentication alone MUST NOT be reported as trust-policy acceptance.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-004
+    schema: schemas/artifact-trust-policy.schema.json
+    conformance: [AVP-TCK-TRUST-POLICY-001]
+  - id: AVP-TRUST-005
+    level: MUST_NOT
+    area: trust.identity.hints
+    statement: Unauthenticated signer hints MUST NOT establish signer identity or policy authorization.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-005
+    schema: schemas/artifact-trust-result.schema.json
+    conformance: [AVP-TCK-TRUST-POLICY-001]
+  - id: AVP-TRUST-006
+    level: MUST_NOT
+    area: trust.fail-closed
+    statement: Required trust evaluation MUST NOT accept integrity-failed, malformed, unsupported, unauthenticated, mismatched, unidentified, unauthorized, or policy-rejected material.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-006
+    schema: schemas/artifact-trust-result.schema.json
+    conformance: [AVP-TCK-TRUST-FAIL-CLOSED-001]
+  - id: AVP-TRUST-007
+    level: MUST
+    area: trust.outcome
+    statement: Trust verification MUST preserve the portable terminal outcome taxonomy including attestation integrity failure.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-007
+    schema: schemas/artifact-trust-result.schema.json
+    conformance: [AVP-TCK-TRUST-OUTCOME-001]
+  - id: AVP-TRUST-008
+    level: MUST_NOT
+    condition: artifact-attestation-publication
+    area: trust.publication.authority
+    statement: AVP-controlled publication MUST NOT expose signing authority through Subject execution context or undeclared Subject capabilities.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-008
+    conformance: [AVP-TCK-TRUST-PUBLICATION-AUTHORITY-001]
+  - id: AVP-TRUST-009
+    level: MUST_NOT
+    area: trust.assurance.honesty
+    statement: Trust results MUST NOT claim properties that the selected binding/policy did not actually verify.
+    spec: spec/trust/artifact-trust-attestation-contract.md
+    anchor: avp-trust-009
+    schema: schemas/artifact-trust-result.schema.json
+    conformance: [AVP-TCK-TRUST-CLAIM-HONESTY-001]

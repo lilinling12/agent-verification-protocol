@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-TRUST-CLAIM-HONESTY-001
+  domain: trust
+  status: draft
+profile: avp-artifact-trust-v0.1
+requirements: [AVP-TRUST-009]
+applicability: mandatory
+type: negative
+vector:
+  actuallyVerifiedProperties:
+    - attestation.authentication
+    - artifact.subject-binding
+    - signer.identity
+    - policy.acceptance
+  unsupportedClaims:
+    - transparency.inclusion
+    - certificate.revocation
+    - timestamp.trusted
+    - slsa.level
+expect:
+  unsupportedClaimsNotReportedVerified: true
+  acceptedOutcomeDoesNotImplyUnsupportedProperties: true

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:artifact-trust-result:0.1",
+  "title": "AVP Artifact Trust Result",
+  "description": "Terminal result of evaluating authenticated attestation material for one AVP Artifact under one trust policy.",
+  "type": "object",
+  "required": ["artifactDigest", "attestationDigest", "bindingProfile", "policyId", "outcome"],
+  "properties": {
+    "artifactDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "attestationDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "bindingProfile": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$"
+    },
+    "policyId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "outcome": {
+      "enum": [
+        "accepted",
+        "integrity-failed",
+        "malformed",
+        "unsupported",
+        "authentication-failed",
+        "subject-mismatch",
+        "identity-rejected",
+        "policy-rejected"
+      ]
+    },
+    "signerIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "statementType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "predicateType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "verifiedProperties": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$"
+      }
+    },
+    "diagnostics": {
+      "type": "object"
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {"const": "accepted"}
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "required": ["signerIdentity"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {"const": "authentication-failed"}
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {"required": ["signerIdentity"]},
+            {"required": ["statementType"]},
+            {"required": ["predicateType"]}
+          ]
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

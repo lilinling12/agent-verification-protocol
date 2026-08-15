@@ -21,7 +21,7 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] MCP verification interoperability profile and `avp-mcp-interop-v0.1` TCK
 - [x] OpenTelemetry mapping interoperability profile and `avp-otel-mapping-v0.1` TCK
 - [x] Subject Adapter interoperability contract and `avp-subject-v0.1` TCK
-- [ ] artifact trust / signature / attestation decision
+- [x] artifact trust / signature / attestation decision
 - [ ] Alpha 2 acceptance audit and release-candidate readiness review
 
 ### Reference implementation already available

@@ -1,0 +1,111 @@
+apiVersion: avp.reconciliation/v0.1
+kind: ReconciliationMatrix
+metadata:
+  domain: artifact-trust
+  status: promoted-draft
+  targetVersion: "0.1"
+entries:
+  - requirement: AVP-TRUST-001
+    decision: promote-artifact-identity-separation
+    implementationEvidence:
+      - schemas/artifact-attestation.schema.json
+      - src/avp_ref/trust/models.py
+      - src/avp_ref/trust/publisher.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-IDENTITY-001.yaml
+    notes: Attestation publication creates independent immutable attestation bytes and never changes the exact-byte SHA-256 identity of the target Artifact.
+  - requirement: AVP-TRUST-002
+    decision: promote-exact-authenticated-subject-binding
+    implementationEvidence:
+      - src/avp_ref/trust/verifier.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-SUBJECT-BINDING-001.yaml
+    notes: Acceptance requires the requested AVP Artifact digest to appear in binding-authoritative authenticated subject identities; names, locators, or parallel caller metadata cannot substitute for digest binding.
+  - requirement: AVP-TRUST-003
+    decision: promote-authenticated-content-and-type-binding
+    implementationEvidence:
+      - schemas/artifact-trust-result.schema.json
+      - src/avp_ref/trust/models.py
+      - src/avp_ref/trust/protocol.py
+      - src/avp_ref/trust/verifier.py
+      - src/avp_ref/tck_adapter/reference_trust.py
+      - tests/test_artifact_trust.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-AUTHENTICATION-001.yaml
+    notes: The portable TCK mutates authenticated payload bytes and authenticated type without naming a cryptographic algorithm; the reference-only deterministic envelope proves both tamper paths fail authentication. The result/model boundary also rejects or sanitizes authenticated signer/type claims on authentication failure, including adversarial binding output that bypasses the reference value model.
+  - requirement: AVP-TRUST-004
+    decision: promote-authentication-policy-separation
+    implementationEvidence:
+      - schemas/artifact-trust-policy.schema.json
+      - src/avp_ref/trust/verifier.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-POLICY-001.yaml
+    notes: Successful authenticator validation is only an input; acceptance additionally requires authenticated signer identity and evaluator-owned policy success.
+  - requirement: AVP-TRUST-005
+    decision: promote-non-authoritative-signer-hints
+    implementationEvidence:
+      - schemas/artifact-trust-result.schema.json
+      - src/avp_ref/trust/models.py
+      - src/avp_ref/trust/verifier.py
+      - src/avp_ref/tck_adapter/reference_trust.py
+      - tests/test_artifact_trust.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-POLICY-001.yaml
+    notes: The negative control deliberately supplies a trusted-looking unauthenticated signer hint beside an authenticated untrusted identity and still requires identity-rejected. Authentication-failed results cannot expose an unauthenticated signer as authenticated identity.
+  - requirement: AVP-TRUST-006
+    decision: promote-fail-closed-trust-gates
+    implementationEvidence:
+      - src/avp_ref/trust/verifier.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-FAIL-CLOSED-001.yaml
+    notes: Attestation Artifact integrity failure, malformed/unsupported binding, authentication failure, subject mismatch, absent/unauthorized authenticated identity, and policy rejection are terminal and cannot be erased by later checks.
+  - requirement: AVP-TRUST-007
+    decision: promote-portable-terminal-taxonomy
+    implementationEvidence:
+      - schemas/artifact-trust-result.schema.json
+      - src/avp_ref/trust/models.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-OUTCOME-001.yaml
+    notes: The portable result taxonomy keeps accepted, integrity-failed, malformed, unsupported, authentication-failed, subject-mismatch, identity-rejected, and policy-rejected machine-distinct; accepted additionally requires signerIdentity while authentication-failed forbids authenticated identity/type claims.
+  - requirement: AVP-TRUST-008
+    decision: retain-conditional-publication-assurance
+    implementationEvidence:
+      - src/avp_ref/trust/publisher.py
+      - src/avp_ref/tck_adapter/reference_trust.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-PUBLICATION-AUTHORITY-001.yaml
+      - spec/security/security-boundary-contract.md
+    notes: This requirement applies only when artifact-attestation-publication is declared. The reference runtime provides a mediated publisher API but intentionally does not declare this capability because same-process Python privacy cannot establish Subject credential-context isolation; declaring it makes the reference TCK fail rather than inflate assurance.
+  - requirement: AVP-TRUST-009
+    decision: promote-assurance-honesty
+    implementationEvidence:
+      - src/avp_ref/trust/models.py
+      - src/avp_ref/trust/verifier.py
+      - src/avp_ref/tck_adapter/reference_trust.py
+      - conformance/tck/cases/trust/AVP-TCK-TRUST-CLAIM-HONESTY-001.yaml
+    notes: Authenticated but otherwise unverified claims such as transparency inclusion, revocation, trusted timestamp, and SLSA level are not promoted into verifiedProperties.
+nonNormativeImplementationDetails:
+  - Python Protocol/dataclass/enum/exception shapes
+  - deterministic HMAC-SHA256 reference TCK fixture and its private envelope syntax
+  - reference fixture payload JSON representation
+  - reference signer secret and signer lookup mechanics
+  - in-process ArtifactAttestationPublisher API
+  - exact diagnostics strings
+  - concrete policy engine implementation
+  - ArtifactStore backend choice
+acceptanceAudit:
+  status: passed
+  evidence:
+    - AEP-0008 and the normative candidate define AVP-owned trust semantics before the Python reference implementation and explicitly defer generic envelope, PKI, key-management, transparency, and domain-predicate ownership upstream
+    - avp-artifact-trust-v0.1 contains 8 portable cases covering all 9 indexed requirements without naming Python classes, a cryptographic algorithm, certificate provider, KMS, Sigstore deployment, or network service
+    - the reference implementation passes all 7 mandatory Artifact Trust cases; AVP-TRUST-008 is correctly skipped because artifact-attestation-publication isolation is not declared
+    - explicitly declaring artifact-attestation-publication causes the reference publication-authority case to fail, proving the reference runtime does not convert API privacy into unsupported security assurance
+    - exact Artifact identity remains unchanged across distinct signer/policy metadata and independent attestation publication
+    - attestation Artifact digest/size corruption is distinguished as integrity-failed and stops before authentication
+    - authenticated payload and authenticated-type tampering produce authentication-failed
+    - authentication-failed results reject authenticated signer/type fields at schema/model boundaries, and the verifier sanitizes adversarial unauthenticated binding claims before producing machine-readable output
+    - a valid authenticator from an unauthorized signer remains identity-rejected, and a trusted-looking unauthenticated signer hint cannot override authenticated identity
+    - an authenticated attestation for a different Artifact produces subject-mismatch rather than accepted
+    - malformed, unsupported, authentication, subject, identity, and policy failures remain fail-closed and machine-distinct
+    - accepted trust does not imply transparency, revocation, timestamp, SLSA, or other properties that were not actually verified
+    - Quality gates passed on Python 3.11 and 3.12 for the authentication-boundary hardening; Python 3.11 executed 172 unit tests plus schema, governance, traceability, TCK-registry, lifecycle, report-pipeline, and reference-smoke validation
+    - Package / Python 3.13 passed the authentication-boundary hardening build, release metadata, clean unconstrained wheel installation, installed-wheel identity, reference smoke, and installed-wheel TCK smoke
+    - installed-wheel TCK smoke explicitly exercises AVP-TCK-TRUST-AUTHENTICATION-001 and AVP-TCK-TRUST-FAIL-CLOSED-001 in addition to the pre-existing lifecycle smoke cases
+remainingGates:
+  - final-head CI and Governance after this acceptance-audit update
+  - unresolved review-thread check
+  - parent PR #31 merge/retarget-rebase sequence required by stacked-PR governance before readiness review
+  - main drift and required-check revalidation after parent integration
+  - explicit user authorization before any merge
