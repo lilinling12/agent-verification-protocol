@@ -1,8 +1,10 @@
 # AEP-0005 — MCP Tools Interoperability Profile v0.1
 
-- Status: Proposed
+- Status: Accepted
 - Authors: AVP maintainers
 - Created: 2026-08-15
+- Accepted: 2026-08-16
+- Acceptance decision: Approved by the protocol maintainer during the Alpha 2 readiness review. This approves the protocol direction only; the AEP is not Final and this decision does not authorize merge, tag, or release.
 - Target AVP version: 0.1
 
 ## Problem

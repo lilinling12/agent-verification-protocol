@@ -1,7 +1,9 @@
 # AEP-0006 — OpenTelemetry Mapping Profile v0.1
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-15
+- Accepted: 2026-08-16
+- Acceptance decision: Approved by the protocol maintainer during the Alpha 2 readiness review. This approves the protocol direction only; the AEP is not Final and this decision does not authorize merge, tag, or release.
 - Target: AVP v0.1 / Alpha 2
 
 ## Context
