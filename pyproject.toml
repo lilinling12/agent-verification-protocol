@@ -30,6 +30,10 @@ otel = [
   "opentelemetry-api>=1.30,<2",
   "opentelemetry-sdk>=1.30,<2",
 ]
+conformance = [
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
+]
 
 [project.urls]
 Homepage = "https://github.com/lilinling12/agent-verification-protocol"

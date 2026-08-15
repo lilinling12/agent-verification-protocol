@@ -62,7 +62,7 @@ jobs:
         run: python -m build
       - name: Validate built-wheel metadata
         run: python scripts/validate_release_metadata.py --wheel dist/*.whl
-      - name: Install wheel in an unconstrained clean environment
+      - name: Install base wheel in an unconstrained clean consumer environment
         run: |
           python -m venv .wheel-venv
           .wheel-venv/bin/python -m pip install dist/*.whl
@@ -80,14 +80,34 @@ jobs:
           PY
       - name: Installed-wheel reference smoke
         run: .wheel-venv/bin/avp conformance
-      - name: Installed-wheel TCK smoke
+      - name: Install wheel conformance environment
+        shell: bash
         run: |
-          .wheel-venv/bin/avp tck run \
-            --repository-root . \
-            --case AVP-TCK-LIFECYCLE-NORMAL-001 \
-            --case AVP-TCK-LIFECYCLE-PAUSE-001
-          .wheel-venv/bin/avp tck run \
-            --repository-root . \
-            --profile avp-artifact-trust-v0.1 \
-            --case AVP-TCK-TRUST-AUTHENTICATION-001 \
-            --case AVP-TCK-TRUST-FAIL-CLOSED-001
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          python -m venv .conformance-venv
+          .conformance-venv/bin/python -m pip install "${wheels[0]}[conformance]"
+          .conformance-venv/bin/python -m pip check
+      - name: Installed-wheel full TCK conformance
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          profiles=(conformance/tck/profiles/*.yaml)
+          if (( ${#profiles[@]} == 0 )); then
+            echo "no TCK profiles found" >&2
+            exit 1
+          fi
+          printf 'running %d installed-wheel TCK profiles\n' "${#profiles[@]}"
+          for profile_path in "${profiles[@]}"; do
+            profile="$(basename "${profile_path}" .yaml)"
+            echo "==> ${profile}"
+            .conformance-venv/bin/avp tck run \
+              --repository-root . \
+              --profile "${profile}"
+          done
