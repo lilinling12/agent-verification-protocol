@@ -1,10 +1,10 @@
 # Alpha 2 Acceptance Audit and Release-Candidate Readiness
 
-Status: **FINAL VALIDATION — NOT YET READY FOR RC PREPARATION**
+Status: **READY FOR RC PREPARATION**
 
 Integrated protocol baseline: `65d7c7413d7fe2def4d9d1593fdeb09753da6324` on `main`.
 
-This document audits Alpha 2 as an integrated protocol/conformance candidate. It does not make a release, change protocol semantics, authorize a pull-request merge, or treat reference implementation behavior as normative authority.
+This document records the completed Alpha 2 integrated protocol/conformance acceptance audit. `READY FOR RC PREPARATION` means the audited protocol baseline is ready for a separately governed release-candidate preparation step. It does **not** authorize merging this audit PR, creating a tag or GitHub Release, publishing a package, or moving any AEP to `Final`.
 
 ## 1. Authority and scope
 
@@ -26,37 +26,39 @@ The Alpha 2 protocol/conformance scope is:
 
 Reference-only capabilities, including concrete Python APIs, cryptographic fixtures, hosted services, database adapters, browser runtimes, containers, microVMs, and production signing backends, are not silently promoted into protocol release requirements.
 
-## 2. Integration result
+## 2. Integrated baseline
 
 The authorized stacked integration completed in dependency order:
 
 1. PR #31 Subject Adapter was final-head revalidated and squash-merged into `main` as `1823d877409386d84fea502fa3d7265fb85060e3`.
 2. PR #32 Artifact Trust was retargeted/rebased onto that exact main baseline so its diff contained only Artifact Trust changes.
-3. The rebased #32 candidate passed fresh Quality / Package / Governance gates, had `behind_by=0`, and had no unresolved review threads.
+3. The rebased #32 candidate passed fresh Quality / Package / Governance gates, was `behind_by=0`, and had no unresolved review threads.
 4. PR #32 was squash-merged into `main` as `65d7c7413d7fe2def4d9d1593fdeb09753da6324`.
-5. PR #33 was then retargeted/rebased onto that exact integrated main baseline and now contains only Alpha 2 audit/governance material.
+5. PR #33 was retargeted/rebased onto that exact integrated main baseline so it contains only Alpha 2 audit/governance changes.
 
-No #33 merge, tag, GitHub Release, package publication, or AEP `Final` transition is authorized by this integration.
+The squash/rebase sequence preserved the audited protocol file trees; it changed commit topology rather than protocol semantics.
 
-## 3. Release-process gates
+## 3. Release-readiness evidence
 
-| Gate | Current evidence | Status |
+| Gate | Evidence | Result |
 |---|---|---|
-| Protocol stack integrated into `main` | #31 and #32 were authorized, revalidated, and squash-merged in dependency order | **PASS** |
-| Integrated-main CI green | `main@65d7c741...` push CI #357 completed successfully | **PASS** |
-| Quality matrix | Python 3.11, 3.12, and 3.13 Quality jobs succeeded on integrated main | **PASS** |
-| Protocol/package schema and traceability validation | Enforced by `scripts/quality.sh` in the successful integrated-main Quality jobs | **PASS** |
-| Clean built-wheel validation | Package / Python 3.13 built distributions, validated metadata, installed the wheel in an unconstrained clean environment, verified installed identity, and ran reference/TCK smoke successfully | **PASS** |
-| Governance | Governance is intentionally a `pull_request` workflow, not a main-push workflow; the final audit PR exact head must pass it | **PENDING FINAL #33 HEAD** |
-| AEP lifecycle | AEP-0001 through AEP-0008 are approved `Accepted`; none is `Final` | **PASS** |
-| Changelog / release notes | Alpha 2 protocol/conformance, reference implementation, repository engineering, and security impacts are recorded under Unreleased | **PASS** |
-| Migration notes against prior public release | No GitHub Release or Git tag exists, so there is no prior published compatibility target | **N/A FOR FIRST RC** |
-| Cross-profile security composition | Detailed Security Composition Review found no release-blocking authority/security contradiction | **PASS** |
-| Open release-blocking issues | Final issue review finds only #23, repository branch-cleanup hygiene; it remains non-release-blocking | **PASS** |
-| Review threads / drift | Final #33 exact-head review-thread and `main` drift check still required after this document update | **PENDING FINAL #33 HEAD** |
-| Reproducible published artifact identifiers | Published release artifacts do not exist yet | **DEFERRED TO RELEASE PROCEDURE** |
+| Protocol stack integrated into `main` | #31 and #32 squash-merged in dependency order after final-head revalidation | **PASS** |
+| Integrated-main CI | `main@65d7c741...` push CI #357 | **PASS** |
+| Quality matrix | Python 3.11, 3.12, and 3.13 Quality jobs | **PASS** |
+| Schema / governance / traceability / TCK registry validation | Executed through the integrated-main quality gate | **PASS** |
+| Clean built-wheel validation | Build, metadata validation, unconstrained clean install, installed-wheel identity, reference smoke, and installed-wheel TCK smoke | **PASS** |
+| Audit-candidate full CI | Retargeted #33 validation candidate CI #359 | **PASS** |
+| Audit-candidate Governance | Retargeted #33 Governance #383 | **PASS** |
+| AEP lifecycle | AEP-0001 through AEP-0008 are `Accepted`; none is `Final` | **PASS** |
+| Changelog / release notes | Alpha 2 protocol/conformance, reference, repository, and security impacts recorded under Unreleased | **PASS** |
+| Migration against prior published release | Repository has no GitHub Release or Git tag | **N/A FOR FIRST RC** |
+| Cross-profile security composition | No release-blocking authority/security contradiction found | **PASS** |
+| Open release-blocking issues | Only open issue #23 is superseded-branch cleanup and remains non-release-blocking | **PASS** |
+| Published release artifact identifiers | No published RC artifacts exist yet | **DEFERRED TO RELEASE PROCEDURE** |
 
-## 4. AEP lifecycle audit
+The final document-state #33 HEAD must retain successful required CI/Governance, `behind_by=0`, and zero unresolved review threads. These are evidence checks for this readiness statement, not authorization to merge #33.
+
+## 4. AEP lifecycle result
 
 Governance defines `Accepted` as an approved protocol direction and `Final` as normative text/conformance merged and released.
 
@@ -73,7 +75,7 @@ On 2026-08-16 the protocol maintainer explicitly approved AEP-0002 through AEP-0
 | AEP-0007 | Subject Adapter | Accepted |
 | AEP-0008 | Artifact Trust / Attestation | Accepted |
 
-The detailed governance record is `docs/acceptance/alpha2-aep-acceptance-review.md`.
+The detailed governance decision record is `docs/acceptance/alpha2-aep-acceptance-review.md`.
 
 ## 5. Conformance completeness
 
@@ -89,13 +91,13 @@ The integrated Alpha 2 stack reports:
 - Quality validation across Python 3.11, 3.12, and 3.13;
 - clean built-wheel validation on Python 3.13.
 
-These numbers are evidence, not protocol authority. The semantic audit additionally verified that ownership remains explicit, portable TCK cases do not standardize Python implementation shapes, conditional capabilities do not erase mandatory behavior, cross-profile failure semantics remain distinct, and the reference runtime does not create semantics absent from AEP/spec/TCK.
+These counts are evidence, not protocol authority. The semantic audit additionally verified stable normative ownership, portable conformance boundaries, fail-closed conditional behavior, non-conflicting cross-profile failure semantics, and that Python reference behavior does not define protocol semantics absent from AEP/spec/TCK.
 
-## 6. Cross-profile security audit
+## 6. Cross-profile security result
 
 `docs/acceptance/alpha2-security-composition-review.md` verifies the composed authority chain across Core, Scenario, Environment, Security, Subject Adapter, MCP, OpenTelemetry, Evidence/Artifact, Oracle, and Artifact Trust.
 
-The review confirms capability and secret boundaries, deny-before-side-effect behavior, Core quiescing semantics, infrastructure/verdict separation, Evidence-integrity versus Trust-authentication layering, telemetry non-authority, and assurance non-inflation. The #31/#32 integration changed commit topology, not the audited protocol file trees, so no new semantic contradiction was introduced by the squash/rebase sequence.
+The review confirms capability and secret boundaries, deny-before-side-effect behavior, Core quiescing semantics, infrastructure/verdict separation, Evidence-integrity versus Trust-authentication layering, telemetry non-authority, and assurance non-inflation. No release-blocking cross-profile security contradiction was identified.
 
 ## 7. Reference implementation boundary
 
@@ -111,15 +113,18 @@ Consequences:
 
 - migration notes against a prior public AVP release are N/A for this first RC;
 - release notes must still explain accumulated normative candidate semantics and non-normative implementation changes;
-- RC version selection belongs to release preparation from the accepted integrated baseline, not to this audit branch.
+- RC version selection belongs to a later release-preparation step from the accepted baseline.
 
-## 9. Remaining final-validation gates
+## 9. Readiness boundary
 
-All protocol integration and AEP-acceptance blockers are closed. The only remaining readiness gates are exact-head checks on this retargeted #33 audit candidate:
+Alpha 2 protocol/conformance acceptance is complete and is **READY FOR RC PREPARATION**.
 
-1. full CI, including Quality 3.11/3.12/3.13 and Package 3.13 clean built-wheel/TCK smoke;
-2. Governance success on the exact PR head;
-3. `behind_by=0` against unchanged integrated `main`;
-4. zero unresolved review threads.
+This state does not itself authorize:
 
-If those gates pass, this document may be promoted to **READY FOR RC PREPARATION**. That state does not authorize merging #33, tagging, releasing, publishing a package, or moving any AEP to `Final`.
+- merging PR #33;
+- creating a release branch, tag, or GitHub Release;
+- publishing a package;
+- changing any AEP from `Accepted` to `Final`;
+- beginning Alpha 3 changes as part of this audit PR.
+
+Those actions remain separate governance decisions. Any future release commit must be selected from `main` and must follow `docs/RELEASE_PROCESS.md` with its own exact-commit release validation.
