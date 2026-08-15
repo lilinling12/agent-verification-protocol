@@ -1,6 +1,6 @@
 # Alpha 2 RC1 Published Release Acceptance
 
-Status: **IN VALIDATION**
+Status: **PASS**
 
 Release under test:
 
@@ -14,6 +14,18 @@ Release under test:
 This audit validates the public release object as consumed outside the build workspace. It is intentionally distinct from pre-publication CI evidence.
 
 The acceptance question is not merely whether commit `ef199124...` once passed CI. The question is whether the bytes and metadata currently published under `v0.3.0-rc.1` remain bound to that exact verified source and continue to satisfy the same consumer/conformance gates when downloaded from the GitHub Release.
+
+## Acceptance result
+
+The first complete published-release validation passed on PR #36 head `309c816e7b4902282a38a22f161a7bdc6ef90287`:
+
+- Release Validation #1 (`31915209505`): PASS;
+- CI #387 (`31915209428`): PASS across Quality / Python 3.11, 3.12, 3.13 and Package / Python 3.13;
+- Governance #417 (`31915209485`): PASS.
+
+Release Validation downloaded the public GitHub Release assets rather than reusing the PR build workspace. The downloaded wheel passed clean base-consumer installation, identity/reference smoke, and the full registered TCK profile set from a separate `[conformance]` environment.
+
+These run identifiers record the first closed audit. Any later change to this PR invalidates final-head readiness until the new exact head passes the same gates again.
 
 ## Acceptance gates
 
