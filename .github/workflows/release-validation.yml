@@ -1,0 +1,102 @@
+name: Release Validation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-validation.yml'
+      - 'scripts/validate_published_release.py'
+      - 'tests/test_validate_published_release.py'
+      - 'docs/acceptance/alpha2-rc1-release-acceptance.md'
+      - 'docs/releases/v0.3.0-rc.1.md'
+      - 'CHANGELOG.md'
+      - 'ROADMAP.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  published-release:
+    name: Published Release / v0.3.0-rc.1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_REPOSITORY: lilinling12/agent-verification-protocol
+      EXPECTED_TAG: v0.3.0-rc.1
+      EXPECTED_COMMIT: ef199124017b0dcc8c4a966d00c4f407760f9a06
+      EXPECTED_VERSION: 0.3.0rc1
+    steps:
+      - name: Checkout validation code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Unit-test published-release validator
+        run: python -m unittest tests.test_validate_published_release -v
+      - name: Download and verify published release bytes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/validate_published_release.py \
+            --repository "${EXPECTED_REPOSITORY}" \
+            --tag "${EXPECTED_TAG}" \
+            --commit "${EXPECTED_COMMIT}" \
+            --version "${EXPECTED_VERSION}" \
+            --output-dir published-release \
+            --token "${GITHUB_TOKEN}"
+      - name: Install published base wheel as an external consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .published-base-venv
+          .published-base-venv/bin/python -m pip install published-release/*.whl
+          .published-base-venv/bin/python -m pip check
+      - name: Verify published wheel identity and base smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          .published-base-venv/bin/python - <<'PY'
+          from importlib.metadata import version
+          from avp_ref import __version__
+          from avp_ref.runtime import ReferenceRuntime
+
+          assert version('avp-reference') == '0.3.0rc1'
+          assert __version__ == '0.3.0rc1'
+          assert ReferenceRuntime().capabilities()['implementation']['version'] == '0.3.0rc1'
+          print('published-wheel identity OK: avp-reference 0.3.0rc1')
+          PY
+          .published-base-venv/bin/avp conformance
+      - name: Install published wheel conformance environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(published-release/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one published wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          python -m venv .published-conformance-venv
+          .published-conformance-venv/bin/python -m pip install "${wheels[0]}[conformance]"
+          .published-conformance-venv/bin/python -m pip check
+      - name: Run full TCK against published wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          profiles=(conformance/tck/profiles/*.yaml)
+          if (( ${#profiles[@]} == 0 )); then
+            echo "no TCK profiles found" >&2
+            exit 1
+          fi
+          printf 'running %d profiles against the published wheel\n' "${#profiles[@]}"
+          for profile_path in "${profiles[@]}"; do
+            profile="$(basename "${profile_path}" .yaml)"
+            echo "==> ${profile}"
+            .published-conformance-venv/bin/avp tck run \
+              --repository-root . \
+              --profile "${profile}"
+          done
