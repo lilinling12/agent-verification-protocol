@@ -58,8 +58,36 @@ jobs:
         run: python -m pip install -c constraints/ci.txt -e '.[dev]'
       - name: Verify build environment
         run: python -m pip check
+      - name: Set reproducible build epoch
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct HEAD)" >> "${GITHUB_ENV}"
       - name: Build source and wheel distributions
         run: python -m build
+      - name: Rebuild distributions for reproducibility
+        run: python -m build --outdir dist-repro
+      - name: Verify reproducible distribution bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          primary=(dist/*)
+          rebuilt=(dist-repro/*)
+          if (( ${#primary[@]} != 2 || ${#rebuilt[@]} != 2 )); then
+            echo "expected exactly two artifacts in both build directories" >&2
+            exit 1
+          fi
+          for artifact in "${primary[@]}"; do
+            peer="dist-repro/$(basename "${artifact}")"
+            if [[ ! -f "${peer}" ]]; then
+              echo "rebuild missing $(basename "${artifact}")" >&2
+              exit 1
+            fi
+            if ! cmp --silent "${artifact}" "${peer}"; then
+              echo "non-reproducible artifact bytes: $(basename "${artifact}")" >&2
+              sha256sum "${artifact}" "${peer}" >&2
+              exit 1
+            fi
+          done
       - name: Validate built-wheel metadata
         run: python scripts/validate_release_metadata.py --wheel dist/*.whl
       - name: Install base wheel in an unconstrained clean consumer environment
