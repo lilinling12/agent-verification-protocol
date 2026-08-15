@@ -71,6 +71,10 @@ This distinction is important:
 
 The profile loop fails closed if no profiles are discovered or if any selected profile is non-conformant.
 
+The first full-profile run, CI #364, correctly exposed a packaging-boundary gap instead of being weakened: Artifact Trust, Core, Environment, Evidence, MCP, and Oracle profiles passed from the clean-installed wheel, but the OpenTelemetry profile could not register its reference adapter because the clean environment contained only mandatory package dependencies. The failure was an implementation-adapter availability failure, not a normative TCK failure.
+
+The remediation keeps OpenTelemetry optional for ordinary package consumers and adds an explicit non-normative `conformance` extra to `avp-reference`. The clean release-validation environment installs the built wheel as `wheel[conformance]`; this supplies reference-validation dependencies such as the OpenTelemetry SDK without making those dependencies mandatory runtime requirements or AVP protocol requirements. Full-profile TCK execution remains mandatory for the RC gate.
+
 ## 5. Changelog and release notes policy
 
 `CHANGELOG.md` deliberately retains `## Unreleased` during RC preparation. Repository policy states that release entries are created from `main` during the release process and development work remains under `Unreleased` until a tag is published.
@@ -88,7 +92,7 @@ Before this preparation PR may be considered ready for merge, all of the followi
 3. Quality / Python 3.13 succeeds.
 4. Package / Python 3.13 succeeds.
 5. Built source and wheel distributions pass release metadata validation.
-6. The wheel installs in a fresh unconstrained environment and `pip check` succeeds.
+6. The built wheel with its declared `conformance` extra installs in a fresh unconstrained environment and `pip check` succeeds.
 7. Installed-wheel distribution/runtime identity matches `0.3.0rc1`.
 8. Installed-wheel reference smoke succeeds.
 9. Installed-wheel full-profile TCK conformance succeeds for all registered profiles.
@@ -107,7 +111,7 @@ After that merge, the selected release candidate commit must be the resulting ex
 
 1. re-run/verify exact-main CI and release gates;
 2. build source and wheel artifacts from that exact commit in a clean environment;
-3. verify full installed-wheel conformance;
+3. verify full installed-wheel conformance using the declared conformance dependencies;
 4. compute and record reproducible artifact SHA-256 digests from the exact release artifacts;
 5. verify tag name, package version, candidate notes, changelog state, AEP references, security review, issues, and repository drift;
 6. obtain explicit maintainer authorization for the tag / GitHub Release / any package publication;
