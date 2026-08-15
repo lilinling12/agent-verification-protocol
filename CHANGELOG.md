@@ -35,6 +35,7 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 - Made `scenario-template.schema.json` the ScenarioTemplate validation authority while retaining `scenario.schema.json` only as an exact compatibility mirror, with repository/package parity enforced by CI.
 - Expanded spec/requirement/TCK traceability and registry validation across the Alpha 2 profiles.
 - Extended Package / Python 3.13 validation to build distributions, validate metadata, install the wheel in a clean unconstrained environment, verify installed-wheel identity, and execute reference/TCK smoke checks from the installed artifact.
+- Prepared the `v0.3.0-rc.1` candidate with PEP 440 package version `0.3.0rc1`, dedicated release notes/evidence, and a clean-installed-wheel gate that runs every registered TCK profile rather than a smoke subset.
 
 ### Security
 - Preserved the Subject/Evaluator authority boundary and fail-closed evaluator validity semantics across Oracle, telemetry, Evidence integrity, Subject execution, and Artifact Trust failures.
