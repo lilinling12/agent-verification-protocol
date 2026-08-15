@@ -111,3 +111,30 @@ jobs:
               --repository-root . \
               --profile "${profile}"
           done
+      - name: Build release evidence
+        run: |
+          python scripts/release_evidence.py build \
+            --dist dist \
+            --output-dir release-evidence \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit "${GITHUB_SHA}"
+      - name: Verify release evidence
+        run: |
+          python scripts/release_evidence.py verify \
+            --dist dist \
+            --output-dir release-evidence \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit "${GITHUB_SHA}"
+      - name: Stage release evidence bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-bundle
+          cp dist/*.whl dist/*.tar.gz release-evidence/MANIFEST.json release-evidence/SHA256SUMS release-bundle/
+      - name: Upload release evidence bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: avp-release-evidence-${{ github.sha }}
+          path: release-bundle/
+          if-no-files-found: error
+          retention-days: 30
