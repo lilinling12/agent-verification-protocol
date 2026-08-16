@@ -17,7 +17,7 @@ MANIFEST_PATH = ROOT / "docs/acceptance/alpha2-finalization-manifest.json"
 EXPECTED_AEPS = {f"AEP-{index:04d}" for index in range(1, 9)}
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUS_RE = re.compile(r"^- Status:\s*(\S+)\s*$", re.MULTILINE)
-PROFILE_ID_RE = re.compile(r"^\s*(?:id|name):\s*([^#\s]+)", re.MULTILINE)
+RELEASE_ACCEPTANCE_STATUS_RE = re.compile(r"^Status:\s*(?:\*\*)?PASS(?:\*\*)?\s*$", re.MULTILINE)
 
 
 class ReadinessValidationError(ValueError):
@@ -76,7 +76,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     _require(baseline.get("releaseClass") == "prerelease", "audit must remain bound to the published prerelease")
     release_acceptance = _repo_path(baseline.get("releaseAcceptance"), "auditBaseline.releaseAcceptance")
     acceptance_text = release_acceptance.read_text(encoding="utf-8")
-    _require("Status: PASS" in acceptance_text, "release acceptance evidence is not PASS")
+    _require(RELEASE_ACCEPTANCE_STATUS_RE.search(acceptance_text) is not None, "release acceptance evidence is not PASS")
     _require(str(baseline["publishedSourceCommit"]) in acceptance_text, "release acceptance is not bound to publishedSourceCommit")
 
     policy = manifest.get("policy")
