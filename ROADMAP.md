@@ -23,6 +23,7 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] Subject Adapter interoperability contract and `avp-subject-v0.1` TCK
 - [x] artifact trust / signature / attestation decision
 - [x] Alpha 2 acceptance audit and release-candidate readiness review
+- [x] `v0.3.0-rc.1` publication and external-consumer release acceptance
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
