@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Unit-test finality audit
-        run: python -m unittest tests.test_aep_final_eligibility -v
+        run: python -m unittest discover -s tests -p 'test_aep_final_eligibility.py' -v
       - name: Audit live release and released protocol evidence
         env:
           GITHUB_TOKEN: ${{ github.token }}
