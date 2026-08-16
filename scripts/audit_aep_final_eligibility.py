@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """Audit Alpha 2 AEP technical finality evidence and lifecycle eligibility.
 
-This tool deliberately separates two questions that governance must not conflate:
+The audit intentionally separates two questions:
 
-1. Did a published release actually contain the normative specification and required
+1. Did a published release contain the normative specification and required
    conformance assets for an AEP?
-2. Does the release policy make that publication a lifecycle-finality boundary?
+2. Does release policy make that publication a lifecycle-finality boundary?
 
-The first question is evidence-driven. The second is governance-driven. A prerelease
-can therefore have complete technical evidence while still requiring an explicit
-stable/finality decision.
-
-The script is intentionally standard-library only so it can run in governance CI
-before project dependencies are installed.
+A prerelease can therefore have complete technical evidence while still requiring
+an explicit stable/finality decision. The script is standard-library only so it can
+run in governance CI before project dependencies are installed.
 """
 
 from __future__ import annotations
@@ -165,9 +162,11 @@ def _asset_names(release: dict[str, Any]) -> set[str]:
     return names
 
 
-def _validate_release(release: dict[str, Any]) -> tuple[bool, str]:
+def _validate_release(release: dict[str, Any]) -> str:
     if release.get("tag_name") != EXPECTED_TAG:
         raise AuditError("release tag does not match the audited RC")
+    if release.get("resolved_tag_commit") != EXPECTED_RELEASE_COMMIT:
+        raise AuditError("release tag does not resolve to the audited source commit")
     if release.get("target_commitish") != EXPECTED_RELEASE_COMMIT:
         raise AuditError("release target_commitish does not match the audited source commit")
     if release.get("draft") is not False:
@@ -190,37 +189,42 @@ def _validate_release(release: dict[str, Any]) -> tuple[bool, str]:
     body = release.get("body")
     if not isinstance(body, str):
         raise AuditError("release body must be present")
-
     normalized = body.casefold()
-    accepted_boundary = "remain accepted" in normalized and "not final" in normalized
-    if not accepted_boundary:
+    if "remain accepted" not in normalized or "not final" not in normalized:
         raise AuditError(
             "release body must explicitly preserve the Accepted/not-Final lifecycle boundary"
         )
-    return True, "PUBLISHED_PRERELEASE_ACCEPTED_NOT_FINAL"
+    return "PUBLISHED_PRERELEASE_ACCEPTED_NOT_FINAL"
+
+
+def _verify_profile_registration(release_root: Path, profiles: Iterable[str]) -> None:
+    registry = _read_text(release_root, "conformance/tck/registry.yaml")
+    for profile_path in profiles:
+        profile_id = Path(profile_path).stem
+        if not re.search(rf"(?m)^\s*-?\s*id:\s*{re.escape(profile_id)}\s*$", registry):
+            raise AuditError(f"released TCK profile is not registered: {profile_id}")
 
 
 def audit(current_root: Path, release_root: Path, release: dict[str, Any]) -> dict[str, Any]:
     governance = _read_text(current_root, "GOVERNANCE.md")
     release_process = _read_text(current_root, "docs/RELEASE_PROCESS.md")
 
-    if "`Final` — normative text and required conformance coverage are merged and released" not in governance:
+    final_rule = "`Final` — normative text and required conformance coverage are merged and released"
+    if final_rule not in governance:
         raise AuditError("GOVERNANCE.md Final definition changed; audit requires review")
     prerelease_rule = "A prerelease is not a stable conformance target unless release notes explicitly say otherwise."
     if prerelease_rule not in release_process:
         raise AuditError("release-candidate stability rule changed; audit requires review")
 
-    _, release_classification = _validate_release(release)
+    release_classification = _validate_release(release)
 
     results: list[dict[str, Any]] = []
     for evidence in AEP_EVIDENCE:
-        current_rfc = _read_text(current_root, evidence.rfc)
-        current_status = _aep_status(current_rfc, evidence.aep)
+        current_status = _aep_status(_read_text(current_root, evidence.rfc), evidence.aep)
         if current_status != "Accepted":
             raise AuditError(f"{evidence.aep} expected current status Accepted, got {current_status}")
 
-        released_rfc = _read_text(release_root, evidence.rfc)
-        released_status = _aep_status(released_rfc, evidence.aep)
+        released_status = _aep_status(_read_text(release_root, evidence.rfc), evidence.aep)
         if released_status != "Accepted":
             raise AuditError(
                 f"{evidence.aep} release-source status expected Accepted, got {released_status}"
@@ -233,6 +237,7 @@ def audit(current_root: Path, release_root: Path, release: dict[str, Any]) -> di
             *evidence.tck_profiles,
         )
         _require_files(release_root, released_paths)
+        _verify_profile_registration(release_root, evidence.tck_profiles)
 
         results.append(
             {
@@ -246,9 +251,9 @@ def audit(current_root: Path, release_root: Path, release: dict[str, Any]) -> di
                 "technicalFinalityEvidence": "PASS",
                 "lifecycleEligibility": "REQUIRES_STABLE_FINALITY_DECISION",
                 "reason": (
-                    "Required normative/conformance assets are present in the published RC source, "
-                    "but the audited GitHub Release is a prerelease and explicitly preserves "
-                    "Accepted/not-Final status."
+                    "Required normative/conformance assets are present and registered in the "
+                    "published RC source, but the public release is a prerelease and explicitly "
+                    "preserves Accepted/not-Final status."
                 ),
             }
         )
