@@ -1,9 +1,12 @@
 # AEP-0001 — Oracle Evaluation Contract v0.1
 
-- Status: Accepted
+- Status: Final
 - Authors: AVP maintainers
 - Created: 2026-08-13
 - Accepted: 2026-08-13
+- Acceptance decision: Accepted by the protocol maintainer on 2026-08-13 as the approved Oracle protocol direction; this historical acceptance preceded the Alpha 2 Final-eligibility evidence review.
+- Finalized: 2026-08-17
+- Final decision: Explicitly approved by the protocol maintainer for `Accepted` → `Final` on 2026-08-17, based on the merged Alpha 2 Final-eligibility audit and released evidence at `v0.3.0-rc.1` / `ef199124017b0dcc8c4a966d00c4f407760f9a06`; the published release bytes passed external-consumer and full TCK validation, no post-release protocol-semantic drift invalidated that evidence, and this Finalization does not authorize stable `v0.3.0` publication.
 - Target AVP version: 0.1
 
 ## Problem
