@@ -1,0 +1,63 @@
+name: Finality Readiness
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/finality-readiness.yml'
+      - 'scripts/audit_aep_final_eligibility.py'
+      - 'tests/test_aep_final_eligibility.py'
+      - 'docs/acceptance/alpha2-aep-final-eligibility.md'
+      - 'docs/acceptance/alpha2-aep-acceptance-review.md'
+      - 'ROADMAP.md'
+      - 'GOVERNANCE.md'
+      - 'docs/RELEASE_PROCESS.md'
+      - 'rfcs/AEP-*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alpha2-finality-readiness:
+    name: Alpha 2 AEP Final Eligibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout audit code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout published RC source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ef199124017b0dcc8c4a966d00c4f407760f9a06
+          path: .release-source
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Unit-test finality audit
+        run: python -m unittest tests.test_aep_final_eligibility -v
+      - name: Audit live release and released protocol evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/audit_aep_final_eligibility.py \
+            --current-root . \
+            --release-root .release-source \
+            --github-token "${GITHUB_TOKEN}" \
+            --output alpha2-final-eligibility.json
+      - name: Assert expected governance classification
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path('alpha2-final-eligibility.json').read_text(encoding='utf-8'))
+          assert result['technicalFinalityEvidence'] == 'PASS'
+          assert result['lifecycleEligibility'] == 'REQUIRES_STABLE_FINALITY_DECISION'
+          assert len(result['aepResults']) == 8
+          print('Alpha 2 technical finality evidence: PASS')
+          print('Lifecycle eligibility: REQUIRES_STABLE_FINALITY_DECISION')
+          PY
