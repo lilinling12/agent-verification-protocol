@@ -24,6 +24,9 @@ python scripts/validate_assets.py
 echo "== Repository governance =="
 python scripts/validate_governance.py
 
+echo "== AEP finalization readiness =="
+python scripts/validate_aep_finalization_readiness.py
+
 echo "== Repository boundaries =="
 python scripts/validate_boundaries.py
 
