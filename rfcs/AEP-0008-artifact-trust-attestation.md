@@ -1,10 +1,12 @@
 # AEP-0008 — Artifact Trust and Attestation Contract v0.1
 
-- Status: Accepted
+- Status: Final
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-16
 - Accepted: 2026-08-16
 - Acceptance decision: Approved by the protocol maintainer during the Alpha 2 readiness review. This approves the protocol direction only; the AEP is not Final and this decision does not authorize merge, tag, or release.
+- Finalized: 2026-08-17
+- Final decision: Explicitly approved by the protocol maintainer for `Accepted` → `Final` on 2026-08-17, based on the merged Alpha 2 Final-eligibility audit and released evidence at `v0.3.0-rc.1` / `ef199124017b0dcc8c4a966d00c4f407760f9a06`; the published release bytes passed external-consumer and full TCK validation, no post-release protocol-semantic drift invalidated that evidence, and this Finalization does not authorize stable `v0.3.0` publication.
 - Target AVP version: 0.1
 
 ## Problem

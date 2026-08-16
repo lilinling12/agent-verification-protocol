@@ -25,10 +25,10 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] Alpha 2 acceptance audit and release-candidate readiness review
 - [x] `v0.3.0-rc.1` publication and external-consumer release acceptance
 - [x] AEP-0001 through AEP-0008 Final eligibility audit
-- [ ] explicit protocol-maintainer authorization and `Accepted` → `Final` lifecycle transition
+- [x] explicit protocol-maintainer authorization and `Accepted` → `Final` lifecycle transition
 - [ ] stable `v0.3.0` release decision
 
-The Final eligibility audit establishes technical eligibility only. It does not itself change any AEP lifecycle state, authorize stable release publication, authorize package-index publication, or begin Alpha 3.
+AEP-0001 through AEP-0008 are Final based on the merged eligibility audit, the explicit protocol-maintainer decision recorded on 2026-08-17, and released evidence at `v0.3.0-rc.1`. Finalization does not itself authorize stable release publication, package-index publication, or Alpha 3.
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
