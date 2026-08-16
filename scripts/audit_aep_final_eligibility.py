@@ -18,6 +18,9 @@ import argparse
 import json
 import re
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -26,6 +29,7 @@ from typing import Any, Iterable
 EXPECTED_TAG = "v0.3.0-rc.1"
 EXPECTED_RELEASE_COMMIT = "ef199124017b0dcc8c4a966d00c4f407760f9a06"
 EXPECTED_REPOSITORY = "lilinling12/agent-verification-protocol"
+GITHUB_API = "https://api.github.com"
 
 
 @dataclass(frozen=True)
@@ -145,6 +149,51 @@ def _load_release(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise AuditError("release metadata must be a JSON object")
     return payload
+
+
+def _fetch_json(url: str, token: str) -> dict[str, Any]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "avp-aep-final-eligibility-audit",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.load(response)
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        raise AuditError(f"GitHub API request failed for {url}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise AuditError(f"GitHub API returned a non-object for {url}")
+    return payload
+
+
+def _bind_tag_resolution(release: dict[str, Any], tag_ref: dict[str, Any]) -> dict[str, Any]:
+    expected_ref = f"refs/tags/{EXPECTED_TAG}"
+    if tag_ref.get("ref") != expected_ref:
+        raise AuditError("GitHub tag ref does not match the audited release tag")
+    target = tag_ref.get("object")
+    if not isinstance(target, dict):
+        raise AuditError("GitHub tag ref is missing its target object")
+    if target.get("type") != "commit":
+        raise AuditError("audited RC tag must resolve directly to a commit")
+    sha = target.get("sha")
+    if not isinstance(sha, str):
+        raise AuditError("GitHub tag target is missing a commit SHA")
+    combined = dict(release)
+    combined["resolved_tag_commit"] = sha
+    return combined
+
+
+def fetch_live_release_metadata(repository: str, tag: str, token: str) -> dict[str, Any]:
+    if repository != EXPECTED_REPOSITORY or tag != EXPECTED_TAG:
+        raise AuditError("this audit is pinned to the Alpha 2 RC1 repository and tag")
+    encoded_tag = urllib.parse.quote(tag, safe="")
+    release = _fetch_json(f"{GITHUB_API}/repos/{repository}/releases/tags/{encoded_tag}", token)
+    tag_ref = _fetch_json(f"{GITHUB_API}/repos/{repository}/git/ref/tags/{encoded_tag}", token)
+    return _bind_tag_resolution(release, tag_ref)
 
 
 def _asset_names(release: dict[str, Any]) -> set[str]:
@@ -276,7 +325,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--current-root", type=Path, required=True)
     parser.add_argument("--release-root", type=Path, required=True)
-    parser.add_argument("--release-json", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--release-json", type=Path)
+    source.add_argument("--github-token")
     parser.add_argument("--output", type=Path)
     return parser.parse_args(argv)
 
@@ -284,11 +335,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     try:
-        result = audit(
-            args.current_root.resolve(),
-            args.release_root.resolve(),
-            _load_release(args.release_json),
+        release = (
+            _load_release(args.release_json)
+            if args.release_json
+            else fetch_live_release_metadata(EXPECTED_REPOSITORY, EXPECTED_TAG, args.github_token)
         )
+        result = audit(args.current_root.resolve(), args.release_root.resolve(), release)
     except AuditError as exc:
         print(f"AEP final eligibility audit failed: {exc}", file=sys.stderr)
         return 1
