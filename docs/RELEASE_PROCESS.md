@@ -36,30 +36,41 @@ v0.3.0-rc.1
 
 A prerelease is not a stable conformance target unless release notes explicitly say otherwise.
 
+A release candidate MAY contain normative changes whose governing AEPs are `Accepted` rather than `Final` when the purpose of the prerelease is to establish the released protocol/conformance evidence required for Final eligibility. The release notes MUST identify those AEPs and MUST NOT describe them as Final.
+
+After the prerelease has been published and its actual consumer artifacts have passed the required release-acceptance checks, the corresponding AEPs may become technically eligible for an explicit maintainer `Accepted` → `Final` decision under `GOVERNANCE.md`.
+
+A stable release that presents those normative changes as the stable conformance baseline MUST reference the governing AEPs as `Final` before publication. This ordering prevents a lifecycle cycle in which Final requires released evidence while the evidence-producing release would itself require Final first.
+
 ## Release readiness
 
-A release requires:
+Every release requires:
 
 - all required CI and governance checks green on the release commit;
 - protocol schemas and packaged schemas synchronized;
 - conformance suite passing from a built wheel, not only an editable checkout;
 - changelog/release notes describing normative and non-normative changes separately;
 - migration notes for incompatible changes;
-- finalized AEP references for normative changes when required;
+- AEP references for normative changes with lifecycle state appropriate to the release class;
 - security-impact review;
 - no unresolved release-blocking issues;
 - reproducible artifact digests recorded when release automation supports them.
 
+For a prerelease that is explicitly collecting Final-eligibility evidence, governing normative AEPs MUST be at least `Accepted`; release notes must make the non-Final state explicit.
+
+For a stable release that establishes a stable conformance target, governing normative AEPs MUST be `Final` unless the change does not require an AEP under `GOVERNANCE.md`.
+
 ## Release procedure
 
 1. Select a commit from `main`; do not release an arbitrary feature-branch head.
-2. Confirm version metadata, changelog, migration notes, and AEP references.
+2. Confirm version metadata, changelog, migration notes, AEP references, and lifecycle state appropriate to the intended release class.
 3. Run the full CI/package/conformance gates.
 4. Build source and wheel artifacts in a clean environment.
 5. Install the wheel in a fresh environment and run `avp conformance`.
 6. Create the release tag and GitHub release only after the selected commit is green.
-7. Publish release notes containing protocol impact, compatibility, security notes, and artifact identifiers.
+7. Publish release notes containing protocol impact, compatibility, security notes, AEP lifecycle state, and artifact identifiers.
 8. Verify the published artifacts before announcing the release.
+9. When a prerelease is being used as Final-eligibility evidence, record the external-consumer acceptance result before proposing the corresponding AEP Final transition.
 
 ## Tags
 
