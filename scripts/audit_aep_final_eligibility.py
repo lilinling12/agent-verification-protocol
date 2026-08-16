@@ -201,7 +201,7 @@ def _verify_profile_registration(release_root: Path, profiles: Iterable[str]) ->
     registry = _read_text(release_root, "conformance/tck/registry.yaml")
     for profile_path in profiles:
         profile_id = Path(profile_path).stem
-        if not re.search(rf"(?m)^\s*-?\s*id:\s*{re.escape(profile_id)}\s*$", registry):
+        if not re.search(rf"(?m)^\s*profile:\s*{re.escape(profile_id)}\s*$", registry):
             raise AuditError(f"released TCK profile is not registered: {profile_id}")
 
 
