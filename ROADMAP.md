@@ -24,6 +24,9 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] artifact trust / signature / attestation decision
 - [x] Alpha 2 acceptance audit and release-candidate readiness review
 - [x] `v0.3.0-rc.1` publication and external-consumer release acceptance
+- [x] AEP Final mechanical-readiness audit
+- [ ] governance decision: whether a prerelease satisfies the AEP `Final` release predicate
+- [ ] AEP-0001..0008 Final lifecycle decision, if authorized and eligible
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
