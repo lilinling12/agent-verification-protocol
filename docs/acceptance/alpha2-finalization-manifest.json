@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "avp-aep-finalization-readiness/v1",
+  "auditBaseline": {
+    "repository": "lilinling12/agent-verification-protocol",
+    "mainCommit": "9f7394ed0b9cdcd4dcd853acc53e0644106fd9f5",
+    "publishedTag": "v0.3.0-rc.1",
+    "publishedSourceCommit": "ef199124017b0dcc8c4a966d00c4f407760f9a06",
+    "releaseClass": "prerelease",
+    "releaseAcceptance": "docs/acceptance/alpha2-rc1-release-acceptance.md"
+  },
+  "policy": {
+    "governanceSource": "GOVERNANCE.md",
+    "finalDefinition": "normative text and required conformance coverage are merged and released",
+    "prereleaseFinality": "UNDEFINED",
+    "automaticFinalTransition": false,
+    "requiredDecision": "explicit protocol-maintainer decision on whether a prerelease satisfies the release predicate for AEP Final"
+  },
+  "overallConclusion": "BLOCKED_ON_GOVERNANCE_CLARIFICATION",
+  "blockers": [
+    "PRERELEASE_FINALITY_UNDEFINED"
+  ],
+  "aeps": [
+    {
+      "id": "AEP-0001",
+      "rfc": "rfcs/AEP-0001-oracle-evaluation-contract.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/oracle/oracle-evaluation-contract.md",
+      "requirementIndex": "spec/oracle/requirement-index.yaml",
+      "tckProfile": "avp-oracle-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/oracle-evaluation-contract-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0002",
+      "rfc": "rfcs/AEP-0002-security-boundary-contract.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/security/security-boundary-contract.md",
+      "requirementIndex": "spec/security/requirement-index.yaml",
+      "tckProfile": "avp-security-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/security-boundary-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0003",
+      "rfc": "rfcs/AEP-0003-scenario-instance-contract.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/scenario/scenario-contract.md",
+      "requirementIndex": "spec/scenario/requirement-index.yaml",
+      "tckProfile": "avp-scenario-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/scenario-instance-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0004",
+      "rfc": "rfcs/AEP-0004-environment-contract.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/environment/environment-contract.md",
+      "requirementIndex": "spec/environment/requirement-index.yaml",
+      "tckProfile": "avp-environment-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/environment-contract-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0005",
+      "rfc": "rfcs/AEP-0005-mcp-tools-interop-profile.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/mcp/mcp-tools-interop-contract.md",
+      "requirementIndex": "spec/mcp/requirement-index.yaml",
+      "tckProfile": "avp-mcp-interop-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/mcp-tools-interop-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0006",
+      "rfc": "rfcs/AEP-0006-opentelemetry-mapping-profile.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/opentelemetry/opentelemetry-mapping-contract.md",
+      "requirementIndex": "spec/opentelemetry/requirement-index.yaml",
+      "tckProfile": "avp-otel-mapping-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/opentelemetry-mapping-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0007",
+      "rfc": "rfcs/AEP-0007-subject-adapter-contract.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/subject/subject-adapter-contract.md",
+      "requirementIndex": "spec/subject/requirement-index.yaml",
+      "tckProfile": "avp-subject-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/subject-adapter-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    },
+    {
+      "id": "AEP-0008",
+      "rfc": "rfcs/AEP-0008-artifact-trust-attestation.md",
+      "expectedStatus": "Accepted",
+      "spec": "spec/trust/artifact-trust-attestation-contract.md",
+      "requirementIndex": "spec/trust/requirement-index.yaml",
+      "tckProfile": "avp-artifact-trust-v0.1",
+      "reconciliation": "docs/reconciliation/v0.1/decisions/artifact-trust-attestation-001.md",
+      "mechanicalReadiness": "READY",
+      "finalEligibility": "BLOCKED_ON_GOVERNANCE_CLARIFICATION"
+    }
+  ]
+}
