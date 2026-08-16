@@ -10,6 +10,7 @@ from scripts.audit_aep_final_eligibility import (
     AuditError,
     EXPECTED_RELEASE_COMMIT,
     EXPECTED_TAG,
+    _bind_tag_resolution,
     audit,
 )
 
@@ -89,66 +90,70 @@ class AepFinalEligibilityAuditTests(unittest.TestCase):
 
     def test_complete_rc_evidence_passes_but_does_not_authorize_final(self) -> None:
         result = audit(self.current_root, self.release_root, self.release_metadata())
-
         self.assertEqual(result["technicalFinalityEvidence"], "PASS")
-        self.assertEqual(
-            result["lifecycleEligibility"],
-            "REQUIRES_STABLE_FINALITY_DECISION",
-        )
+        self.assertEqual(result["lifecycleEligibility"], "REQUIRES_STABLE_FINALITY_DECISION")
         self.assertEqual(len(result["aepResults"]), 8)
         for item in result["aepResults"]:
             self.assertEqual(item["technicalFinalityEvidence"], "PASS")
-            self.assertEqual(
-                item["lifecycleEligibility"],
-                "REQUIRES_STABLE_FINALITY_DECISION",
-            )
+            self.assertEqual(item["lifecycleEligibility"], "REQUIRES_STABLE_FINALITY_DECISION")
+
+    def test_live_tag_resolution_binds_lightweight_tag(self) -> None:
+        release = self.release_metadata()
+        release.pop("resolved_tag_commit")
+        tag_ref = {
+            "ref": f"refs/tags/{EXPECTED_TAG}",
+            "object": {"type": "commit", "sha": EXPECTED_RELEASE_COMMIT},
+        }
+        bound = _bind_tag_resolution(release, tag_ref)
+        self.assertEqual(bound["resolved_tag_commit"], EXPECTED_RELEASE_COMMIT)
+
+    def test_annotated_tag_requires_manual_review(self) -> None:
+        release = self.release_metadata()
+        tag_ref = {
+            "ref": f"refs/tags/{EXPECTED_TAG}",
+            "object": {"type": "tag", "sha": "1" * 40},
+        }
+        with self.assertRaisesRegex(AuditError, "resolve directly to a commit"):
+            _bind_tag_resolution(release, tag_ref)
 
     def test_missing_released_normative_spec_fails_closed(self) -> None:
-        missing = self.release_root / AEP_EVIDENCE[0].normative_specs[0]
-        missing.unlink()
-
+        (self.release_root / AEP_EVIDENCE[0].normative_specs[0]).unlink()
         with self.assertRaisesRegex(AuditError, "required released asset missing"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_current_aep_must_still_be_accepted(self) -> None:
         evidence = AEP_EVIDENCE[1]
         self._write(self.current_root, evidence.rfc, f"# {evidence.aep}\n\n- Status: Final\n")
-
         with self.assertRaisesRegex(AuditError, "expected current status Accepted"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_release_source_aep_must_have_been_accepted(self) -> None:
         evidence = AEP_EVIDENCE[2]
         self._write(self.release_root, evidence.rfc, f"# {evidence.aep}\n\n- Status: Proposed\n")
-
         with self.assertRaisesRegex(AuditError, "release-source status expected Accepted"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_tag_commit_substitution_fails_closed(self) -> None:
         release = self.release_metadata()
         release["resolved_tag_commit"] = "0" * 40
-
         with self.assertRaisesRegex(AuditError, "tag does not resolve"):
             audit(self.current_root, self.release_root, release)
 
     def test_release_target_substitution_fails_closed(self) -> None:
         release = self.release_metadata()
         release["target_commitish"] = "0" * 40
-
         with self.assertRaisesRegex(AuditError, "target_commitish"):
             audit(self.current_root, self.release_root, release)
 
     def test_release_must_remain_prerelease_for_this_audit(self) -> None:
         release = self.release_metadata()
         release["prerelease"] = False
-
         with self.assertRaisesRegex(AuditError, "must remain classified as a prerelease"):
             audit(self.current_root, self.release_root, release)
 
     def test_release_body_must_preserve_not_final_boundary(self) -> None:
         release = self.release_metadata()
         release["body"] = "Alpha 2 release candidate."
-
         with self.assertRaisesRegex(AuditError, "Accepted/not-Final"):
             audit(self.current_root, self.release_root, release)
 
@@ -157,7 +162,6 @@ class AepFinalEligibilityAuditTests(unittest.TestCase):
         assets = list(release["assets"])
         assets.append({"name": "unexpected.bin"})
         release["assets"] = assets
-
         with self.assertRaisesRegex(AuditError, "release asset set mismatch"):
             audit(self.current_root, self.release_root, release)
 
@@ -169,25 +173,24 @@ class AepFinalEligibilityAuditTests(unittest.TestCase):
             "\n".join(line for line in registry.splitlines() if profile_id not in line) + "\n",
             encoding="utf-8",
         )
-
         with self.assertRaisesRegex(AuditError, "not registered"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_governance_rule_change_requires_manual_review(self) -> None:
         self._write(self.current_root, "GOVERNANCE.md", "changed\n")
-
         with self.assertRaisesRegex(AuditError, "Final definition changed"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_release_policy_change_requires_manual_review(self) -> None:
         self._write(self.current_root, "docs/RELEASE_PROCESS.md", "changed\n")
-
         with self.assertRaisesRegex(AuditError, "stability rule changed"):
             audit(self.current_root, self.release_root, self.release_metadata())
 
     def test_output_shape_is_json_serializable(self) -> None:
-        result = audit(self.current_root, self.release_root, self.release_metadata())
-        rendered = json.dumps(result, sort_keys=True)
+        rendered = json.dumps(
+            audit(self.current_root, self.release_root, self.release_metadata()),
+            sort_keys=True,
+        )
         self.assertIn("avp-aep-final-eligibility/v1", rendered)
 
 
