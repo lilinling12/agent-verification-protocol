@@ -42,7 +42,8 @@ class AepFinalEligibilityAuditTests(unittest.TestCase):
         self._write(self.current_root, "GOVERNANCE.md", FINAL_RULE + "\n")
         self._write(self.current_root, "docs/RELEASE_PROCESS.md", PRERELEASE_RULE + "\n")
 
-        registry_lines = ["profiles:"]
+        registry_lines = ["cases:"]
+        case_number = 0
         for evidence in AEP_EVIDENCE:
             rfc = f"# {evidence.aep}\n\n- Status: Accepted\n"
             self._write(self.current_root, evidence.rfc, rfc)
@@ -55,7 +56,13 @@ class AepFinalEligibilityAuditTests(unittest.TestCase):
             ):
                 self._write(self.release_root, relative)
             for profile in evidence.tck_profiles:
-                registry_lines.append(f"  - id: {Path(profile).stem}")
+                case_number += 1
+                registry_lines.extend(
+                    (
+                        f"  - id: FIXTURE-{case_number:03d}",
+                        f"    profile: {Path(profile).stem}",
+                    )
+                )
 
         self._write(
             self.release_root,
