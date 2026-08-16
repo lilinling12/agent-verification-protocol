@@ -26,9 +26,14 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] `v0.3.0-rc.1` publication and external-consumer release acceptance
 - [x] AEP-0001 through AEP-0008 Final eligibility audit
 - [x] explicit protocol-maintainer authorization and `Accepted` → `Final` lifecycle transition
+- [ ] byte-safe historical design-baseline restoration and automated integrity enforcement
+- [ ] global historical-design disposition ledger for documents 03–21 and ADR-001
+- [ ] full design ↔ AEP/spec ↔ schema/TCK ↔ reference-runtime alignment audit
 - [ ] stable `v0.3.0` release decision
 
 AEP-0001 through AEP-0008 are Final based on the merged eligibility audit, the explicit protocol-maintainer decision recorded on 2026-08-17, and released evidence at `v0.3.0-rc.1`. Finalization does not itself authorize stable release publication, package-index publication, or Alpha 3.
+
+Stable `v0.3.0` remains gated on Alpha 2 Baseline Reconciliation Closure. Historical design restoration is provenance-only and must preserve the archived source bytes; reconciliation, specification, schemas, and language-neutral TCK remain authoritative over reference-runtime behavior.
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
