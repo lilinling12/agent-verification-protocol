@@ -49,3 +49,9 @@ A normative requirement requires:
 5. conformance strategy defined;
 6. security impact reviewed;
 7. compatibility/version impact recorded.
+
+## Closure artifacts
+
+- `HISTORICAL-DESIGN-DISPOSITION.md` — global disposition ledger for the immutable Alpha v0.1 historical design baseline, including historical-profile to current-profile responsibility mapping.
+
+Closure artifacts document reconciliation state; they do not outrank AEPs or current normative specification.
