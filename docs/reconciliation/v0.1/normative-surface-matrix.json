@@ -2,8 +2,8 @@
   "matrix_version": "1.0",
   "status": "audit-candidate",
   "authority": "non-normative-acceptance-evidence",
-  "audit_baseline": "77c5c0a90897c9eb25156ef8e8c4a17a9dddb147",
-  "closure_status": "BLOCKED",
+  "audit_baseline": "d8d6c594d6295b98a215db8b18384ffa88a4085e",
+  "closure_status": "READY",
   "domains": [
     {"domain":"core","lineage":{"type":"reconciliation","path":"docs/reconciliation/v0.1/decisions/episode-lifecycle-001.md"},"spec":["spec/core/episode-lifecycle.md","spec/core/terminology.md"],"requirement_index":"spec/core/requirement-index.yaml","profile":"avp-core-v0.1"},
     {"domain":"environment","lineage":{"type":"final-aep","path":"rfcs/AEP-0004-environment-contract.md"},"spec":["spec/environment/environment-contract.md"],"requirement_index":"spec/environment/requirement-index.yaml","profile":"avp-environment-v0.1"},
@@ -28,8 +28,6 @@
     {"path":"schemas/scenario-template.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["scenario"]},
     {"path":"schemas/security-assurance.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["security"]}
   ],
-  "blockers": [
-    {"id":"NSC-005","surface":"spec/*/requirement-index.yaml#status","category":"authority-metadata-drift","decision_required":true,"rationale":"All current requirement indexes use draft-normative-candidate while eight governing AEPs are Final and their normative text/conformance were released in v0.3.0-rc.1. Core and Evidence use reconciliation lineage rather than those AEPs. The repository must define and apply an explicit requirement-index status vocabulary instead of guessing a bulk Final value."}
-  ],
+  "blockers": [],
   "closure_rule": "READY requires zero blockers, exact coverage of all current spec domains, root schemas and TCK profiles, and no unresolved schema authority classification. BLOCKED is a valid audit result and MUST NOT be converted to READY by weakening validation."
 }

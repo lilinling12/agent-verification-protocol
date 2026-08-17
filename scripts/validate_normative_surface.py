@@ -19,6 +19,10 @@ ALLOWED_CLASSIFICATIONS = {
     "ORPHAN_REQUIRES_GOVERNANCE",
     "ALIAS_REQUIRES_DISPOSITION",
 }
+ALLOWED_REQUIREMENT_INDEX_STATUSES = {
+    "draft-normative-candidate",
+    "normative",
+}
 
 
 def fail(message: str) -> None:
@@ -114,14 +118,17 @@ def main() -> None:
         if index_path != (SPEC_ROOT / domain / "requirement-index.yaml").resolve():
             fail(f"{domain} requirement index path is not canonical")
         index = load_yaml(index_path)
+        index_status = index.get("status")
+        if index_status not in ALLOWED_REQUIREMENT_INDEX_STATUSES:
+            fail(f"{domain} has invalid requirement-index status {index_status!r}")
+        if index_status == "draft-normative-candidate":
+            draft_status_seen = True
         profile = record.get("profile")
         if not isinstance(profile, str) or index.get("profile") != profile:
             fail(f"{domain} profile differs from requirement index")
         if profile in seen_profiles or not (PROFILE_ROOT / f"{profile}.yaml").is_file():
             fail(f"{domain} references invalid or duplicate profile {profile!r}")
         seen_profiles.add(profile)
-        if index.get("status") == "draft-normative-candidate":
-            draft_status_seen = True
         specs = string_list(record.get("spec"), f"{domain}.spec")
         for spec in specs:
             confined_file(spec, f"{domain}.spec")
@@ -149,6 +156,8 @@ def main() -> None:
         fail("matrix profile coverage differs from TCK profile inventory")
     if draft_status_seen and "NSC-005" not in blocker_ids:
         fail("draft requirement-index authority metadata requires NSC-005")
+    if not draft_status_seen and "NSC-005" in blocker_ids:
+        fail("NSC-005 is stale after all requirement indexes become normative")
 
     schema_entries = matrix.get("schemas")
     if not isinstance(schema_entries, list) or not schema_entries:

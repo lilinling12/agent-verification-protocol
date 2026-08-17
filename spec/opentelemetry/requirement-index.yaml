@@ -1,5 +1,5 @@
 version: "0.1"
-status: draft-normative-candidate
+status: normative
 profile: avp-otel-mapping-v0.1
 requirements:
   - id: AVP-OTEL-001

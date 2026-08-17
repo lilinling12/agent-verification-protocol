@@ -1,8 +1,8 @@
 # Alpha 2 Normative Surface Closure Audit
 
-Status: **BLOCKED — GOVERNANCE DISPOSITIONS REQUIRED**
+Status: **READY — NORMATIVE SURFACE CLOSED**
 
-Current audit baseline: `main@77c5c0a90897c9eb25156ef8e8c4a17a9dddb147`
+Current audit baseline: `main@d8d6c594d6295b98a215db8b18384ffa88a4085e`
 
 Machine-readable record: `docs/reconciliation/v0.1/normative-surface-matrix.json`
 
@@ -60,13 +60,24 @@ Disposition: **remove the duplicate rather than manufacture a compatibility cont
 
 The normative-surface validator continues to derive the exact root-schema inventory from the repository. Reintroducing an unclassified duplicate, retired event schema, reliability schema, or generic core envelope would therefore fail the audit unless it received an explicit governed disposition.
 
+### NSC-005 — requirement-index authority status defined
+
+The previous `status: draft-normative-candidate` value was used by every domain requirement index without a defined lifecycle distinct from AEP and release state. That made authority metadata ambiguous after eight governing AEPs became Final while Core and Evidence continued to use accepted reconciliation lineage.
+
+Disposition: **define requirement-index authority metadata independently instead of copying AEP lifecycle values**. The requirement-index vocabulary is now:
+
+- `draft-normative-candidate` — a governed candidate requirement set that is not yet the current accepted machine-readable requirement authority for its domain;
+- `normative` — the current machine-readable normative requirement authority for a domain, backed by recorded accepted lineage and its normative specification/conformance surface.
+
+All ten current domain requirement indexes are `normative`. Eight domains are backed by Final AEPs; Core and Evidence remain backed by their accepted reconciliation decisions. This deliberately does not manufacture AEPs for historical normalization.
+
+`normative` is not a synonym for AEP `Final`, TCK profile maturity, stable release readiness, or repository-wide Normative Surface Closure. This disposition therefore does **not** authorize stable `v0.3.0` by itself.
+
+The normative-surface validator rejects unknown requirement-index statuses, requires NSC-005 whenever any requirement index remains `draft-normative-candidate`, and rejects a stale NSC-005 blocker when all requirement indexes are `normative`. No requirement statement, schema ownership, TCK expectation, or reference-runtime behavior changes in this disposition.
+
 ## Remaining blocking findings
 
-### NSC-005 — Requirement-index authority metadata is stale/undefined
-
-Current requirement indexes use `status: draft-normative-candidate`. Eight governing AEPs are Final and their normative text/conformance were included in the published RC evidence, while Core and Evidence use earlier reconciliation lineage. The repository has no explicit requirement-index lifecycle vocabulary that would justify blindly replacing every status with `Final`.
-
-Required disposition: define the status vocabulary and its relationship to AEP/spec release state, then apply it deliberately by domain.
+None. NSC-001 through NSC-005 have explicit governed dispositions and no unresolved root-schema authority classification remains.
 
 ## Non-findings
 
@@ -76,12 +87,14 @@ The audit also does not require every domain to have an AEP. Core and Evidence h
 
 ## Closure decision
 
-**Normative Surface Closure is not ready to close. Stable `v0.3.0` remains blocked.**
+**Normative Surface Closure is READY.**
 
-NSC-001, NSC-002, NSC-003, and NSC-004 are closed by retiring unowned authority surfaces rather than manufacturing missing protocol ownership or deriving semantics from implementation behavior. One blocker remains: NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
+NSC-001, NSC-002, NSC-003, and NSC-004 are closed by retiring unowned authority surfaces rather than manufacturing missing protocol ownership or deriving semantics from implementation behavior. NSC-005 is closed by defining an explicit requirement-index authority vocabulary and applying `normative` to all ten current domain indexes without changing requirement semantics.
 
-A future closure change may set the matrix to `READY` only after NSC-005 is resolved through the governed authority-metadata path and the exact-head quality/governance checks pass.
+The machine-readable matrix therefore has zero blockers and `closure_status: READY`. The validator fails closed if blockers reappear, schema/domain/profile inventories drift, lineage claims are invalid, requirement-index authority metadata becomes ambiguous, or zero-blocker/closure state becomes inconsistent.
+
+`READY` here is a **Normative Surface Closure** decision only. It does not itself authorize a stable `v0.3.0` release and does not make reference implementation behavior normative. Repository merge eligibility still requires the normal exact-head CI/Governance evidence.
 
 ## Next work
 
-Resolve NSC-005 as a separate, reviewable authority-metadata change. Only after Normative Surface Closure reaches `READY` should AVP proceed to the reference implementation alignment audit and then stable-release eligibility.
+Proceed to the **Reference Runtime Alignment Audit**. That audit must verify the reference runtime against the already-governed normative surface without allowing Python behavior to redefine protocol semantics. Stable-release eligibility remains a later, separate decision after runtime alignment evidence is complete.
