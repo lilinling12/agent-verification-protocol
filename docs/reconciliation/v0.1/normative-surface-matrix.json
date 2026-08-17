@@ -2,7 +2,7 @@
   "matrix_version": "1.0",
   "status": "audit-candidate",
   "authority": "non-normative-acceptance-evidence",
-  "audit_baseline": "90d24ee2f9fef66a26872fba4853dcf917b507b5",
+  "audit_baseline": "7abbb3b85f799eaef108478284898fdeb9d688ad",
   "closure_status": "BLOCKED",
   "domains": [
     {"domain":"core","lineage":{"type":"reconciliation","path":"docs/reconciliation/v0.1/decisions/episode-lifecycle-001.md"},"spec":["spec/core/episode-lifecycle.md","spec/core/terminology.md"],"requirement_index":"spec/core/requirement-index.yaml","profile":"avp-core-v0.1"},
@@ -22,7 +22,6 @@
     {"path":"schemas/artifact-trust-policy.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["trust"]},
     {"path":"schemas/artifact-trust-result.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["trust"]},
     {"path":"schemas/avp-core.schema.json","classification":"UNOWNED_REQUIRES_GOVERNANCE","blocker_ids":["NSC-003"]},
-    {"path":"schemas/avp-event.schema.json","classification":"UNOWNED_REQUIRES_GOVERNANCE","blocker_ids":["NSC-002"]},
     {"path":"schemas/episode-lifecycle.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["core"]},
     {"path":"schemas/evidence.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["evidence"]},
     {"path":"schemas/oracle-evaluation.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["oracle"]},
@@ -31,7 +30,6 @@
     {"path":"schemas/security-assurance.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["security"]}
   ],
   "blockers": [
-    {"id":"NSC-002","surface":"schemas/avp-event.schema.json","category":"unowned-schema","decision_required":true,"rationale":"No current requirement index declares this event schema as schema impact. The historical event/evidence representation was explicitly reconciled away from using implementation or legacy shapes as authority. The event surface requires explicit ownership or non-normative disposition."},
     {"id":"NSC-003","surface":"schemas/avp-core.schema.json","category":"unowned-schema","decision_required":true,"rationale":"The Core requirement index owns episode-lifecycle.schema.json but does not declare avp-core.schema.json. Its broad resource-kind envelope therefore lacks a current requirement owner and cannot become normative merely because it is under schemas/."},
     {"id":"NSC-005","surface":"spec/*/requirement-index.yaml#status","category":"authority-metadata-drift","decision_required":true,"rationale":"All current requirement indexes use draft-normative-candidate while eight governing AEPs are Final and their normative text/conformance were released in v0.3.0-rc.1. Core and Evidence use reconciliation lineage rather than those AEPs. The repository must define and apply an explicit requirement-index status vocabulary instead of guessing a bulk Final value."}
   ],

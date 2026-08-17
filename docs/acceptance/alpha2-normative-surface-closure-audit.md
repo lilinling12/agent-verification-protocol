@@ -2,7 +2,7 @@
 
 Status: **BLOCKED — GOVERNANCE DISPOSITIONS REQUIRED**
 
-Current audit baseline: `main@90d24ee2f9fef66a26872fba4853dcf917b507b5`
+Current audit baseline: `main@7abbb3b85f799eaef108478284898fdeb9d688ad`
 
 Machine-readable record: `docs/reconciliation/v0.1/normative-surface-matrix.json`
 
@@ -32,6 +32,16 @@ The retirement is also consistent with the concrete repository surfaces: the orp
 
 Historical reconciliation evidence is updated to stop treating the retired path as a live repository artifact while retaining the `DEFERRED` / `NON_NORMATIVE` dispositions. The normative-surface matrix removes NSC-001 only after the root schema itself is removed.
 
+### NSC-002 — legacy AVP event root schema retired
+
+`schemas/avp-event.schema.json` had no current requirement-index owner. The historical Evidence reconciliation already records that the legacy event schema's loose `payload_ref` / `evidence` reference shapes are not safely interchangeable with the governed ArtifactRef/Evidence model. The current Evidence requirement index therefore names `schemas/artifact-ref.schema.json` and `schemas/evidence.schema.json`, not the legacy event schema.
+
+The OpenTelemetry profile does govern **event correlation semantics**: `AVP-OTEL-002` requires preservation of event identity, event type, and Episode-local ordering when events are mapped to telemetry. It deliberately does not define a universal AVP event wire object, and its language-neutral TCK case checks those observable correlation properties without depending on `schemas/avp-event.schema.json`.
+
+The Python `AVPEvent` value object is also not used as replacement authority. Its implementation shape differs from the retired root schema (for example, the root schema required `schema_version` and `observed_at`, while the reference value object does not expose those fields). NSC-002 therefore **retires the unowned root schema rather than changing protocol semantics to match either legacy schema or Python code**.
+
+Disposition: remove `schemas/avp-event.schema.json`; remove it from historical promoted-schema evidence; preserve current Evidence and OpenTelemetry normative requirements/TCK unchanged; leave reference-runtime event behavior unchanged. No new AEP, normative requirement, schema replacement, or TCK expectation is created by this cleanup.
+
 ### NSC-004 — duplicate Scenario schema alias retired
 
 `schemas/scenario.schema.json` was byte-identical to the requirement-owned `schemas/scenario-template.schema.json`, but no current requirement declared the duplicate path. The packaged reference-resource copy was likewise unused by the Scenario loader, which explicitly loads `scenario-template.schema.json` and `scenario-instance.schema.json`.
@@ -41,12 +51,6 @@ Disposition: **remove the duplicate rather than manufacture a compatibility cont
 The normative-surface validator continues to derive the exact root-schema inventory from the repository. Reintroducing an unclassified duplicate would therefore fail the audit unless it received an explicit governed disposition.
 
 ## Remaining blocking findings
-
-### NSC-002 — AVP event schema has no current requirement owner
-
-`schemas/avp-event.schema.json` is not declared as schema impact by any current requirement index. Its broad event/evidence shape cannot be treated as normative merely because it remains under `schemas/`.
-
-Required disposition: establish a governed current owner or explicitly retire/reclassify the surface.
 
 ### NSC-003 — AVP core resource envelope has no current requirement owner
 
@@ -70,7 +74,7 @@ The audit also does not require every domain to have an AEP. Core and Evidence h
 
 **Normative Surface Closure is not ready to close. Stable `v0.3.0` remains blocked.**
 
-NSC-001 and NSC-004 are closed by retiring unowned schema surfaces rather than inventing compatibility or normative semantics. Three blockers remain: NSC-002, NSC-003, and NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
+NSC-001, NSC-002, and NSC-004 are closed by retiring unowned authority surfaces rather than manufacturing missing protocol ownership or deriving semantics from implementation behavior. Two blockers remain: NSC-003 and NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
 
 A future closure change may set the matrix to `READY` only after every remaining blocker is resolved through the appropriate governed path and the exact-head quality/governance checks pass.
 
