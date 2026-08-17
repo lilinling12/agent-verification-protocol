@@ -62,6 +62,13 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
         self.assertFalse((validator.ROOT / "schemas/scenario.schema.json").exists())
         self.assertFalse((validator.ROOT / "src/avp_ref/resources/scenario.schema.json").exists())
 
+    def test_retired_reliability_schema_is_absent(self) -> None:
+        schema_paths = {item["path"] for item in self.matrix["schemas"]}
+        self.assertNotIn("schemas/reliability-report.schema.json", schema_paths)
+        self.assertFalse((validator.ROOT / "schemas/reliability-report.schema.json").exists())
+        blocker_ids = {item["id"] for item in self.matrix["blockers"]}
+        self.assertNotIn("NSC-001", blocker_ids)
+
     def test_draft_requirement_metadata_requires_explicit_blocker(self) -> None:
         matrix = copy.deepcopy(self.matrix)
         matrix["blockers"] = [item for item in matrix["blockers"] if item["id"] != "NSC-005"]
