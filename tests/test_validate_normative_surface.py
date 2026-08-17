@@ -52,9 +52,18 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
 
     def test_unresolved_schema_requires_known_blocker(self) -> None:
         matrix = copy.deepcopy(self.matrix)
-        entry = next(item for item in matrix["schemas"] if item["path"] == "schemas/avp-core.schema.json")
+        entry = next(item for item in matrix["schemas"] if item["path"] == "schemas/artifact-ref.schema.json")
+        entry["classification"] = "UNOWNED_REQUIRES_GOVERNANCE"
+        entry.pop("owner_domains")
         entry["blocker_ids"] = ["NSC-999"]
         self.assert_rejected(matrix)
+
+    def test_retired_avp_core_schema_is_absent(self) -> None:
+        schema_paths = {item["path"] for item in self.matrix["schemas"]}
+        self.assertNotIn("schemas/avp-core.schema.json", schema_paths)
+        self.assertFalse((validator.ROOT / "schemas/avp-core.schema.json").exists())
+        blocker_ids = {item["id"] for item in self.matrix["blockers"]}
+        self.assertNotIn("NSC-003", blocker_ids)
 
     def test_retired_scenario_alias_is_absent(self) -> None:
         schema_paths = {item["path"] for item in self.matrix["schemas"]}

@@ -2,7 +2,7 @@
 
 Status: **BLOCKED — GOVERNANCE DISPOSITIONS REQUIRED**
 
-Current audit baseline: `main@7abbb3b85f799eaef108478284898fdeb9d688ad`
+Current audit baseline: `main@77c5c0a90897c9eb25156ef8e8c4a17a9dddb147`
 
 Machine-readable record: `docs/reconciliation/v0.1/normative-surface-matrix.json`
 
@@ -42,21 +42,25 @@ The Python `AVPEvent` value object is also not used as replacement authority. It
 
 Disposition: remove `schemas/avp-event.schema.json`; remove it from historical promoted-schema evidence; preserve current Evidence and OpenTelemetry normative requirements/TCK unchanged; leave reference-runtime event behavior unchanged. No new AEP, normative requirement, schema replacement, or TCK expectation is created by this cleanup.
 
+### NSC-003 — legacy AVP core resource envelope retired
+
+`schemas/avp-core.schema.json` described a broad `apiVersion` / `kind` / `metadata` resource envelope spanning `ScenarioTemplate`, `ScenarioInstance`, `Benchmark`, `EnvironmentManifest`, `AgentSystem`, `EpisodeManifest`, `OracleBundle`, `MutationSet`, `FaultProfile`, and `ReleasePolicy`. The current Core requirement index does not own that envelope; it owns `schemas/episode-lifecycle.schema.json` only where lifecycle transition-record shape is required.
+
+The accepted Core reconciliation decision standardizes semantic Episode lifecycle phases and explicitly limits JSON Schema authority to lifecycle transition-record shape. It does not establish a universal AVP resource-kind registry or generic metadata envelope. Historical umbrella protocol responsibilities were likewise split across narrower authority domains, and the historical disposition ledger records `schemas/episode-lifecycle.schema.json`—not `schemas/avp-core.schema.json`—as promoted Core schema evidence.
+
+Current domain schemas that use `apiVersion`, `kind`, or `metadata` define those fields directly under their own governed contracts. In particular, ScenarioTemplate and ScenarioInstance each declare their own exact `kind` and metadata requirements rather than inheriting from the legacy envelope. The reference wheel does not package `avp-core.schema.json` as a runtime schema resource.
+
+Disposition: **retire the unowned generic envelope rather than backfill a new Core owner or infer a cross-domain resource model from legacy structure**. This closes an authority-surface ambiguity without changing Core lifecycle semantics, any requirement index, any TCK expectation, or the Python reference runtime.
+
 ### NSC-004 — duplicate Scenario schema alias retired
 
 `schemas/scenario.schema.json` was byte-identical to the requirement-owned `schemas/scenario-template.schema.json`, but no current requirement declared the duplicate path. The packaged reference-resource copy was likewise unused by the Scenario loader, which explicitly loads `scenario-template.schema.json` and `scenario-instance.schema.json`.
 
 Disposition: **remove the duplicate rather than manufacture a compatibility contract**. Both `schemas/scenario.schema.json` and `src/avp_ref/resources/scenario.schema.json` are retired. `schemas/scenario-template.schema.json` remains the sole canonical ScenarioTemplate schema named by `AVP-SCENARIO-003`; the reference loader behavior is unchanged. This is authority-surface cleanup, not a protocol semantic change.
 
-The normative-surface validator continues to derive the exact root-schema inventory from the repository. Reintroducing an unclassified duplicate would therefore fail the audit unless it received an explicit governed disposition.
+The normative-surface validator continues to derive the exact root-schema inventory from the repository. Reintroducing an unclassified duplicate, retired event schema, reliability schema, or generic core envelope would therefore fail the audit unless it received an explicit governed disposition.
 
 ## Remaining blocking findings
-
-### NSC-003 — AVP core resource envelope has no current requirement owner
-
-Core requirements declare `schemas/episode-lifecycle.schema.json`; they do not declare `schemas/avp-core.schema.json`. The latter enumerates a broad set of resource kinds beyond the current Core lifecycle requirement surface.
-
-Required disposition: establish explicit normative ownership or retire/reclassify the envelope.
 
 ### NSC-005 — Requirement-index authority metadata is stale/undefined
 
@@ -74,10 +78,10 @@ The audit also does not require every domain to have an AEP. Core and Evidence h
 
 **Normative Surface Closure is not ready to close. Stable `v0.3.0` remains blocked.**
 
-NSC-001, NSC-002, and NSC-004 are closed by retiring unowned authority surfaces rather than manufacturing missing protocol ownership or deriving semantics from implementation behavior. Two blockers remain: NSC-003 and NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
+NSC-001, NSC-002, NSC-003, and NSC-004 are closed by retiring unowned authority surfaces rather than manufacturing missing protocol ownership or deriving semantics from implementation behavior. One blocker remains: NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
 
-A future closure change may set the matrix to `READY` only after every remaining blocker is resolved through the appropriate governed path and the exact-head quality/governance checks pass.
+A future closure change may set the matrix to `READY` only after NSC-005 is resolved through the governed authority-metadata path and the exact-head quality/governance checks pass.
 
 ## Next work
 
-Resolve the remaining blockers in separate, reviewable changes. Semantic promotions require the AEP/spec/schema/TCK lifecycle; non-normative retirement/relocation and metadata-vocabulary work must remain narrowly scoped. Only after Normative Surface Closure reaches `READY` should AVP proceed to the reference implementation alignment audit and then stable-release eligibility.
+Resolve NSC-005 as a separate, reviewable authority-metadata change. Only after Normative Surface Closure reaches `READY` should AVP proceed to the reference implementation alignment audit and then stable-release eligibility.
