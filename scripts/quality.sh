@@ -15,6 +15,9 @@ python scripts/validate_release_metadata.py
 echo "== Historical design baseline integrity =="
 python scripts/validate_design_baseline.py
 
+echo "== Historical design disposition closure =="
+python scripts/validate_historical_disposition.py
+
 echo "== Unit tests =="
 python -m unittest discover -s tests -v
 
