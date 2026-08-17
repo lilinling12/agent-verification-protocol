@@ -12,6 +12,9 @@ python scripts/validate_dependencies.py
 echo "== Release metadata =="
 python scripts/validate_release_metadata.py
 
+echo "== Historical design baseline integrity =="
+python scripts/validate_design_baseline.py
+
 echo "== Unit tests =="
 python -m unittest discover -s tests -v
 
