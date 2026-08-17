@@ -47,8 +47,7 @@ This is the human-readable view of the global historical-design closure ledger. 
 - **07 `07-environment-fabric.md` — SPLIT:** Portable environment state authority, reset/time, observation, projection, snapshot/restore, diff and fault semantics are normative; hosted provisioning/fabric internals are not.
 - **08 `08-verification-engine.md` — SPLIT:** Verification semantics were decomposed into lifecycle/result separation, Evidence, Oracle, and trust domains. Engine orchestration remains reference implementation behavior.
 - **09 `09-failure-intelligence.md` — SPLIT:** Root-cause analysis, clustering, explanation and remediation recommendations are evaluator methodology or product intelligence, not portable conformance semantics.
-- **10 `10-reliability-statistics.md` — SPLIT:** Statistical reliability semantics are not governed by a Final Alpha 2 profile. The existing reliability-report schema and Python helper are current repository surfaces, but without a normative spec owner they do not prove promotion and must be resolved by the normative-surface audit.
-  - **Closure gap:** `schemas/reliability-report.schema.json` exists without a corresponding Final normative spec/requirement-index/TCK profile; the next normative-surface audit must classify, govern, or remove that orphan surface before stable release.
+- **10 `10-reliability-statistics.md` — SPLIT:** Statistical reliability semantics are not governed by a Final Alpha 2 profile. NSC-001 resolves the orphan authority surface by retiring `schemas/reliability-report.schema.json` from the normative schema root rather than promoting historical methodology or Python behavior into protocol authority. The portable reliability/statistical methodology remains `DEFERRED`; `src/avp_ref/reliability.py` remains `NON_NORMATIVE` reference behavior.
 - **11 `11-conformance-test-spec.md` — SUPERSEDED:** The historical conformance specification was replaced by the current language-neutral TCK registry, schemas, runner contract and requirement-linked cases.
 - **12 `12-open-source-governance.md` — SUPERSEDED:** Repository governance and protocol change control are governed by the current governance/AEP/release process rather than the historical draft.
 - **13 `13-reference-runtime-design.md` — NON_NORMATIVE:** Reference-runtime design is implementation evidence only. Current reference code follows the normative specification and TCK and does not define protocol semantics.
@@ -85,9 +84,9 @@ This is the human-readable view of the global historical-design closure ledger. 
 
 ## Stable-release consequence
 
-Global historical disposition closure is necessary but not sufficient for stable release. In particular, the current repository contains `schemas/reliability-report.schema.json` without a corresponding Final normative specification, requirement index, or TCK profile. The ledger records that mismatch rather than treating the schema or Python helper as proof of promotion.
+Global historical disposition closure is necessary but not sufficient for stable release. NSC-001 retires the unowned reliability-report schema from the normative schema root while preserving the historical decision that portable reliability/statistical methodology is deferred and the current Python reliability helper is non-normative. No reliability requirement, schema, TCK profile, or cross-language contract is created by that retirement.
 
-The next gate is **Normative Surface Closure**, which audits `AEP ↔ spec ↔ requirement-index ↔ schema ↔ TCK`, classifies orphan authority surfaces, and must close blocking mismatches before implementation-alignment and stable-eligibility audits.
+The active gate remains **Normative Surface Closure**, which audits `AEP ↔ spec ↔ requirement-index ↔ schema ↔ TCK` and must close the remaining blocking mismatches before implementation-alignment and stable-eligibility audits.
 
 ## Machine verification
 

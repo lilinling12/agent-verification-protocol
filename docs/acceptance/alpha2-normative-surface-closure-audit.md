@@ -2,7 +2,7 @@
 
 Status: **BLOCKED — GOVERNANCE DISPOSITIONS REQUIRED**
 
-Current audit baseline: `main@31b9f9aae7bf65f989db4a8d76e66493ba06fefe`
+Current audit baseline: `main@90d24ee2f9fef66a26872fba4853dcf917b507b5`
 
 Machine-readable record: `docs/reconciliation/v0.1/normative-surface-matrix.json`
 
@@ -20,7 +20,17 @@ All 10 current specification domains have a requirement index and a registered T
 
 AEP-0001 through AEP-0008 are Final under the explicit protocol-maintainer decision and released `v0.3.0-rc.1` evidence. Core and Evidence predate that AEP batch and retain explicit reconciliation lineage; this audit does not invent an AEP solely to normalize history.
 
-## Resolved finding
+## Resolved findings
+
+### NSC-001 — orphan Reliability report schema retired
+
+`schemas/reliability-report.schema.json` had no normative reliability specification, requirement index, or TCK profile owner. Historical reconciliation explicitly classifies portable reliability/statistical methodology as `DEFERRED` and the current Python reliability helper as `NON_NORMATIVE`.
+
+Disposition: **retire the orphan schema from the normative `schemas/` root rather than manufacture protocol authority around it**. No reliability AEP, normative requirement, schema replacement, or TCK profile is created. `src/avp_ref/reliability.py` remains reference-only behavior and is unchanged.
+
+The retirement is also consistent with the concrete repository surfaces: the orphan schema described a report envelope requiring fields such as `report_version`, `experiment_id`, `valid_episodes`, and `metrics`, while the Python helper exposes a different implementation-oriented `ReliabilityReport` shape. That mismatch is evidence that neither surface can legitimately define the other. Protocol semantics therefore remain one-way from governed normative authority, not from the Python implementation.
+
+Historical reconciliation evidence is updated to stop treating the retired path as a live repository artifact while retaining the `DEFERRED` / `NON_NORMATIVE` dispositions. The normative-surface matrix removes NSC-001 only after the root schema itself is removed.
 
 ### NSC-004 — duplicate Scenario schema alias retired
 
@@ -31,12 +41,6 @@ Disposition: **remove the duplicate rather than manufacture a compatibility cont
 The normative-surface validator continues to derive the exact root-schema inventory from the repository. Reintroducing an unclassified duplicate would therefore fail the audit unless it received an explicit governed disposition.
 
 ## Remaining blocking findings
-
-### NSC-001 — Reliability report is an orphan authority surface
-
-`schemas/reliability-report.schema.json` lives in the normative schema root, but no current reliability normative specification, requirement index, or TCK profile owns it. Historical reliability methodology is explicitly deferred. `src/avp_ref/reliability.py` is reference behavior and cannot supply missing protocol authority.
-
-Required disposition: governed promotion through the normal protocol lifecycle, or explicit non-normative relocation/reclassification/removal.
 
 ### NSC-002 — AVP event schema has no current requirement owner
 
@@ -66,7 +70,7 @@ The audit also does not require every domain to have an AEP. Core and Evidence h
 
 **Normative Surface Closure is not ready to close. Stable `v0.3.0` remains blocked.**
 
-NSC-004 is closed by removing an unowned duplicate surface. Four blockers remain: NSC-001, NSC-002, NSC-003, and NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
+NSC-001 and NSC-004 are closed by retiring unowned schema surfaces rather than inventing compatibility or normative semantics. Three blockers remain: NSC-002, NSC-003, and NSC-005. The machine validator intentionally accepts this truthful `BLOCKED` state while failing closed if inventory, ownership evidence, blocker linkage, Final-AEP claims, or closure-state rules drift.
 
 A future closure change may set the matrix to `READY` only after every remaining blocker is resolved through the appropriate governed path and the exact-head quality/governance checks pass.
 

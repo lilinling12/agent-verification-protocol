@@ -1,9 +1,0 @@
-{
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"urn:avp:schemas:reliability-report:0.1",
-  "title":"AVP Reliability Report",
-  "type":"object",
-  "required":["report_version","experiment_id","valid_episodes","invalid_episodes","metrics"],
-  "properties":{"report_version":{"const":"0.1.0"},"experiment_id":{"type":"string"},"valid_episodes":{"type":"integer","minimum":0},"invalid_episodes":{"type":"integer","minimum":0},"pairing":{"type":"object"},"resource_manifest_digest":{"type":"string"},"metrics":{"type":"array","items":{"type":"object","required":["name","estimate"],"properties":{"name":{"type":"string"},"estimate":{"type":"number"},"sample_size":{"type":"integer","minimum":0},"ci":{"type":"object","properties":{"level":{"type":"number"},"lower":{"type":"number"},"upper":{"type":"number"},"method":{"type":"string"}},"required":["level","lower","upper","method"]}},"additionalProperties":true}}},
-  "additionalProperties":true
-}
