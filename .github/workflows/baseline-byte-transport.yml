@@ -1,22 +1,22 @@
 name: Baseline Byte Transport
 
 on:
-  push:
+  pull_request:
     branches:
-      - chore/baseline-byte-transport
-    paths:
-      - .github/workflows/baseline-byte-transport.yml
+      - main
 
 permissions:
   contents: write
 
 jobs:
   materialize:
-    runs-on: ubuntu-latest
+    if: github.head_ref == 'chore/baseline-byte-transport'
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout transport branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: chore/baseline-byte-transport
           fetch-depth: 1
 
       - name: Materialize and verify immutable sources
@@ -64,5 +64,9 @@ jobs:
           git add \
             docs/design/alpha-v0.1/03-agent-verification-protocol.md \
             docs/design/alpha-v0.1/06-system-architecture.md
-          git commit -m "chore: materialize verified baseline transport"
+          if git diff --cached --quiet; then
+            echo 'verified source blobs are already persisted'
+            exit 0
+          fi
+          git commit -m 'chore: materialize verified baseline transport'
           git push origin HEAD:chore/baseline-byte-transport
