@@ -1,5 +1,5 @@
 version: "0.1"
-status: draft-normative-candidate
+status: normative
 profile: avp-mcp-interop-v0.1
 requirements:
   - id: AVP-MCP-001

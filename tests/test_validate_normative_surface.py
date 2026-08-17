@@ -26,12 +26,27 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.validate(matrix)
 
-    def test_current_blocked_audit_is_valid(self) -> None:
+    def test_current_ready_audit_is_valid(self) -> None:
+        self.assertEqual("READY", self.matrix["closure_status"])
+        self.assertEqual([], self.matrix["blockers"])
         self.validate(copy.deepcopy(self.matrix))
 
-    def test_ready_is_rejected_while_blockers_remain(self) -> None:
+    def test_blocked_is_rejected_when_zero_blockers_remain(self) -> None:
         matrix = copy.deepcopy(self.matrix)
-        matrix["closure_status"] = "READY"
+        matrix["closure_status"] = "BLOCKED"
+        self.assert_rejected(matrix)
+
+    def test_ready_is_rejected_when_a_blocker_is_added(self) -> None:
+        matrix = copy.deepcopy(self.matrix)
+        matrix["blockers"].append(
+            {
+                "id": "NSC-999",
+                "surface": "synthetic",
+                "category": "synthetic-regression",
+                "decision_required": True,
+                "rationale": "Synthetic blocker used to verify fail-closed READY semantics.",
+            }
+        )
         self.assert_rejected(matrix)
 
     def test_missing_domain_is_rejected(self) -> None:
@@ -85,9 +100,44 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
         blocker_ids = {item["id"] for item in self.matrix["blockers"]}
         self.assertNotIn("NSC-002", blocker_ids)
 
+    def test_unknown_requirement_index_status_is_rejected(self) -> None:
+        original_load_yaml = validator.load_yaml
+
+        def load_with_invalid_status(path: Path) -> dict:
+            value = original_load_yaml(path)
+            if path.name == "requirement-index.yaml" and path.parent.name == "core":
+                value = copy.deepcopy(value)
+                value["status"] = "Final"
+            return value
+
+        with patch.object(validator, "load_yaml", side_effect=load_with_invalid_status):
+            self.assert_rejected(copy.deepcopy(self.matrix))
+
     def test_draft_requirement_metadata_requires_explicit_blocker(self) -> None:
+        original_load_yaml = validator.load_yaml
+
+        def load_with_draft_status(path: Path) -> dict:
+            value = original_load_yaml(path)
+            if path.name == "requirement-index.yaml" and path.parent.name == "core":
+                value = copy.deepcopy(value)
+                value["status"] = "draft-normative-candidate"
+            return value
+
+        with patch.object(validator, "load_yaml", side_effect=load_with_draft_status):
+            self.assert_rejected(copy.deepcopy(self.matrix))
+
+    def test_nsc005_is_rejected_when_all_indexes_are_normative(self) -> None:
         matrix = copy.deepcopy(self.matrix)
-        matrix["blockers"] = [item for item in matrix["blockers"] if item["id"] != "NSC-005"]
+        matrix["closure_status"] = "BLOCKED"
+        matrix["blockers"].append(
+            {
+                "id": "NSC-005",
+                "surface": "spec/*/requirement-index.yaml#status",
+                "category": "authority-metadata-drift",
+                "decision_required": True,
+                "rationale": "Synthetic stale blocker used to verify fail-closed status linkage.",
+            }
+        )
         self.assert_rejected(matrix)
 
     def test_final_aep_lineage_must_actually_be_final(self) -> None:

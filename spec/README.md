@@ -19,7 +19,20 @@ When semantics conflict, resolution order is: `spec/` -> `schemas/` -> `conforma
 - `subject/` — Subject Adapter identity, Agent System binding, invocation budgets, controlled capability gateway, outcome separation, stale-handle behavior, and transport/isolation claim honesty;
 - `trust/` — Artifact attestation authentication, signer identity, evaluator-owned trust-policy acceptance, publication-authority claims, and fail-closed trust outcomes.
 
-Normative-candidate status is tracked by each domain's requirement index and reconciliation assets; presence under `spec/` does not by itself imply an accepted stable standard.
+Presence under `spec/` does not by itself establish accepted protocol authority. Each domain is tied to recorded governance/reconciliation lineage, a requirement index, and its conformance surface.
+
+## Requirement-index status
+
+The top-level `status` in a domain `requirement-index.yaml` describes the authority state of that machine-readable requirement set. It is intentionally separate from AEP lifecycle state, TCK architecture/profile metadata, and release maturity.
+
+The allowed values are:
+
+- `draft-normative-candidate` — the requirement set is a governed candidate and is not yet the current accepted machine-readable requirement authority for the domain;
+- `normative` — the requirement set is the current machine-readable normative requirement authority for the domain, backed by the domain's recorded accepted lineage and normative specification/conformance surface.
+
+`normative` does **not** mean that a governing AEP is necessarily `Final`, that a stable AVP release has been published, or that repository-wide Normative Surface Closure is `READY`. Those are separate governance and release decisions. Core and Evidence, for example, may have `normative` requirement indexes through accepted reconciliation lineage without manufacturing an AEP solely to normalize history.
+
+Unknown requirement-index status values are invalid. Status transitions must follow the applicable governance path and must not be used to bypass semantic review or conformance evidence.
 
 ## Belongs here
 
