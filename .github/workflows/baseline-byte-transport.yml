@@ -1,0 +1,68 @@
+name: Baseline Byte Transport
+
+on:
+  push:
+    branches:
+      - chore/baseline-byte-transport
+    paths:
+      - .github/workflows/baseline-byte-transport.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Materialize and verify immutable sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/design/alpha-v0.1
+
+          cat .transport/03/*.b64 | base64 --decode > docs/design/alpha-v0.1/03-agent-verification-protocol.md
+          cat .transport/06/*.b64 | base64 --decode > docs/design/alpha-v0.1/06-system-architecture.md
+
+          verify() {
+            local file="$1"
+            local expected_bytes="$2"
+            local expected_lines="$3"
+            local expected_sha256="$4"
+            local expected_blob="$5"
+
+            test "$(wc -c < "$file")" -eq "$expected_bytes"
+            test "$(wc -l < "$file")" -eq "$expected_lines"
+            test "$(sha256sum "$file" | awk '{print $1}')" = "$expected_sha256"
+            test "$(git hash-object "$file")" = "$expected_blob"
+          }
+
+          verify \
+            docs/design/alpha-v0.1/03-agent-verification-protocol.md \
+            23653 \
+            1177 \
+            73a9c43c91a54f23d7b5cdb0772ca497130ee5293979b7b66047f204313bc92f \
+            414e5c32c255bcb9d0bb283b5b4b6d295c47762f
+
+          verify \
+            docs/design/alpha-v0.1/06-system-architecture.md \
+            26078 \
+            1345 \
+            b6e0c99c15e21ca2d8fdaf9226b8e8c48374ab1e944bd184846fd5e123725e5d \
+            5e31b2d8df43211cdcb8c701fa4efffd862bbe94
+
+      - name: Persist verified Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            docs/design/alpha-v0.1/03-agent-verification-protocol.md \
+            docs/design/alpha-v0.1/06-system-architecture.md
+          git commit -m "chore: materialize verified baseline transport"
+          git push origin HEAD:chore/baseline-byte-transport
