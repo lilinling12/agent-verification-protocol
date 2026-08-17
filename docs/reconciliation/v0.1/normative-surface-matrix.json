@@ -1,0 +1,43 @@
+{
+  "matrix_version": "1.0",
+  "status": "audit-candidate",
+  "authority": "non-normative-acceptance-evidence",
+  "audit_baseline": "c7a27f915bff2a5bdb045a9e6e30d099518fec57",
+  "closure_status": "BLOCKED",
+  "domains": [
+    {"domain":"core","lineage":{"type":"reconciliation","path":"docs/reconciliation/v0.1/decisions/episode-lifecycle-001.md"},"spec":["spec/core/episode-lifecycle.md","spec/core/terminology.md"],"requirement_index":"spec/core/requirement-index.yaml","profile":"avp-core-v0.1"},
+    {"domain":"environment","lineage":{"type":"final-aep","path":"rfcs/AEP-0004-environment-contract.md"},"spec":["spec/environment/environment-contract.md"],"requirement_index":"spec/environment/requirement-index.yaml","profile":"avp-environment-v0.1"},
+    {"domain":"evidence","lineage":{"type":"reconciliation","path":"docs/reconciliation/v0.1/decisions/evidence-artifact-identity-001.md"},"spec":["spec/evidence/evidence-artifact-identity.md"],"requirement_index":"spec/evidence/requirement-index.yaml","profile":"avp-evidence-v0.1"},
+    {"domain":"mcp","lineage":{"type":"final-aep","path":"rfcs/AEP-0005-mcp-tools-interop-profile.md"},"spec":["spec/mcp/mcp-tools-interop-contract.md"],"requirement_index":"spec/mcp/requirement-index.yaml","profile":"avp-mcp-interop-v0.1"},
+    {"domain":"opentelemetry","lineage":{"type":"final-aep","path":"rfcs/AEP-0006-opentelemetry-mapping-profile.md"},"spec":["spec/opentelemetry/opentelemetry-mapping-contract.md"],"requirement_index":"spec/opentelemetry/requirement-index.yaml","profile":"avp-otel-mapping-v0.1"},
+    {"domain":"oracle","lineage":{"type":"final-aep","path":"rfcs/AEP-0001-oracle-evaluation-contract.md"},"spec":["spec/oracle/oracle-evaluation-contract.md"],"requirement_index":"spec/oracle/requirement-index.yaml","profile":"avp-oracle-v0.1"},
+    {"domain":"scenario","lineage":{"type":"final-aep","path":"rfcs/AEP-0003-scenario-instance-contract.md"},"spec":["spec/scenario/scenario-contract.md"],"requirement_index":"spec/scenario/requirement-index.yaml","profile":"avp-scenario-v0.1"},
+    {"domain":"security","lineage":{"type":"final-aep","path":"rfcs/AEP-0002-security-boundary-contract.md"},"spec":["spec/security/security-boundary-contract.md"],"requirement_index":"spec/security/requirement-index.yaml","profile":"avp-security-v0.1"},
+    {"domain":"subject","lineage":{"type":"final-aep","path":"rfcs/AEP-0007-subject-adapter-contract.md"},"spec":["spec/subject/subject-adapter-contract.md"],"requirement_index":"spec/subject/requirement-index.yaml","profile":"avp-subject-v0.1"},
+    {"domain":"trust","lineage":{"type":"final-aep","path":"rfcs/AEP-0008-artifact-trust-attestation.md"},"spec":["spec/trust/artifact-trust-attestation-contract.md"],"requirement_index":"spec/trust/requirement-index.yaml","profile":"avp-artifact-trust-v0.1"}
+  ],
+  "schemas": [
+    {"path":"schemas/artifact-attestation.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["trust"]},
+    {"path":"schemas/artifact-ref.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["evidence"]},
+    {"path":"schemas/artifact-trust-policy.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["trust"]},
+    {"path":"schemas/artifact-trust-result.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["trust"]},
+    {"path":"schemas/avp-core.schema.json","classification":"UNOWNED_REQUIRES_GOVERNANCE","blocker_ids":["NSC-003"]},
+    {"path":"schemas/avp-event.schema.json","classification":"UNOWNED_REQUIRES_GOVERNANCE","blocker_ids":["NSC-002"]},
+    {"path":"schemas/episode-lifecycle.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["core"]},
+    {"path":"schemas/evidence.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["evidence"]},
+    {"path":"schemas/oracle-evaluation.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["oracle"]},
+    {"path":"schemas/reliability-report.schema.json","classification":"ORPHAN_REQUIRES_GOVERNANCE","blocker_ids":["NSC-001"]},
+    {"path":"schemas/scenario-instance.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["scenario"]},
+    {"path":"schemas/scenario-template.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["scenario"]},
+    {"path":"schemas/scenario.schema.json","classification":"ALIAS_REQUIRES_DISPOSITION","identical_to":"schemas/scenario-template.schema.json","blocker_ids":["NSC-004"]},
+    {"path":"schemas/security-assurance.schema.json","classification":"REQUIREMENT_OWNED","owner_domains":["security"]}
+  ],
+  "blockers": [
+    {"id":"NSC-001","surface":"schemas/reliability-report.schema.json","category":"orphan-normative-surface","decision_required":true,"rationale":"The schema is located in the normative schemas root but no current normative reliability specification, requirement index, or TCK profile owns it. Historical reliability methodology is DEFERRED and the Python helper is non-normative. A governed decision must promote, relocate/reclassify, or remove this surface before stable release."},
+    {"id":"NSC-002","surface":"schemas/avp-event.schema.json","category":"unowned-schema","decision_required":true,"rationale":"No current requirement index declares this event schema as schema impact. The historical event/evidence representation was explicitly reconciled away from using implementation or legacy shapes as authority. The event surface requires explicit ownership or non-normative disposition."},
+    {"id":"NSC-003","surface":"schemas/avp-core.schema.json","category":"unowned-schema","decision_required":true,"rationale":"The Core requirement index owns episode-lifecycle.schema.json but does not declare avp-core.schema.json. Its broad resource-kind envelope therefore lacks a current requirement owner and cannot become normative merely because it is under schemas/."},
+    {"id":"NSC-004","surface":"schemas/scenario.schema.json","category":"ambiguous-schema-alias","decision_required":true,"rationale":"The file is byte-identical to scenario-template.schema.json, while the Scenario requirement index explicitly names scenario-template.schema.json and scenario-instance.schema.json. The duplicate name requires an explicit canonical-alias, deprecation, relocation, or removal decision."},
+    {"id":"NSC-005","surface":"spec/*/requirement-index.yaml#status","category":"authority-metadata-drift","decision_required":true,"rationale":"All current requirement indexes use draft-normative-candidate while eight governing AEPs are Final and their normative text/conformance were released in v0.3.0-rc.1. Core and Evidence use reconciliation lineage rather than those AEPs. The repository must define and apply an explicit requirement-index status vocabulary instead of guessing a bulk Final value."}
+  ],
+  "closure_rule": "READY requires zero blockers, exact coverage of all current spec domains, root schemas and TCK profiles, and no unresolved schema authority classification. BLOCKED is a valid audit result and MUST NOT be converted to READY by weakening validation."
+}

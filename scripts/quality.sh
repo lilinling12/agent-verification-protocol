@@ -18,6 +18,9 @@ python scripts/validate_design_baseline.py
 echo "== Historical design disposition closure =="
 python scripts/validate_historical_disposition.py
 
+echo "== Normative surface closure audit =="
+python scripts/validate_normative_surface.py
+
 echo "== Unit tests =="
 python -m unittest discover -s tests -v
 
