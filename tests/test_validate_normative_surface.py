@@ -56,11 +56,11 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
         entry["blocker_ids"] = ["NSC-999"]
         self.assert_rejected(matrix)
 
-    def test_alias_bytes_must_match(self) -> None:
-        matrix = copy.deepcopy(self.matrix)
-        entry = next(item for item in matrix["schemas"] if item["path"] == "schemas/scenario.schema.json")
-        entry["identical_to"] = "schemas/scenario-instance.schema.json"
-        self.assert_rejected(matrix)
+    def test_retired_scenario_alias_is_absent(self) -> None:
+        schema_paths = {item["path"] for item in self.matrix["schemas"]}
+        self.assertNotIn("schemas/scenario.schema.json", schema_paths)
+        self.assertFalse((validator.ROOT / "schemas/scenario.schema.json").exists())
+        self.assertFalse((validator.ROOT / "src/avp_ref/resources/scenario.schema.json").exists())
 
     def test_draft_requirement_metadata_requires_explicit_blocker(self) -> None:
         matrix = copy.deepcopy(self.matrix)
