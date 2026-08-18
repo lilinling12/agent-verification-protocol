@@ -23,7 +23,16 @@ def _resolved_reference_digest(scenario: ScenarioInstance, path: str) -> str | N
 
 @dataclass(frozen=True, slots=True)
 class EpisodeManifest:
-    protocol_version: str
+    """Identity-bound reference-runtime inputs for one Episode.
+
+    ``scenario_api_version`` identifies the serialized ScenarioInstance
+    vocabulary consumed by this Episode.  It is deliberately not named as a
+    whole-AVP protocol version: AVP conformance is represented by governed TCK
+    profiles and validated conformance reports, not by this non-normative
+    reference-runtime manifest.
+    """
+
+    scenario_api_version: str
     runtime_version: str
     scenario_instance_digest: str
     scenario_template_digest: str
@@ -55,7 +64,7 @@ class EpisodeManifest:
     ) -> "EpisodeManifest":
         seed_bundle: Mapping[str, Any] = scenario.document.get("compilation", {}).get("seed_bundle", {})
         return cls(
-            protocol_version=str(scenario.document.get("apiVersion", "avp.spec/v0.1")),
+            scenario_api_version=str(scenario.document["apiVersion"]),
             runtime_version=runtime_version,
             scenario_instance_digest=scenario.instance_digest,
             scenario_template_digest=scenario.template_digest,
@@ -73,7 +82,7 @@ class EpisodeManifest:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "protocol_version": self.protocol_version,
+            "scenario_api_version": self.scenario_api_version,
             "runtime_version": self.runtime_version,
             "scenario_instance_digest": self.scenario_instance_digest,
             "scenario_template_digest": self.scenario_template_digest,
