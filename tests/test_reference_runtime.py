@@ -124,6 +124,29 @@ class ReferenceRuntimeTest(unittest.TestCase):
         self.assertNotEqual(first.episode_id, second.episode_id)
         self.assertEqual(first.manifest.manifest_digest, second.manifest.manifest_digest)
 
+    def test_manifest_scopes_scenario_api_version_as_identity(self):
+        scenario = reference_scenario(seed=78)
+        runtime = ReferenceRuntime()
+        episode = runtime.create_episode(
+            scenario=scenario,
+            agent_system=reference_agent_system("manifest-version-scope"),
+            environment_adapter=reference_environment(),
+            subject_adapter=reference_subject_adapter(correct_subject),
+            oracle_package=reference_oracle_package(),
+        )
+
+        manifest = episode.manifest
+        serialized = manifest.to_dict()
+        self.assertEqual(scenario.document["apiVersion"], manifest.scenario_api_version)
+        self.assertEqual(scenario.document["apiVersion"], serialized["scenario_api_version"])
+        self.assertNotIn("protocol_version", serialized)
+        self.assertNotIn("protocol_version", manifest.__dataclass_fields__)
+        self.assertEqual(digest(serialized), manifest.manifest_digest)
+
+        legacy_shape = dict(serialized)
+        legacy_shape["protocol_version"] = legacy_shape.pop("scenario_api_version")
+        self.assertNotEqual(digest(legacy_shape), manifest.manifest_digest)
+
     def test_reliability_metrics(self):
         good = run_repeated(correct_subject, runs=4)
         bad = run_repeated(false_success_subject, runs=4)
