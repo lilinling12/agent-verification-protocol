@@ -1,8 +1,8 @@
 # Alpha 2 Reference Runtime Alignment Audit
 
-Status: **BLOCKED — RRA-004 UNDER REMEDIATION**
+Status: **BLOCKED — RRA-005 UNDER REMEDIATION**
 
-Audit baseline: `main@7666c9b04922bbc5696f1983393d8a9247f0238c`
+Audit baseline: `main@c65ab1a3400ed6513eab68c4999164d95fcb1aae`
 
 ## Purpose
 
@@ -52,39 +52,47 @@ PR #56 bound both surfaces to the `avp-reference` distribution version without c
 
 ### RRA-004 — runtime discovery claim levels
 
+Status: **RESOLVED**
+
+The public runtime discovery `features` map mixed static implementation support, interoperability metadata, configured-instance state, registered TCK profile identifiers, and broad isolation labels. The default runtime also advertised a telemetry feature even when no telemetry bridge was configured.
+
+PR #57 normalized only the public runtime boundary. Static implementation support now lives under `implementation_features`; actual Oracle/telemetry configuration lives under `instance_configuration`; profile-like self-claims and the ambiguous isolation label were removed. `TCKRunner.for_reference()` continues to consume only implementation identity. The remediation passed exact-head Quality, Governance, built-wheel full TCK conformance, release-evidence, and Ready-transition Governance gates before squash merge as `c65ab1a3400ed6513eab68c4999164d95fcb1aae`.
+
+### RRA-005 — public discovery version scope drift
+
 Status: **BLOCKING — REMEDIATION CANDIDATE**
 
-The public runtime discovery `features` map currently mixes materially different claim levels:
+The public runtime discovery document still exposes a top-level `version: avp.spec/v0.1` alongside `protocol: avp`.
 
-- implementation/API support, such as Environment and Subject adapter SPI identifiers;
-- implementation interoperability metadata, such as the MCP protocol version;
-- configured-instance state, such as the selected Oracle runner SPI and whether telemetry is actually configured;
-- profile-like labels, including `avp-oracle-v0.1` and `avp-evidence-v0.1`, which are registered TCK profile identifiers rather than runtime configuration;
-- broad labels such as `isolation: adapter-dependent`, whose meaning is not precise enough to distinguish implementation support from a verified runtime guarantee.
+`avp.spec/v0.1` is the current Scenario document `apiVersion` vocabulary in the machine-readable ScenarioInstance contract. The current normative AVP surface is composed of multiple governed domains and TCK profiles; there is no accepted specification that promotes this Scenario document identifier into a single global AVP runtime, protocol, or conformance version.
 
-The default `ReferenceRuntime()` is created with no telemetry bridge, yet the current public discovery document still reports a telemetry feature string. This can cause consumers to interpret code availability as active instance configuration. Profile-like labels can similarly be mistaken for conformance evidence even though TCK conformance is represented only by validated `ConformanceReport` output.
+Because `/.well-known/avp` returns this discovery document directly, a consumer can reasonably interpret the top-level `version` as a whole-AVP protocol/conformance version. That exceeds the authority of the identifier and conflates document vocabulary support with protocol conformance.
 
 Remediation rule:
 
-- public runtime discovery MUST separate static implementation support from current instance configuration;
-- registered TCK profile identifiers MUST NOT be used as runtime self-claims;
-- optional configured components MUST reflect the actual runtime instance rather than package availability;
-- broad implementation notes MUST NOT be presented as stronger protocol or security guarantees than they represent;
-- TCK profile identity and conditional capabilities remain explicit conformance-runner inputs and validated report output;
-- execution-engine behavior, normative specification, schemas, and TCK expectations MUST remain unchanged.
+- public runtime discovery MUST NOT expose `avp.spec/v0.1` as a global AVP protocol/conformance version;
+- the reference implementation MAY report the Scenario API vocabulary it supports, but the field MUST be scoped explicitly as implementation/document support metadata;
+- implementation distribution identity remains under `implementation.version` and validated TCK conformance remains represented by `ConformanceReport` output;
+- `protocol: avp` MAY remain as a non-versioned discovery discriminator;
+- execution-engine behavior, Episode manifest identity, normative specification, schemas, and TCK expectations MUST remain unchanged in this remediation.
 
-The current remediation candidate applies this normalization only at the public `avp_ref.runtime.ReferenceRuntime` boundary. It replaces the ambiguous `features` map with explicit `implementation_features` and `instance_configuration` sections while preserving implementation identity and protocol/version metadata.
+The current remediation candidate removes the ambiguous public top-level `version` and relabels the same engine-provided value as `implementation_features.scenario_api_version`. It does not invent a replacement global protocol version.
 
 ## TCK adapter audit notes
 
 The current reference TCK architecture dispatches registered cases through domain adapters. Mandatory and mixed cases cannot be reported as `SKIP`; conditional cases require an explicit capability condition. The reviewed Core, Evidence, Subject, MCP, OpenTelemetry, and Artifact Trust paths exercise reference implementation behavior rather than simply returning portable expectations unchanged.
 
-`TCKRunner.for_reference()` consumes only the runtime `implementation` identity from discovery. It receives the selected TCK profile and declared conditional capabilities separately, so the RRA-004 discovery normalization does not alter conformance applicability or report semantics.
+`TCKRunner.for_reference()` consumes only the runtime `implementation` identity from discovery. It receives the selected TCK profile and declared conditional capabilities separately, so discovery metadata normalization does not alter conformance applicability or report semantics.
 
 The current CI package job installs the built wheel into a clean conformance environment and executes every registered TCK profile. This remains a required gate for every runtime-alignment remediation candidate.
 
 ## Remaining scope
 
-After RRA-004 is resolved on `main`, continue domain-by-domain reference-runtime alignment review for implementation-only convenience behavior, packaging/runtime boundaries, optional component wiring, and any mandatory normative requirement not genuinely exercised by the reference implementation path.
+After RRA-005 is resolved on `main`, continue the alignment audit independently for:
+
+- Episode manifest version-label semantics, including whether the current `protocol_version` field is correctly scoped to Scenario document vocabulary; any correction must account for manifest-digest and replay-evidence impact;
+- bundled component identity/versioning, including Oracle runner and reference adapter component versions, without assuming every component must equal the distribution version;
+- development distribution identity after the immutable `v0.3.0-rc.1` source point, including whether current post-RC fixes require a separately governed prerelease/development version before publication;
+- implementation-only convenience behavior, packaging/runtime boundaries, optional component wiring, and any mandatory normative requirement not genuinely exercised by the reference implementation path.
 
 Reference Runtime Alignment is not yet READY, and this audit does not authorize stable `v0.3.0` publication.
