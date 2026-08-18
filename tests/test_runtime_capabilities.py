@@ -9,12 +9,18 @@ class ReferenceRuntimeCapabilitiesTest(unittest.TestCase):
     def test_public_discovery_separates_claim_levels(self) -> None:
         capabilities = ReferenceRuntime().capabilities()
 
+        self.assertEqual("avp", capabilities["protocol"])
+        self.assertNotIn("version", capabilities)
         self.assertNotIn("profiles", capabilities)
         self.assertNotIn("features", capabilities)
         self.assertEqual("avp-reference", capabilities["implementation"]["name"])
         self.assertEqual(__version__, capabilities["implementation"]["version"])
 
         implementation_features = capabilities["implementation_features"]
+        self.assertEqual(
+            "avp.spec/v0.1",
+            implementation_features["scenario_api_version"],
+        )
         self.assertEqual(
             "avp.environment/v0.1",
             implementation_features["environment_adapter_spi"],
