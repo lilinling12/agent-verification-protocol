@@ -1,5 +1,6 @@
 import unittest
 
+from avp_ref import __version__
 from avp_ref.reference import (
     correct_subject,
     reference_agent_system,
@@ -28,6 +29,16 @@ def _episode(runtime: ReferenceRuntime, name: str):
 
 
 class TelemetryBridgeTest(unittest.TestCase):
+    def test_public_bridge_identity_matches_distribution(self):
+        bridge = OpenTelemetryBridge()
+        self.assertEqual(__version__, bridge.describe().version)
+
+        session = bridge.start_episode("ep_identity", "sha256:" + "0" * 64)
+        session.finalize()
+        spans = bridge.finished_spans()
+        self.assertTrue(spans)
+        self.assertEqual(__version__, spans[-1].instrumentation_scope.version)
+
     def test_runtime_produces_trace_evidence_and_tool_spans(self):
         bridge = OpenTelemetryBridge()
         runtime = ReferenceRuntime(bridge)
