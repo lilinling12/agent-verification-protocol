@@ -28,7 +28,7 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] explicit protocol-maintainer authorization and `Accepted` → `Final` lifecycle transition
 - [x] byte-safe historical design-baseline restoration and automated integrity enforcement
 - [x] global historical-design disposition ledger for documents 03–21 and ADR-001
-- [ ] Normative Surface Closure (`AEP/reconciliation ↔ spec ↔ requirement-index ↔ schema ↔ TCK`)
+- [x] Normative Surface Closure (`AEP/reconciliation ↔ spec ↔ requirement-index ↔ schema ↔ TCK`)
 - [ ] reference-runtime implementation alignment audit (`spec → TCK → src/avp_ref`)
 - [ ] stable `v0.3.0` release decision
 
