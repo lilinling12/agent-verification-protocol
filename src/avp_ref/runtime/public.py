@@ -2,8 +2,8 @@
 
 The execution engine lives in :mod:`avp_ref.runtime.engine`.  This module keeps
 consumer discovery metadata separate from engine behavior so implementation
-support, configured-instance state, and AVP conformance evidence are not
-collapsed into one ambiguous claim surface.
+support, configured-instance state, document vocabulary, and AVP conformance
+evidence are not collapsed into one ambiguous claim surface.
 """
 
 from __future__ import annotations
@@ -19,11 +19,13 @@ class ReferenceRuntime(_EngineReferenceRuntime):
     TCK profile identity and conditional-capability declarations are recorded
     by validated ``ConformanceReport`` output.  Runtime discovery therefore
     reports implementation identity, implementation-level interoperability
-    surfaces, and current instance configuration separately.
+    surfaces, supported document vocabulary, and current instance configuration
+    separately.
     """
 
     def capabilities(self) -> dict[str, Any]:
         capabilities = super().capabilities()
+        scenario_api_version = capabilities.pop("version", None)
         engine_features = dict(capabilities.pop("features", {}))
         capabilities.pop("profiles", None)
 
@@ -31,6 +33,10 @@ class ReferenceRuntime(_EngineReferenceRuntime):
             "scenario_instance_required": engine_features.get(
                 "scenario_instance_required"
             ),
+            # ``avp.spec/v0.1`` is the Scenario document API vocabulary used by
+            # the current reference implementation.  It is not a global AVP
+            # protocol/conformance version claim.
+            "scenario_api_version": scenario_api_version,
             "environment_adapter_spi": engine_features.get(
                 "environment_adapter_spi"
             ),
