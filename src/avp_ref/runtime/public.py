@@ -2,7 +2,8 @@
 
 The execution engine lives in :mod:`avp_ref.runtime.engine`.  This module keeps
 consumer discovery metadata separate from engine behavior so implementation
-feature descriptions cannot be mistaken for AVP TCK conformance claims.
+support, configured-instance state, and AVP conformance evidence are not
+collapsed into one ambiguous claim surface.
 """
 
 from __future__ import annotations
@@ -16,12 +17,32 @@ class ReferenceRuntime(_EngineReferenceRuntime):
     """Public reference runtime with conservative discovery metadata.
 
     TCK profile identity and conditional-capability declarations are recorded
-    by validated ``ConformanceReport`` output.  The runtime discovery document
-    therefore exposes implementation identity and non-normative implementation
-    features, but does not self-assert conformance profiles.
+    by validated ``ConformanceReport`` output.  Runtime discovery therefore
+    reports implementation identity, implementation-level interoperability
+    surfaces, and current instance configuration separately.
     """
 
     def capabilities(self) -> dict[str, Any]:
         capabilities = super().capabilities()
+        engine_features = dict(capabilities.pop("features", {}))
         capabilities.pop("profiles", None)
+
+        capabilities["implementation_features"] = {
+            "scenario_instance_required": engine_features.get(
+                "scenario_instance_required"
+            ),
+            "environment_adapter_spi": engine_features.get(
+                "environment_adapter_spi"
+            ),
+            "subject_adapter_spi": engine_features.get("subject_adapter_spi"),
+            "mcp_protocol": engine_features.get("mcp_protocol"),
+        }
+        capabilities["instance_configuration"] = {
+            "oracle_runner_spi": self._oracle_runner.describe().protocol_version,
+            "telemetry_bridge": (
+                self._telemetry_bridge.describe().name
+                if self._telemetry_bridge is not None
+                else None
+            ),
+        }
         return capabilities

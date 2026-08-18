@@ -1,8 +1,8 @@
 # Alpha 2 Reference Runtime Alignment Audit
 
-Status: **BLOCKED — RRA-003 UNDER REMEDIATION**
+Status: **BLOCKED — RRA-004 UNDER REMEDIATION**
 
-Audit baseline: `main@de8fa1c61d94924f63c173fe4f8ea1cdaff73899`
+Audit baseline: `main@7666c9b04922bbc5696f1983393d8a9247f0238c`
 
 ## Purpose
 
@@ -44,34 +44,47 @@ PR #55 removed that self-claim from the public runtime boundary without changing
 
 ### RRA-003 — OpenTelemetry release identity drift
 
+Status: **RESOLVED**
+
+The public `OpenTelemetryBridge` previously inherited hard-coded `0.2.0-alpha.5` release identity in both `TelemetryDescription.version` and exported span instrumentation scope metadata.
+
+PR #56 bound both surfaces to the `avp-reference` distribution version without changing telemetry mapping semantics, TCK expectations, or policy. The remediation passed exact-head Quality, Governance, built-wheel full TCK conformance, and release-evidence gates before squash merge as `7666c9b04922bbc5696f1983393d8a9247f0238c`.
+
+### RRA-004 — runtime discovery claim levels
+
 Status: **BLOCKING — REMEDIATION CANDIDATE**
 
-The public `OpenTelemetryBridge` implementation still inherited hard-coded `0.2.0-alpha.5` identity in two consumer-visible places:
+The public runtime discovery `features` map currently mixes materially different claim levels:
 
-- `TelemetryDescription.version` returned by `OpenTelemetryBridge.describe()`;
-- the OpenTelemetry tracer instrumentation scope version attached to exported spans.
+- implementation/API support, such as Environment and Subject adapter SPI identifiers;
+- implementation interoperability metadata, such as the MCP protocol version;
+- configured-instance state, such as the selected Oracle runner SPI and whether telemetry is actually configured;
+- profile-like labels, including `avp-oracle-v0.1` and `avp-evidence-v0.1`, which are registered TCK profile identifiers rather than runtime configuration;
+- broad labels such as `isolation: adapter-dependent`, whose meaning is not precise enough to distinguish implementation support from a verified runtime guarantee.
 
-The reference distribution version is owned by `avp_ref._version.__version__` and is currently `0.3.0rc1`. A release-specific bridge identity that drifts from the installed distribution makes telemetry provenance ambiguous and can cause consumers to attribute spans to a stale reference-runtime release.
+The default `ReferenceRuntime()` is created with no telemetry bridge, yet the current public discovery document still reports a telemetry feature string. This can cause consumers to interpret code availability as active instance configuration. Profile-like labels can similarly be mistaken for conformance evidence even though TCK conformance is represented only by validated `ConformanceReport` output.
 
 Remediation rule:
 
-- the public OpenTelemetry bridge release identity MUST use the reference distribution single source of truth;
-- both `TelemetryDescription.version` and tracer instrumentation scope version MUST match `avp_ref.__version__`;
-- OTel mapping semantics, TCK expectations, telemetry policy, and protocol requirements MUST remain unchanged;
-- no claim of `avp-otel-mapping-v0.1` conformance is inferred from the implementation version.
+- public runtime discovery MUST separate static implementation support from current instance configuration;
+- registered TCK profile identifiers MUST NOT be used as runtime self-claims;
+- optional configured components MUST reflect the actual runtime instance rather than package availability;
+- broad implementation notes MUST NOT be presented as stronger protocol or security guarantees than they represent;
+- TCK profile identity and conditional capabilities remain explicit conformance-runner inputs and validated report output;
+- execution-engine behavior, normative specification, schemas, and TCK expectations MUST remain unchanged.
 
-The current remediation candidate applies this at the public telemetry boundary while preserving the underlying bridge execution behavior.
+The current remediation candidate applies this normalization only at the public `avp_ref.runtime.ReferenceRuntime` boundary. It replaces the ambiguous `features` map with explicit `implementation_features` and `instance_configuration` sections while preserving implementation identity and protocol/version metadata.
 
 ## TCK adapter audit notes
 
 The current reference TCK architecture dispatches registered cases through domain adapters. Mandatory and mixed cases cannot be reported as `SKIP`; conditional cases require an explicit capability condition. The reviewed Core, Evidence, Subject, MCP, OpenTelemetry, and Artifact Trust paths exercise reference implementation behavior rather than simply returning portable expectations unchanged.
 
+`TCKRunner.for_reference()` consumes only the runtime `implementation` identity from discovery. It receives the selected TCK profile and declared conditional capabilities separately, so the RRA-004 discovery normalization does not alter conformance applicability or report semantics.
+
 The current CI package job installs the built wheel into a clean conformance environment and executes every registered TCK profile. This remains a required gate for every runtime-alignment remediation candidate.
 
 ## Remaining scope
 
-After RRA-003 is resolved on `main`, continue the audit from the new exact baseline. The next explicit review area is the consumer-visible `features` map, which currently mixes static implementation support, configured-instance state, protocol identifiers, and profile-like labels. That claim-level review is intentionally excluded from RRA-003 so release-identity correction remains independently auditable.
-
-Other remaining areas include implementation-only convenience behavior, packaging/runtime boundaries, and any mandatory normative requirement not genuinely exercised by the reference implementation path.
+After RRA-004 is resolved on `main`, continue domain-by-domain reference-runtime alignment review for implementation-only convenience behavior, packaging/runtime boundaries, optional component wiring, and any mandatory normative requirement not genuinely exercised by the reference implementation path.
 
 Reference Runtime Alignment is not yet READY, and this audit does not authorize stable `v0.3.0` publication.
