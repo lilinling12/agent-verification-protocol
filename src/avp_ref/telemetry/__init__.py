@@ -4,8 +4,9 @@ Telemetry is supporting evidence and diagnostics; authoritative verdicts remain
 based on evaluator-owned state and Oracles.
 """
 
-from .bridge import NoopTelemetryBridge, OpenTelemetryBridge, TelemetryBridge
+from .bridge import NoopTelemetryBridge, TelemetryBridge
 from .models import TelemetryArtifact, TelemetryCompleteness, TelemetryDescription, TelemetryPolicy
+from .public import OpenTelemetryBridge
 
 __all__ = [
     "NoopTelemetryBridge",
