@@ -30,7 +30,7 @@ class ReferenceRuntimeCapabilitiesTest(unittest.TestCase):
 
         instance_configuration = capabilities["instance_configuration"]
         self.assertEqual(
-            "avp.oracle-runner/v0.1",
+            "avp.oracle/v2",
             instance_configuration["oracle_runner_spi"],
         )
         self.assertIsNone(instance_configuration["telemetry_bridge"])
