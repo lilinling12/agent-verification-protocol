@@ -13,6 +13,7 @@ import time
 import uuid
 from typing import BinaryIO
 
+from avp_ref._version import __version__ as _RUNNER_VERSION
 from avp_ref.canonical import digest
 
 from .errors import OracleConfigurationError, OracleProtocolError, OracleSecurityError
@@ -27,7 +28,6 @@ from .models import (
 from .package import module_code_digest, parse_entrypoint
 from .protocol import PROTOCOL_VERSION, decode_success, encode_request
 
-_RUNNER_VERSION = "0.2.0-alpha.8"
 _PROTOCOL_EXIT = 65
 _ORACLE_CRASH_EXIT = 70
 _SECURITY_EXIT = 77
