@@ -88,7 +88,7 @@ class PublishedReleaseValidationTest(unittest.TestCase):
     def _ref(self):
         return {"object": {"type": "commit", "sha": self.commit}}
 
-    def _validate(self, release=None, ref=None, payloads=None):
+    def _validate(self, release=None, ref=None, payloads=None, *, prerelease=True):
         release = self._release() if release is None else release
         ref = self._ref() if ref is None else ref
         payloads = self.payloads if payloads is None else payloads
@@ -108,6 +108,7 @@ class PublishedReleaseValidationTest(unittest.TestCase):
                 commit=self.commit,
                 version=self.version,
                 output_dir=self.output,
+                prerelease=prerelease,
             )
 
     def test_valid_release_round_trip(self) -> None:
@@ -130,6 +131,66 @@ class PublishedReleaseValidationTest(unittest.TestCase):
         release["prerelease"] = False
         with self.assertRaisesRegex(self.module.PublishedReleaseError, "prerelease flag"):
             self._validate(release=release)
+
+    def test_rejects_noncanonical_or_unsupported_version(self) -> None:
+        for version in ("0.3.0-rc1", "0.3.0rc2.dev0", "0.3.0+local", "../../escape"):
+            with self.subTest(version=version), self.assertRaisesRegex(
+                self.module.PublishedReleaseError,
+                "canonical AVP RC/stable PEP 440 subset",
+            ):
+                self.module.validate_published_release(
+                    repository=self.repository,
+                    tag=self.tag,
+                    commit=self.commit,
+                    version=version,
+                    output_dir=self.output,
+                )
+
+    def test_rejects_tag_version_or_class_mismatch(self) -> None:
+        with self.assertRaisesRegex(self.module.PublishedReleaseError, "tag/version/class mismatch"):
+            self.module.validate_published_release(
+                repository=self.repository,
+                tag="v0.3.0-rc.2",
+                commit=self.commit,
+                version=self.version,
+                output_dir=self.output,
+            )
+
+        with self.assertRaisesRegex(self.module.PublishedReleaseError, "stable distribution version"):
+            self.module.validate_published_release(
+                repository=self.repository,
+                tag=self.tag,
+                commit=self.commit,
+                version=self.version,
+                output_dir=self.output,
+                prerelease=False,
+            )
+
+        with self.assertRaisesRegex(self.module.PublishedReleaseError, "RC distribution version"):
+            self.module.validate_published_release(
+                repository=self.repository,
+                tag="v0.3.0",
+                commit=self.commit,
+                version="0.3.0",
+                output_dir=self.output,
+                prerelease=True,
+            )
+
+    def test_accepts_stable_identity_shape_before_network_access(self) -> None:
+        with patch.object(
+            self.module,
+            "_request_json",
+            side_effect=self.module.PublishedReleaseError("network probe reached"),
+        ):
+            with self.assertRaisesRegex(self.module.PublishedReleaseError, "network probe reached"):
+                self.module.validate_published_release(
+                    repository=self.repository,
+                    tag="v0.3.0",
+                    commit=self.commit,
+                    version="0.3.0",
+                    output_dir=self.output,
+                    prerelease=False,
+                )
 
     def test_rejects_unexpected_or_duplicate_assets(self) -> None:
         release = self._release()

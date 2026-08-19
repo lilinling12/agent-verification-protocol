@@ -6,67 +6,138 @@ on:
       - '.github/workflows/release-validation.yml'
       - 'scripts/validate_published_release.py'
       - 'tests/test_validate_published_release.py'
-      - 'docs/acceptance/alpha2-rc1-release-acceptance.md'
-      - 'docs/releases/v0.3.0-rc.1.md'
+      - 'tests/test_release_validation_workflow.py'
+      - 'docs/acceptance/**release**'
+      - 'docs/releases/**'
       - 'CHANGELOG.md'
       - 'ROADMAP.md'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Exact published Git tag to validate'
+        required: true
+        type: string
+      commit:
+        description: 'Exact lowercase 40-character release commit SHA'
+        required: true
+        type: string
+      version:
+        description: 'Exact AVP RC/stable PEP 440 distribution version'
+        required: true
+        type: string
+      release_class:
+        description: 'Expected GitHub Release classification'
+        required: true
+        type: choice
+        options:
+          - prerelease
+          - stable
 
 permissions:
   contents: read
 
 jobs:
   published-release:
-    name: Published Release / v0.3.0-rc.1
+    name: Published Release / external consumer
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       EXPECTED_REPOSITORY: lilinling12/agent-verification-protocol
-      EXPECTED_TAG: v0.3.0-rc.1
-      EXPECTED_COMMIT: ef199124017b0dcc8c4a966d00c4f407760f9a06
-      EXPECTED_VERSION: 0.3.0rc1
+      # Pull requests continuously regression-test the immutable RC1 evidence point.
+      # workflow_dispatch supplies the exact identity of a newly published RC/stable release.
+      EXPECTED_TAG: ${{ inputs.tag || 'v0.3.0-rc.1' }}
+      EXPECTED_COMMIT: ${{ inputs.commit || 'ef199124017b0dcc8c4a966d00c4f407760f9a06' }}
+      EXPECTED_VERSION: ${{ inputs.version || '0.3.0rc1' }}
+      EXPECTED_RELEASE_CLASS: ${{ inputs.release_class || 'prerelease' }}
     steps:
-      - name: Checkout validation code
+      - name: Checkout governed validation code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Validate requested release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${EXPECTED_RELEASE_CLASS}" in
+            prerelease|stable) ;;
+            *)
+              echo "unsupported release class: ${EXPECTED_RELEASE_CLASS}" >&2
+              exit 1
+              ;;
+          esac
+          if [[ ! "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release validation requires an exact lowercase 40-character commit SHA" >&2
+            exit 1
+          fi
+      - name: Checkout exact published source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.EXPECTED_COMMIT }}
+          path: release-source
+          persist-credentials: false
+      - name: Verify exact published source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C release-source rev-parse HEAD)"
+          if [[ "${actual}" != "${EXPECTED_COMMIT}" ]]; then
+            echo "release source checkout drift: expected ${EXPECTED_COMMIT}, got ${actual}" >&2
+            exit 1
+          fi
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
-      - name: Unit-test published-release validator
-        run: python -m unittest discover -s tests -p 'test_validate_published_release.py' -v
+      - name: Unit-test published-release validator and workflow contract
+        run: |
+          python -m unittest discover -s tests -p 'test_validate_published_release.py' -v
+          python -m unittest discover -s tests -p 'test_release_validation_workflow.py' -v
       - name: Download and verify published release bytes
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          python scripts/validate_published_release.py \
-            --repository "${EXPECTED_REPOSITORY}" \
-            --tag "${EXPECTED_TAG}" \
-            --commit "${EXPECTED_COMMIT}" \
-            --version "${EXPECTED_VERSION}" \
-            --output-dir published-release \
+          set -euo pipefail
+          args=(
+            --repository "${EXPECTED_REPOSITORY}"
+            --tag "${EXPECTED_TAG}"
+            --commit "${EXPECTED_COMMIT}"
+            --version "${EXPECTED_VERSION}"
+            --output-dir published-release
             --token "${GITHUB_TOKEN}"
+          )
+          if [[ "${EXPECTED_RELEASE_CLASS}" == "stable" ]]; then
+            args+=(--stable)
+          fi
+          python scripts/validate_published_release.py "${args[@]}"
       - name: Install published base wheel as an external consumer
         shell: bash
         run: |
           set -euo pipefail
+          shopt -s nullglob
+          wheels=(published-release/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one published wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
           python -m venv .published-base-venv
-          .published-base-venv/bin/python -m pip install published-release/*.whl
+          .published-base-venv/bin/python -m pip install "${wheels[0]}"
           .published-base-venv/bin/python -m pip check
       - name: Verify published wheel identity and base smoke
         shell: bash
         run: |
           set -euo pipefail
-          .published-base-venv/bin/python - <<'PY'
+          EXPECTED_VERSION="${EXPECTED_VERSION}" .published-base-venv/bin/python - <<'PY'
+          import os
           from importlib.metadata import version
           from avp_ref import __version__
           from avp_ref.runtime import ReferenceRuntime
 
-          assert version('avp-reference') == '0.3.0rc1'
-          assert __version__ == '0.3.0rc1'
-          assert ReferenceRuntime().capabilities()['implementation']['version'] == '0.3.0rc1'
-          print('published-wheel identity OK: avp-reference 0.3.0rc1')
+          expected = os.environ['EXPECTED_VERSION']
+          assert version('avp-reference') == expected
+          assert __version__ == expected
+          assert ReferenceRuntime().capabilities()['implementation']['version'] == expected
+          print(f'published-wheel identity OK: avp-reference {expected}')
           PY
           .published-base-venv/bin/avp conformance
       - name: Install published wheel conformance environment
@@ -82,21 +153,21 @@ jobs:
           python -m venv .published-conformance-venv
           .published-conformance-venv/bin/python -m pip install "${wheels[0]}[conformance]"
           .published-conformance-venv/bin/python -m pip check
-      - name: Run full TCK against published wheel
+      - name: Run full TCK from exact published source
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          profiles=(conformance/tck/profiles/*.yaml)
+          profiles=(release-source/conformance/tck/profiles/*.yaml)
           if (( ${#profiles[@]} == 0 )); then
-            echo "no TCK profiles found" >&2
+            echo "no TCK profiles found in exact published source" >&2
             exit 1
           fi
-          printf 'running %d profiles against the published wheel\n' "${#profiles[@]}"
+          printf 'running %d profiles from exact published source against the published wheel\n' "${#profiles[@]}"
           for profile_path in "${profiles[@]}"; do
             profile="$(basename "${profile_path}" .yaml)"
             echo "==> ${profile}"
             .published-conformance-venv/bin/avp tck run \
-              --repository-root . \
+              --repository-root release-source \
               --profile "${profile}"
           done
