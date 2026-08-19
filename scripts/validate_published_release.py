@@ -14,6 +14,12 @@ from typing import Any
 _FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _DIGEST = re.compile(r"^sha256:([0-9a-f]{64})$")
+# AVP's governed release-transition state currently permits exact RC and stable
+# publication identities. Keep this subset deliberately narrower than arbitrary
+# PEP 440 so release tags and artifact filenames can be derived unambiguously.
+_RELEASE_VERSION = re.compile(
+    r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:rc(0|[1-9][0-9]*))?$"
+)
 _SCHEMA_VERSION = "avp-release-evidence/v1"
 
 
@@ -21,15 +27,42 @@ class PublishedReleaseError(ValueError):
     """Raised when a published release is incomplete, inconsistent, or tampered with."""
 
 
-def _validate_identity(repository: str, tag: str, commit: str, version: str) -> None:
+def _expected_tag(version: str, *, prerelease: bool) -> str:
+    match = _RELEASE_VERSION.fullmatch(version)
+    if match is None:
+        raise PublishedReleaseError(
+            "distribution version must use the canonical AVP RC/stable PEP 440 subset"
+        )
+
+    major, minor, patch, rc_number = match.groups()
+    release = f"{major}.{minor}.{patch}"
+    if prerelease:
+        if rc_number is None:
+            raise PublishedReleaseError("prerelease validation requires an RC distribution version")
+        return f"v{release}-rc.{rc_number}"
+    if rc_number is not None:
+        raise PublishedReleaseError("stable validation requires a stable distribution version")
+    return f"v{release}"
+
+
+def _validate_identity(
+    repository: str,
+    tag: str,
+    commit: str,
+    version: str,
+    *,
+    prerelease: bool,
+) -> None:
     if not _REPOSITORY.fullmatch(repository):
         raise PublishedReleaseError(f"invalid repository identity: {repository!r}")
-    if not tag or any(character.isspace() for character in tag):
-        raise PublishedReleaseError("release tag must be a non-empty token")
     if not _FULL_SHA.fullmatch(commit):
         raise PublishedReleaseError("release validation requires an exact lowercase 40-character commit SHA")
-    if not version or any(character.isspace() for character in version):
-        raise PublishedReleaseError("distribution version must be a non-empty token")
+
+    expected_tag = _expected_tag(version, prerelease=prerelease)
+    if tag != expected_tag:
+        raise PublishedReleaseError(
+            f"release tag/version/class mismatch: expected {expected_tag!r}, got {tag!r}"
+        )
 
 
 def _request_json(url: str, token: str | None) -> dict[str, Any]:
@@ -98,7 +131,7 @@ def validate_published_release(
 ) -> dict[str, Any]:
     """Download and verify an exact GitHub release and its authoritative evidence assets."""
 
-    _validate_identity(repository, tag, commit, version)
+    _validate_identity(repository, tag, commit, version, prerelease=prerelease)
     api_root = f"https://api.github.com/repos/{repository}"
     release = _request_json(f"{api_root}/releases/tags/{tag}", token)
     ref = _request_json(f"{api_root}/git/ref/tags/{tag}", token)
