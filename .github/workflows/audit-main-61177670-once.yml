@@ -1,0 +1,116 @@
+name: Audit exact-main 61177670 gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    name: Verify exact-main push CI
+    if: github.repository == 'lilinling12/agent-verification-protocol' && github.head_ref == 'ci/audit-main-61177670'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: 61177670a199d4536f753f105912fd50f5faa9e7
+      EXPECTED_ARTIFACT: avp-release-evidence-61177670a199d4536f753f105912fd50f5faa9e7
+
+    steps:
+      - name: Verify exact-main push CI evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "${actual_main}" != "${TARGET_SHA}" ]]; then
+            echo "main drift: expected ${TARGET_SHA}, got ${actual_main}" >&2
+            exit 1
+          fi
+
+          runs_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs" \
+            -f event=push \
+            -f branch=main \
+            -f head_sha="${TARGET_SHA}" \
+            -f per_page=100)"
+
+          run_id="$(jq -r '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_branch == "main" and .head_sha == env.TARGET_SHA)] | sort_by(.run_number) | last | .id // empty' <<<"${runs_json}")"
+          if [[ -z "${run_id}" ]]; then
+            echo "no push-triggered CI run found for exact main ${TARGET_SHA}" >&2
+            exit 1
+          fi
+
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+          run_number="$(jq -r '.run_number' <<<"${run_json}")"
+          run_status="$(jq -r '.status' <<<"${run_json}")"
+          run_conclusion="$(jq -r '.conclusion' <<<"${run_json}")"
+          run_event="$(jq -r '.event' <<<"${run_json}")"
+          run_branch="$(jq -r '.head_branch' <<<"${run_json}")"
+          run_sha="$(jq -r '.head_sha' <<<"${run_json}")"
+
+          printf 'CI run: id=%s number=%s event=%s branch=%s sha=%s status=%s conclusion=%s\n' \
+            "${run_id}" "${run_number}" "${run_event}" "${run_branch}" "${run_sha}" "${run_status}" "${run_conclusion}"
+
+          if [[ "${run_event}" != "push" || "${run_branch}" != "main" || "${run_sha}" != "${TARGET_SHA}" || "${run_status}" != "completed" || "${run_conclusion}" != "success" ]]; then
+            echo "exact-main CI is not completed successfully" >&2
+            exit 1
+          fi
+
+          jobs_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" -f per_page=100)"
+
+          for quality_job in \
+            'Quality / Python 3.11' \
+            'Quality / Python 3.12' \
+            'Quality / Python 3.13'
+          do
+            conclusion="$(jq -r --arg name "${quality_job}" '[.jobs[] | select(.name == $name)] | last | .conclusion // empty' <<<"${jobs_json}")"
+            if [[ "${conclusion}" != "success" ]]; then
+              echo "required quality job failed or missing: ${quality_job} => ${conclusion:-missing}" >&2
+              exit 1
+            fi
+          done
+
+          package_json="$(jq -c '[.jobs[] | select(.name == "Package / Python 3.13")] | last // empty' <<<"${jobs_json}")"
+          if [[ -z "${package_json}" || "$(jq -r '.conclusion' <<<"${package_json}")" != "success" ]]; then
+            echo "Package / Python 3.13 failed or missing" >&2
+            exit 1
+          fi
+
+          required_steps=(
+            'Verify reproducible distribution bytes'
+            'Validate built-wheel metadata'
+            'Install base wheel in an unconstrained clean consumer environment'
+            'Verify installed-wheel identity'
+            'Installed-wheel full TCK conformance'
+            'Build release evidence'
+            'Verify release evidence'
+            'Stage release evidence bundle'
+            'Upload release evidence bundle'
+          )
+
+          for step_name in "${required_steps[@]}"; do
+            step_conclusion="$(jq -r --arg name "${step_name}" '[.steps[] | select(.name == $name)] | last | .conclusion // empty' <<<"${package_json}")"
+            if [[ "${step_conclusion}" != "success" ]]; then
+              echo "required package step failed or missing: ${step_name} => ${step_conclusion:-missing}" >&2
+              exit 1
+            fi
+          done
+
+          artifacts_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" -f per_page=100)"
+          artifact_count="$(jq -r --arg name "${EXPECTED_ARTIFACT}" '[.artifacts[] | select(.name == $name and .expired == false)] | length' <<<"${artifacts_json}")"
+          if [[ "${artifact_count}" != "1" ]]; then
+            echo "expected exact-SHA release-evidence artifact missing or ambiguous: ${EXPECTED_ARTIFACT} count=${artifact_count}" >&2
+            exit 1
+          fi
+
+          artifact_digest="$(jq -r --arg name "${EXPECTED_ARTIFACT}" '.artifacts[] | select(.name == $name and .expired == false) | .digest // ""' <<<"${artifacts_json}")"
+
+          echo "Quality jobs: PASS (3.11, 3.12, 3.13)"
+          echo "Package / Python 3.13: PASS"
+          echo "Full TCK + release evidence steps: PASS"
+          echo "Release evidence artifact: ${EXPECTED_ARTIFACT}"
+          echo "Release evidence digest: ${artifact_digest}"
+          echo "EXACT_MAIN_GATE=PASS"
