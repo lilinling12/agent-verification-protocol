@@ -19,6 +19,7 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 ### Repository engineering
 - Completed the Reference Runtime Alignment Audit through RRA-009, including the governed `0.3.0rc2.dev0` post-RC development identity and mandatory Core normal-path runtime-execution evidence.
 - Re-reviewed all registered reference TCK adapters and the installed-wheel all-profile gate without finding an additional evidence-backed implementation-alignment blocker; stable `v0.3.0`, `v0.3.0-rc.2`, and package-index publication remain separate maintainer decisions.
+- Added a fail-closed published-release ledger and explicit development/release provenance states so future RC or stable release commits can be selected without disabling post-release version-identity protection.
 
 ## [0.3.0-rc.1] - 2026-08-16
 
