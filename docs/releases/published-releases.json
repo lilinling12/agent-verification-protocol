@@ -7,6 +7,12 @@
       "tag": "v0.3.0-rc.1",
       "commit": "ef199124017b0dcc8c4a966d00c4f407760f9a06",
       "class": "prerelease"
+    },
+    {
+      "version": "0.3.0rc2",
+      "tag": "v0.3.0-rc.2",
+      "commit": "9cfbdb7f72b3418aa960100f33845249db73fbcf",
+      "class": "prerelease"
     }
   ]
 }
