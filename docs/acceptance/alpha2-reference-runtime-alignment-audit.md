@@ -31,7 +31,7 @@ Reference Runtime Alignment is READY only when:
 
 Status: **RESOLVED**
 
-PR #54 bound the optional FastAPI application version to the distribution single source of truth and merged as `4376dde904d37910e57f4a9d1ccd1e94d05a4d3d6` only after its required gates passed. The authoritative merged commit for the HTTP remediation is `4376dde904d37925bf6cf2970922748629ca567c`.
+PR #54 bound the optional FastAPI application version to the distribution single source of truth and merged as `4376dde904d37925bf6cf2970922748629ca567c` after its required gates passed.
 
 ### RRA-002 — ambiguous runtime profile claims
 
