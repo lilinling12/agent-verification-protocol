@@ -17,8 +17,8 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 - Finalized AEP-0001 through AEP-0008 after the recorded maintainer decision and released `v0.3.0-rc.1` evidence; this does not authorize stable `v0.3.0` publication.
 
 ### Repository engineering
-- Continued the Reference Runtime Alignment Audit through RRA-008, including a governed `0.3.0rc2.dev0` post-RC development identity that prevents reuse of the immutable published `0.3.0rc1` identity.
-- Opened RRA-009 to ensure the mandatory Core normal-path conformance result is backed by real runtime execution rather than implementation-internal transition-table inspection.
+- Completed the Reference Runtime Alignment Audit through RRA-009, including the governed `0.3.0rc2.dev0` post-RC development identity and mandatory Core normal-path runtime-execution evidence.
+- Re-reviewed all registered reference TCK adapters and the installed-wheel all-profile gate without finding an additional evidence-backed implementation-alignment blocker; stable `v0.3.0`, `v0.3.0-rc.2`, and package-index publication remain separate maintainer decisions.
 
 ## [0.3.0-rc.1] - 2026-08-16
 

@@ -29,12 +29,12 @@ This roadmap tracks protocol stabilization separately from reference-implementat
 - [x] byte-safe historical design-baseline restoration and automated integrity enforcement
 - [x] global historical-design disposition ledger for documents 03–21 and ADR-001
 - [x] Normative Surface Closure (`AEP/reconciliation ↔ spec ↔ requirement-index ↔ schema ↔ TCK`)
-- [ ] reference-runtime implementation alignment audit (`spec → TCK → src/avp_ref`)
+- [x] reference-runtime implementation alignment audit (`spec → TCK → src/avp_ref`)
 - [ ] stable `v0.3.0` release decision
 
 AEP-0001 through AEP-0008 are Final based on the merged eligibility audit, the explicit protocol-maintainer decision recorded on 2026-08-17, and released evidence at `v0.3.0-rc.1`. Finalization does not itself authorize stable release publication, package-index publication, or Alpha 3.
 
-Stable `v0.3.0` remains gated on Alpha 2 Baseline Reconciliation Closure. Historical design restoration is provenance-only and must preserve the archived source bytes; reconciliation, specification, schemas, and language-neutral TCK remain authoritative over reference-runtime behavior. Normative Surface Closure must resolve every orphan or ambiguously owned authority surface before implementation alignment can become a stable-release gate.
+Stable `v0.3.0` remains a separate maintainer release decision. Historical design restoration is provenance-only and must preserve the archived source bytes; reconciliation, specification, schemas, and language-neutral TCK remain authoritative over reference-runtime behavior. Normative Surface Closure and Reference Runtime Alignment are completed stabilization gates, but their completion does not itself authorize release publication.
 
 ### Reference implementation already available
 - [x] MCP gateway proxy and verification path
