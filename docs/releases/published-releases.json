@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "avp-published-release-ledger/v1",
+  "distribution": "avp-reference",
+  "releases": [
+    {
+      "version": "0.3.0rc1",
+      "tag": "v0.3.0-rc.1",
+      "commit": "ef199124017b0dcc8c4a966d00c4f407760f9a06",
+      "class": "prerelease"
+    }
+  ]
+}
