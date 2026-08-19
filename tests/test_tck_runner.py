@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from avp_ref import cli
+from avp_ref.runtime import EpisodeState, ReferenceRuntime
 from avp_ref.tck_adapter import (
     TCKAdapterError,
     TCKCaseResult,
@@ -19,6 +20,7 @@ from avp_ref.tck_adapter import (
     TCKStatus,
     validate_report,
 )
+from avp_ref.tck_adapter.reference_aligned import AlignedReferenceTCKAdapter
 
 ROOT = Path(__file__).resolve().parents[1]
 NORMAL = "AVP-TCK-LIFECYCLE-NORMAL-001"
@@ -37,6 +39,20 @@ class _SkippingMandatoryAdapter:
             detail="invalid synthetic skip",
             skip_reason="synthetic",
         )
+
+
+class _AbortingVerificationRuntime(ReferenceRuntime):
+    """Test double proving the normal-path TCK observes runtime execution.
+
+    The transition relation itself remains unchanged, but the execution pipeline
+    deliberately terminates during verification.  A probe that only inspects the
+    static transition table would incorrectly PASS this implementation.
+    """
+
+    def verify(self, episode_id: str):
+        episode = self.episodes[episode_id]
+        episode.transition(EpisodeState.ABORTED)
+        return episode
 
 
 class TCKRunnerTest(unittest.TestCase):
@@ -93,6 +109,21 @@ class TCKRunnerTest(unittest.TestCase):
         self.assertTrue(run.conformant)
         self.assertEqual(1, run.report["summary"]["passed"])
         self.assertIs(TCKStatus.PASS, run.case_results[0].status)
+
+    def test_normal_path_observes_runtime_execution_failure(self) -> None:
+        case = self.repository.load_cases(
+            "avp-core-v0.1",
+            selected_case_ids=(NORMAL,),
+        )[0]
+        adapter = AlignedReferenceTCKAdapter(
+            runtime_factory=_AbortingVerificationRuntime,
+        )
+
+        result = adapter.evaluate(case.document)
+
+        self.assertIs(TCKStatus.FAIL, result.status)
+        self.assertIn("transition drift", result.detail)
+        self.assertIn("ABORTED", result.detail)
 
     def test_declared_pause_capability_executes_instead_of_skipping(self) -> None:
         runner = TCKRunner.for_reference(

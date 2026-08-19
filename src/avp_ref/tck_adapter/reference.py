@@ -103,14 +103,54 @@ class ReferenceTCKAdapter:
         return evaluator(case)
 
     def _evaluate_normal_path(self, case: Mapping[str, Any]) -> TCKCaseResult:
+        """Exercise the mandatory Core happy path through real runtime calls.
+
+        The TCK vector remains authoritative for the expected lifecycle.  This
+        probe must therefore compare that vector with records produced by an
+        actual Episode execution rather than merely consulting the runtime's
+        transition table.  Otherwise a broken provision/run/verify pipeline
+        could still pass the mandatory normal-path case.
+        """
+
         case_id = self._case_id(case)
-        transitions = self._transition_pairs(case.get("vector", {}).get("transitions"), case_id)
-        rejected = [pair for pair in transitions if not self._transition_allowed(*pair)]
-        if rejected:
-            return self._fail(case_id, f"normal path rejects required transitions: {rejected}")
-        if transitions[0][0] != "CREATED" or transitions[-1][1] != "COMPLETED":
-            raise TCKAdapterError(f"{case_id} normal path must run CREATED -> COMPLETED")
-        return self._pass(case_id, "normal lifecycle path is accepted")
+        expected_transitions = self._transition_pairs(
+            case.get("vector", {}).get("transitions"),
+            case_id,
+        )
+        expect = case.get("expect")
+        if not isinstance(expect, Mapping):
+            raise TCKAdapterError(f"{case_id} expect must be a mapping")
+        if expect.get("accepted") is not True:
+            raise TCKAdapterError(f"{case_id} normal path must require accepted=true")
+        terminal_state = expect.get("terminalState")
+        if not isinstance(terminal_state, str) or not terminal_state:
+            raise TCKAdapterError(f"{case_id} expect.terminalState must be a non-empty string")
+        self._state(terminal_state)
+
+        runtime, episode = self._run_to_completion()
+        try:
+            actual_transitions = tuple(
+                (record.previous_state.value, record.resulting_state.value)
+                for record in episode.transition_records
+            )
+            if actual_transitions != expected_transitions:
+                return self._fail(
+                    case_id,
+                    "normal lifecycle execution transition drift "
+                    f"expected={list(expected_transitions)} actual={list(actual_transitions)}",
+                )
+            if episode.state.value != terminal_state:
+                return self._fail(
+                    case_id,
+                    "normal lifecycle execution terminal state drift "
+                    f"expected={terminal_state} actual={episode.state.value}",
+                )
+            return self._pass(
+                case_id,
+                "normal lifecycle vector is exercised by runtime execution",
+            )
+        finally:
+            runtime.release(episode.episode_id)
 
     def _evaluate_transition_record(self, case: Mapping[str, Any]) -> TCKCaseResult:
         """Check whether runtime execution exposes ordered protocol transition records."""
@@ -346,10 +386,11 @@ class ReferenceTCKAdapter:
             qualifier = "non-empty " if not allow_empty else ""
             raise TCKAdapterError(f"{context} must be a {qualifier}list")
         if not all(isinstance(item, str) and item for item in value):
-            raise TCKAdapterError(f"{context} must contain non-empty strings")
-        if len(value) != len(set(value)):
-            raise TCKAdapterError(f"{context} contains duplicate values")
-        return set(value)
+            raise TCKAdapterError(f"{context} contains a non-string state")
+        result = set(value)
+        if len(result) != len(value):
+            raise TCKAdapterError(f"{context} contains duplicate states")
+        return result
 
     @staticmethod
     def _pass(case_id: str, detail: str) -> TCKCaseResult:

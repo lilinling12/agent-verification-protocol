@@ -10,14 +10,15 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 - Scoped Scenario API vocabulary metadata correctly instead of exposing it as a whole-AVP runtime/protocol version.
 - Corrected `EpisodeManifest` identity labeling from `protocol_version` to `scenario_api_version`, preserving exact replay source binding while intentionally changing the reference-manifest digest format.
 - Bound OpenTelemetry bridge/tracer release identity and bundled subprocess Oracle runner implementation identity to the reference distribution version while preserving their independent protocol identifiers.
+- Changed the mandatory Core normal-path reference TCK probe to execute the actual Episode lifecycle and validate runtime-produced transition records and terminal state instead of passing from the transition relation alone.
 
 ### Protocol and conformance
 - Closed the Alpha 2 Normative Surface Closure audit without changing accepted normative semantics, schemas, or TCK expectations.
 - Finalized AEP-0001 through AEP-0008 after the recorded maintainer decision and released `v0.3.0-rc.1` evidence; this does not authorize stable `v0.3.0` publication.
 
 ### Repository engineering
-- Continued the Reference Runtime Alignment Audit through RRA-007 with exact-head Quality, Governance, installed-wheel full TCK, and release-evidence gates.
-- Identified a post-RC development provenance blocker: current `main` contains material changes after the immutable `v0.3.0-rc.1` source commit while still declaring package version `0.3.0rc1`. A separately governed development/prerelease version policy decision is required before publishing any new artifacts from post-RC source.
+- Continued the Reference Runtime Alignment Audit through RRA-008, including a governed `0.3.0rc2.dev0` post-RC development identity that prevents reuse of the immutable published `0.3.0rc1` identity.
+- Opened RRA-009 to ensure the mandatory Core normal-path conformance result is backed by real runtime execution rather than implementation-internal transition-table inspection.
 
 ## [0.3.0-rc.1] - 2026-08-16
 
