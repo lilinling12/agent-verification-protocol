@@ -1,8 +1,8 @@
 # Alpha 2 Reference Runtime Alignment Audit
 
-Status: **BLOCKED — RRA-009 UNDER REMEDIATION**
+Status: **READY — REFERENCE RUNTIME ALIGNMENT CLOSED**
 
-Audit baseline: `main@042d891bbe02f3c3d81a7e419de1d140d0bf5511`
+Audit baseline: `main@d122ae6820bfacece1749509b35842cb33069f03`
 
 ## Purpose
 
@@ -87,43 +87,61 @@ Exact-head CI #444 (`32206904808`) passed Python 3.11/3.12/3.13 Quality, reprodu
 
 ### RRA-009 — Core mandatory normal-path probe does not execute the runtime lifecycle
 
-Status: **BLOCKING — REMEDIATION CANDIDATE**
+Status: **RESOLVED**
 
-`AVP-TCK-LIFECYCLE-NORMAL-001` is a mandatory Core case for AVP-CORE-001, AVP-CORE-008, and AVP-CORE-009. Its vector requires the ordered normal lifecycle path from `CREATED` through `COMPLETED`, and its expectation requires `accepted: true` with terminal state `COMPLETED`.
+`AVP-TCK-LIFECYCLE-NORMAL-001` is a mandatory Core case for AVP-CORE-001, AVP-CORE-008, and AVP-CORE-009. Before remediation, the reference adapter checked only whether the implementation transition relation allowed the TCK vector and could therefore report PASS without executing an Episode.
 
-The current reference adapter validates that case by passing each vector pair to the reference implementation's `assert_transition()` relation and then returning PASS when all pairs are statically allowed. It does not create an Episode, invoke `ReferenceRuntime.provision()`, `run_subject()`, or `verify()`, inspect runtime-produced transition records, or observe the actual terminal state.
+PR #63 changed the probe to execute the actual `ReferenceRuntime` normal path, observe canonical `Episode.transition_records`, require an exact match with the authoritative TCK vector, and require the actual terminal state to match `expect.terminalState`. A negative regression runtime preserves the same transition relation but deliberately terminates verification as `ABORTED`; the mandatory normal-path case now reports FAIL for that implementation instead of passing from table inspection alone.
 
-That is insufficient conformance evidence for this mandatory positive execution case. A defect in the runtime orchestration path could prevent an Episode from reaching `COMPLETED` while the adapter would still report PASS because the underlying transition table remained unchanged.
+The remediation did not change normative Core requirements, requirement indexes, schemas, TCK case data, lifecycle transition semantics, capability declarations, or conformance-report semantics.
 
-Remediation rule:
+Exact-head CI #446 (`32210596018`) passed Python 3.11/3.12/3.13 Quality, reproducible package construction, clean installed-wheel identity/smoke, installed-wheel full registered TCK conformance, and release-evidence build/verification. Governance #481 (`32210596117`), Ready Governance #482 (`32210691048`), and Release Validation #16 (`32210596244`) also passed. Release Validation re-verified the immutable published `v0.3.0-rc.1` bytes, installed-wheel identity, and full TCK independently of the post-RC source tree. PR #63 was explicitly authorized and squash-merged as `d122ae6820bfacece1749509b35842cb33069f03`.
 
-- the TCK vector and Core requirements remain unchanged and authoritative;
-- the reference adapter MUST execute the normal path through the actual reference runtime;
-- PASS requires runtime-produced ordered `Episode.transition_records` to match the TCK vector exactly and the actual terminal state to match `expect.terminalState`;
-- malformed TCK expectation shape remains a runner/adapter error rather than a protocol FAIL;
-- an implementation that executes but terminates on a different legal path must report FAIL;
-- runtime resources MUST be released after observation, including FAIL outcomes;
-- regression coverage MUST prove that an implementation with an unchanged transition table but a deliberately aborting verification pipeline cannot PASS the normal-path case.
+## Final cross-profile adapter review
 
-The current remediation candidate reuses the existing `_run_to_completion()` runtime path, compares canonical Episode transition records and terminal state against the case document, and adds a deliberately aborting runtime test double. It does not modify the normative Core specification, requirement index, schemas, TCK case data, lifecycle transition relation, or conformance report semantics.
+After RRA-009 merged, the remaining registered reference adapters were re-reviewed for the same class of false-positive conformance evidence.
 
-## TCK adapter audit notes
+- **Core:** execution-sensitive normal path, transition records, QUIESCING, and replay probes exercise runtime behavior; state-projection/transition-matrix/illegal/terminal probes intentionally inspect the implementation lifecycle relation because those cases assert relation semantics rather than orchestration completion.
+- **Environment:** mandatory cases invoke real reference adapter lifecycle, reset/time, observation, projection, snapshot/restore, semantic diff, and fault APIs.
+- **Evidence:** mandatory cases invoke real ArtifactStore/Evidence identity, representation, integrity, and immutability behavior; controlled corruption exists only as a negative test fixture.
+- **Oracle:** runtime-sensitive cases execute `ReferenceRuntime` with a deterministic OracleRunner seam and observe request scope, failure classification, Evidence integrity, and immutable evaluation records. Value-object construction is used only where the case directly asserts identity binding of those protocol objects.
+- **Scenario:** mandatory cases execute the real compiler, identity verifier, immutable ScenarioInstance projection, and reference resolver paths.
+- **MCP:** mandatory cases invoke the real verification gateway and transport boundary, including pre-side-effect denial, schema drift, call binding, result/error separation, upstream failure, and unsupported-feature fail-closed behavior.
+- **Subject:** mandatory cases invoke real Subject Adapter lifecycle, projection, budget, capability mediation, outcome/result validation, and assurance-description behavior.
+- **Security:** mandatory cases exercise Subject/Evaluator capability separation, deny-before-side-effect behavior, managed credential context, hidden material, future-fault secrecy, and an explicit machine-readable `SecurityAssurance` resource. The assurance declaration is not required by the normative contract to be embedded in runtime discovery; adding such a binding would invent implementation semantics rather than improve conformance evidence.
+- **OpenTelemetry:** mandatory cases exercise the real telemetry bridge/session mapping, correlation, outcome preservation, propagation, data minimization, completeness, and Evidence binding.
+- **Artifact Trust:** mandatory trust cases exercise real reference Artifact/attestation verifier/policy/publisher boundaries with a deterministic reference-only authenticated-envelope fixture. The optional privileged publication case remains conditional and is skipped unless `artifact-attestation-publication` is explicitly declared.
 
-The runner contract requires mandatory and mixed cases to execute and forbids implementation gaps from being represented as `SKIP`. An adapter translates TCK actions into implementation-specific calls and observations; it does not gain authority to replace an execution assertion with a weaker implementation-internal proxy.
+No additional implementation-alignment defect meeting the RRA blocker threshold was found in this review. In particular, the review did not mass-normalize component/resource/protocol versions to the distribution version where those identifiers have independent semantics.
 
-Static relation inspection remains appropriate evidence where a case explicitly tests the implementation's supported state projection or transition relation. RRA-009 is intentionally narrower: the mandatory normal-path positive case declares acceptance and a terminal execution result, so its reference probe must observe execution rather than only the relation that execution is expected to use.
+## TCK and package gate review
 
-`TCKRunner.for_reference()` continues to consume only runtime implementation identity from discovery. Selected profiles and declared conditional capabilities remain explicit runner inputs. No new conditional capability is advertised by this remediation.
+`TCKRunner` fails closed when a registered case lacks an implementation adapter, validates result identity, builds a `ConformanceReport`, and validates that report before returning a conformance result.
 
-The CI package job must continue installing the built wheel into clean consumer/conformance environments and execute every registered TCK profile on the exact remediation head.
+The Package CI gate enumerates `conformance/tck/profiles/*.yaml` and executes every registered profile against the freshly built wheel in a clean conformance environment. This is intentionally not a hard-coded profile allowlist. The gate therefore continues to detect adapter coverage gaps or package-only drift as profiles evolve.
 
-## Remaining scope
+Conditional capability behavior remains unchanged:
 
-After RRA-009 is resolved on `main`, continue independently for:
+- Core pause: `pause-capability-advertised` is not declared by the default reference runner because there is no reviewed public pause API claim.
+- Artifact Trust privileged publication: `artifact-attestation-publication` is not declared by the default reference runner because the base reference runtime does not claim production publication authority.
 
-- whether other mandatory positive TCK cases rely on implementation-internal proxies where their case semantics require observable execution;
-- any remaining bundled-component identity semantics where evidence demonstrates an actual release-identity defect, without assuming resource/API/component versions must equal the distribution version;
-- implementation-only convenience behavior, packaging/runtime boundaries, optional component wiring, and any mandatory normative requirement not genuinely exercised by the reference implementation path;
-- final Reference Runtime Alignment acceptance before any separate stable `v0.3.0` release decision.
+Those conditional cases may validly report `SKIP`; mandatory or mixed cases may not use missing implementation support as a skip reason.
 
-Reference Runtime Alignment is not yet READY. This audit does not authorize stable `v0.3.0`, publication of `v0.3.0-rc.2`, package-index publication, or merge of its own remediation PR.
+## Acceptance conclusion
+
+**READY — REFERENCE RUNTIME ALIGNMENT CLOSED.**
+
+RRA-001 through RRA-009 are resolved. The final cross-profile review found no additional evidence-backed implementation-alignment blocker. The governed authority chain remains one-way:
+
+`Normative Spec -> Schema -> TCK -> Reference Runtime`
+
+This acceptance closes the Alpha 2 reference-runtime implementation alignment audit only. It does **not**:
+
+- publish or authorize `v0.3.0-rc.2`;
+- publish or authorize stable `v0.3.0`;
+- authorize package-index publication;
+- claim implementation support for optional signed/attested Artifact publication that remains intentionally unclaimed;
+- make Python reference behavior normative;
+- authorize Alpha 3 work by itself.
+
+Any future source or conformance change that alters an accepted premise of this audit must be evaluated under the repository's normal governance and exact-head validation rules.
