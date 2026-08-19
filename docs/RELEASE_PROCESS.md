@@ -42,28 +42,52 @@ After the prerelease has been published and its actual consumer artifacts have p
 
 A stable release that presents those normative changes as the stable conformance baseline MUST reference the governing AEPs as `Final` before publication. This ordering prevents a lifecycle cycle in which Final requires released evidence while the evidence-producing release would itself require Final first.
 
-### Development identity after a published RC
+### Governed release provenance state
 
-Once an RC version has been published, `main` and pull-request builds MUST NOT continue to reuse that published distribution version for materially different source bytes.
+AVP records release provenance in two machine-readable resources:
 
-While stabilizing toward the next RC, AVP uses a PEP 440 development release of that next RC as the repository source version. For example, after published `0.3.0rc1` and before publication of `0.3.0rc2`:
+- `docs/releases/published-releases.json` is the ordered ledger of already-published release identities. Its first entry is the immutable `v0.3.0-rc.1` evidence seed. Later published releases are appended through governed transitions; existing entries are not rewritten.
+- `docs/releases/release-development-state.json` records the latest published anchor, the planned next release, the current source version, and whether the repository is in `development` or exact `release` mode.
+
+`scripts/validate_release_development_state.py` validates both resources and the source version from `src/avp_ref/_version.py`.
+
+In `development` mode:
+
+- `latestPublished` MUST equal the final published-ledger entry;
+- `sourceVersion` MUST be an unreleased PEP 440 development version;
+- ordering MUST satisfy `latestPublished < sourceVersion < nextRelease`;
+- `nextRelease` MUST be a valid AVP public release identity with an exact derived tag.
+
+In `release` mode:
+
+- `sourceVersion` MUST equal `nextRelease.version` exactly;
+- the selected release MUST be newer than `latestPublished`;
+- the public tag is derived from the selected release version;
+- RC releases use `vX.Y.Z-rc.N`; stable releases use `vX.Y.Z`.
+
+Entering `release` mode is a release-selection change, not publication authorization. It requires normal review and exact-head gates. Creating a tag or GitHub Release remains a separate maintainer-authorized action.
+
+After a release is published and independently accepted, its exact version/tag/commit/class record is appended to the published ledger. A subsequent governed transition returns the repository to `development` mode with `latestPublished` bound to that ledger tail and a new monotonic unreleased source identity.
+
+### Development identity after a published release
+
+Once a release version has been published, `main` and pull-request builds MUST NOT continue to reuse that published distribution version for materially different source bytes.
+
+The repository source version therefore uses an unreleased PEP 440 development identity that remains strictly newer than the latest published release and strictly older than the planned next release. For the current post-RC1 stabilization state:
 
 ```text
 0.3.0rc1 < 0.3.0rc2.dev0 < 0.3.0rc2 < 0.3.0
 ```
 
-The repository records this state in `docs/releases/release-development-state.json`, and `scripts/validate_release_development_state.py` enforces the ordering and immutable published-release anchor.
-
 This development identity has deliberately narrow meaning:
 
-- it identifies unreleased repository artifacts built after the previous RC;
-- it does not authorize publication of the next RC;
+- it identifies unreleased repository artifacts built after the previous release;
+- it does not authorize publication of the planned release;
 - it does not authorize stable release publication;
 - it does not alter normative protocol semantics or AEP lifecycle state;
-- it MUST remain strictly newer than the latest published release and strictly older than the declared next release;
-- it MUST be a development release of the declared next RC, not a development release of the already-published RC.
+- it MUST remain strictly newer than the latest published release and strictly older than the planned next release.
 
-Advancing from `rcN.devM` to a published `rcN` remains a separate release decision and must follow the full release procedure below. After any new release is published, the release-development state and immutable published-release anchor must be advanced in the same governed transition before further development artifacts are produced.
+Changing the planned next release is itself a governed release-management decision. A release must never be selected by disabling the provenance validator or by silently reusing a previously published identity.
 
 ## Release readiness
 
@@ -87,13 +111,15 @@ For a stable release that establishes a stable conformance target, governing nor
 
 1. Select a commit from `main`; do not release an arbitrary feature-branch head.
 2. Confirm version metadata, changelog, migration notes, AEP references, and lifecycle state appropriate to the intended release class.
-3. Run the full CI/package/conformance gates.
-4. Build source and wheel artifacts in a clean environment.
-5. Install the wheel in a fresh environment and run `avp conformance`.
-6. Create the release tag and GitHub release only after the selected commit is green.
-7. Publish release notes containing protocol impact, compatibility, security notes, AEP lifecycle state, and artifact identifiers.
-8. Verify the published artifacts before announcing the release.
-9. When a prerelease is being used as Final-eligibility evidence, record the external-consumer acceptance result before proposing the corresponding AEP Final transition.
+3. Enter the governed `release` provenance state so source version, planned version, and planned tag are exact and machine-validated.
+4. Run the full CI/package/conformance gates on that exact release-selection commit.
+5. Build source and wheel artifacts in a clean environment.
+6. Install the wheel in a fresh environment and run `avp conformance` plus the complete registered TCK profile set.
+7. Create the release tag and GitHub release only after the selected commit is green and the maintainer explicitly authorizes publication.
+8. Publish release notes containing protocol impact, compatibility, security notes, AEP lifecycle state, and artifact identifiers.
+9. Verify the published artifacts through the published-release consumer path before announcing the release.
+10. Append the accepted published identity to `published-releases.json` and return the repository to a new governed development state before materially different source bytes are produced under another identity.
+11. When a prerelease is being used as Final-eligibility evidence, record the external-consumer acceptance result before proposing the corresponding AEP Final transition.
 
 ## Tags
 
