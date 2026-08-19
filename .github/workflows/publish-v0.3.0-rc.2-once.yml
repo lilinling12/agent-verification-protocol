@@ -33,6 +33,7 @@ jobs:
       TARGET: 9cfbdb7f72b3418aa960100f33845249db73fbcf
       SOURCE_RUN: '32236927283'
       ARTIFACT_NAME: avp-release-evidence-9cfbdb7f72b3418aa960100f33845249db73fbcf
+      RELEASE_TITLE: AVP v0.3.0-rc.2
 
     steps:
       - name: Checkout exact release source
@@ -48,13 +49,19 @@ jobs:
           set -Eeuo pipefail
 
           mutation_started=0
+          release_id=""
           cleanup_on_error() {
             rc=$?
             if (( rc != 0 && mutation_started == 1 )); then
               echo "publication failed after mutation began; cleaning draft release and tag" >&2
-              release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.id' 2>/dev/null || true)"
               if [[ -n "${release_id}" ]]; then
                 gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null 2>&1 || true
+              else
+                mapfile -t cleanup_ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+                  --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true and .target_commitish == \"${TARGET}\" and .name == \"${RELEASE_TITLE}\") | .id" 2>/dev/null || true)
+                for id in "${cleanup_ids[@]:-}"; do
+                  [[ -n "${id}" ]] && gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}" >/dev/null 2>&1 || true
+                done
               fi
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" >/dev/null 2>&1 || true
             fi
@@ -87,13 +94,25 @@ jobs:
             exit 1
           fi
 
-          echo "Failing closed if publication identity already exists..."
+          echo "Reconciling only the draft orphan created by the previous controlled attempt..."
+          mapfile -t matching_releases < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"${TAG}\") | [.id, .draft, .prerelease, .target_commitish, .name] | @tsv")
+          for row in "${matching_releases[@]:-}"; do
+            [[ -z "${row}" ]] && continue
+            IFS=$'\t' read -r existing_id existing_draft existing_prerelease existing_target existing_name <<< "${row}"
+            if [[ "${existing_draft}" == "true" && "${existing_target}" == "${TARGET}" && "${existing_name}" == "${RELEASE_TITLE}" ]]; then
+              echo "deleting exact orphan draft release id=${existing_id} from the previous fail-closed attempt"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${existing_id}" >/dev/null
+            else
+              echo "release identity ${TAG} already exists in a non-orphan state; refusing to overwrite" >&2
+              printf 'id=%s draft=%s prerelease=%s target=%s name=%s\n' \
+                "${existing_id}" "${existing_draft}" "${existing_prerelease}" "${existing_target}" "${existing_name}" >&2
+              exit 1
+            fi
+          done
+
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
-            echo "tag ${TAG} already exists; refusing duplicate publication" >&2
-            exit 1
-          fi
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null 2>&1; then
-            echo "release ${TAG} already exists; refusing duplicate publication" >&2
+            echo "tag ${TAG} already exists before this controlled publication attempt; refusing overwrite" >&2
             exit 1
           fi
 
@@ -157,34 +176,51 @@ jobs:
           output.write_text(text, encoding='utf-8')
           PY
 
-          echo "Creating draft prerelease on exact commit..."
+          echo "Creating immutable lightweight tag on the exact release source..."
           mutation_started=1
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/${TAG}" \
+            -f sha="${TARGET}" >/dev/null
+
+          tag_type="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.type')"
+          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.sha')"
+          if [[ "${tag_type}" != "commit" || "${tag_sha}" != "${TARGET}" ]]; then
+            echo "new tag does not resolve directly to exact release commit" >&2
+            exit 1
+          fi
+
+          echo "Creating draft prerelease using the pre-verified tag..."
           gh release create "${TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
             --target "${TARGET}" \
-            --title "AVP v0.3.0-rc.2" \
+            --title "${RELEASE_TITLE}" \
             --notes-file public-release-notes.md \
             --prerelease \
             --draft \
             release-bundle/avp_reference-0.3.0rc2-py3-none-any.whl \
             release-bundle/avp_reference-0.3.0rc2.tar.gz \
             release-bundle/MANIFEST.json \
-            release-bundle/SHA256SUMS
+            release-bundle/SHA256SUMS >/dev/null
 
-          echo "Verifying draft identity before publication..."
-          tag_type="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.type')"
-          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.sha')"
-          release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.draft')"
-          release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.prerelease')"
-          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.target_commitish')"
-          if [[ "${tag_type}" != "commit" || "${tag_sha}" != "${TARGET}" || "${release_draft}" != "true" || "${release_prerelease}" != "true" || "${release_target}" != "${TARGET}" ]]; then
+          mapfile -t draft_ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true and .target_commitish == \"${TARGET}\" and .name == \"${RELEASE_TITLE}\") | .id")
+          if (( ${#draft_ids[@]} != 1 )); then
+            echo "expected exactly one controlled draft release, found ${#draft_ids[@]}" >&2
+            exit 1
+          fi
+          release_id="${draft_ids[0]}"
+
+          echo "Verifying draft release metadata and exact asset set..."
+          release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.draft')"
+          release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.prerelease')"
+          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.target_commitish')"
+          if [[ "${release_draft}" != "true" || "${release_prerelease}" != "true" || "${release_target}" != "${TARGET}" ]]; then
             echo "draft release identity verification failed" >&2
-            printf 'tag_type=%s tag_sha=%s draft=%s prerelease=%s target=%s\n' \
-              "${tag_type}" "${tag_sha}" "${release_draft}" "${release_prerelease}" "${release_target}" >&2
             exit 1
           fi
 
-          mapfile -t asset_names < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets[].name' | sort)
+          mapfile -t asset_names < <(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.assets[].name' | sort)
           expected_assets=(MANIFEST.json SHA256SUMS avp_reference-0.3.0rc2-py3-none-any.whl avp_reference-0.3.0rc2.tar.gz)
           if [[ "${asset_names[*]}" != "${expected_assets[*]}" ]]; then
             echo "draft asset set mismatch" >&2
@@ -193,10 +229,9 @@ jobs:
           fi
 
           echo "Publishing validated draft as prerelease..."
-          gh release edit "${TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --draft=false \
-            --prerelease
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+            -f draft=false \
+            -f prerelease=true >/dev/null
 
           echo "Verifying public prerelease identity..."
           release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.draft')"
