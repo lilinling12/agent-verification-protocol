@@ -21,6 +21,7 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 - Re-reviewed all registered reference TCK adapters and the installed-wheel all-profile gate without finding an additional evidence-backed implementation-alignment blocker; stable `v0.3.0`, `v0.3.0-rc.2`, and package-index publication remain separate maintainer decisions.
 - Added a fail-closed published-release ledger and explicit development/release provenance states so future RC or stable release commits can be selected without disabling post-release version-identity protection.
 - Generalized the published-release Actions path so future prerelease or stable GitHub Releases can be validated from explicit tag/commit/version/class inputs while pull requests continue to regression-test immutable RC1 bytes.
+- Selected `0.3.0rc2` in governed release mode and added RC2 candidate notes; publication remains separately authorized only after the squash-merged `main` release commit passes its exact-commit gates.
 
 ## [0.3.0-rc.1] - 2026-08-16
 
