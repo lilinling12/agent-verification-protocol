@@ -1,7 +1,7 @@
 {
   "schemaVersion": "avp-release-development-state/v2",
   "distribution": "avp-reference",
-  "mode": "development",
+  "mode": "release",
   "latestPublished": {
     "version": "0.3.0rc1",
     "tag": "v0.3.0-rc.1",
@@ -11,5 +11,5 @@
     "version": "0.3.0rc2",
     "tag": "v0.3.0-rc.2"
   },
-  "sourceVersion": "0.3.0rc2.dev0"
+  "sourceVersion": "0.3.0rc2"
 }
