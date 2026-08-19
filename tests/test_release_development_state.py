@@ -17,6 +17,13 @@ RC1 = {
     "class": "prerelease",
 }
 
+RC2 = {
+    "version": "0.3.0rc2",
+    "tag": "v0.3.0-rc.2",
+    "commit": "9cfbdb7f72b3418aa960100f33845249db73fbcf",
+    "class": "prerelease",
+}
+
 VALID_LEDGER = {
     "schemaVersion": "avp-published-release-ledger/v1",
     "distribution": "avp-reference",
@@ -112,16 +119,28 @@ class ReleaseDevelopmentStateTests(unittest.TestCase):
 
     def test_accepts_governed_published_ledger_advancement(self) -> None:
         ledger = copy.deepcopy(VALID_LEDGER)
-        ledger["releases"].append(
-            {
-                "version": "0.3.0rc2",
-                "tag": "v0.3.0-rc.2",
-                "commit": "1" * 40,
-                "class": "prerelease",
-            }
-        )
+        ledger["releases"].append(copy.deepcopy(RC2))
         releases = self.releases(ledger)
-        self.assertEqual(releases[-1]["version"], "0.3.0rc2")
+        self.assertEqual(releases[-1], RC2)
+
+    def test_accepts_post_rc2_development_transition_toward_stable(self) -> None:
+        ledger = copy.deepcopy(VALID_LEDGER)
+        ledger["releases"].append(copy.deepcopy(RC2))
+
+        state = copy.deepcopy(VALID_STATE)
+        state["latestPublished"] = {
+            "version": RC2["version"],
+            "tag": RC2["tag"],
+            "commit": RC2["commit"],
+        }
+        state["nextRelease"] = {"version": "0.3.0", "tag": "v0.3.0"}
+        state["sourceVersion"] = "0.3.0rc3.dev0"
+
+        self.validate(
+            state,
+            source_version="0.3.0rc3.dev0",
+            ledger=ledger,
+        )
 
     def test_rejects_non_monotonic_published_ledger(self) -> None:
         ledger = copy.deepcopy(VALID_LEDGER)
