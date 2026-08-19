@@ -1,8 +1,8 @@
 # Alpha 2 Reference Runtime Alignment Audit
 
-Status: **BLOCKED — RRA-008 POLICY CANDIDATE UNDER VALIDATION**
+Status: **BLOCKED — RRA-009 UNDER REMEDIATION**
 
-Audit baseline: `main@777e3ee50496863f5964257295f5b02ba4ac08db`
+Audit baseline: `main@042d891bbe02f3c3d81a7e419de1d140d0bf5511`
 
 ## Purpose
 
@@ -19,7 +19,7 @@ Reference Runtime Alignment is READY only when:
 1. consumer-visible reference behavior does not contradict current normative requirements;
 2. implementation identity is bound to the installed distribution identity;
 3. runtime discovery metadata does not self-assert TCK conformance that is not represented by validated `ConformanceReport` evidence;
-4. mandatory TCK behavior is exercised by the reference adapter rather than manufactured by expectation rewriting;
+4. mandatory TCK behavior is exercised by the reference adapter rather than manufactured by expectation rewriting or implementation-only table inspection where the case requires execution behavior;
 5. conditional TCK cases are skipped only when their explicit capability condition is not declared;
 6. built-wheel identity, reference smoke, full registered TCK profiles, and release-evidence gates pass on the exact candidate head;
 7. development and published distribution identities cannot ambiguously bind one public version to multiple source revisions;
@@ -71,41 +71,57 @@ PR #60 bound the bundled Oracle runner implementation version to the `avp-refere
 
 ### RRA-008 — post-RC development distribution provenance
 
-Status: **BLOCKING — POLICY CANDIDATE UNDER VALIDATION**
+Status: **RESOLVED**
 
-PR #61 established the blocker on `main` as `777e3ee50496863f5964257295f5b02ba4ac08db`: published `v0.3.0-rc.1` / `avp-reference==0.3.0rc1` is immutable evidence for exact source `ef199124017b0dcc8c4a966d00c4f407760f9a06`, while later repository source must not continue producing different artifacts under that already-published version identity.
+PR #61 established the fail-closed blocker: published `v0.3.0-rc.1` / `avp-reference==0.3.0rc1` is immutable evidence for exact source `ef199124017b0dcc8c4a966d00c4f407760f9a06`, while materially later source must not continue producing different artifacts under that already-published distribution version.
 
-The policy candidate uses a PEP 440 development release of the next RC for unreleased repository artifacts:
+PR #62 adopted the governed post-RC development identity policy:
 
 ```text
 0.3.0rc1 < 0.3.0rc2.dev0 < 0.3.0rc2 < 0.3.0
 ```
 
-Candidate implementation:
+The implementation moved repository source identity to `0.3.0rc2.dev0`, added `docs/releases/release-development-state.json`, added a fail-closed development-state validator and regression coverage, and wired the validator into the quality gate. It preserves the immutable RC1 source anchor and keeps publication of `v0.3.0-rc.2` or stable `v0.3.0` as independent release decisions.
 
-- `src/avp_ref/_version.py` becomes `0.3.0rc2.dev0`;
-- `docs/releases/release-development-state.json` records the immutable latest published release, declared next RC, and active source version;
-- `scripts/validate_release_development_state.py` fails closed on published-version reuse, non-canonical PEP 440 forms, source/state drift, tag/version drift, ordering violations, immutable RC1 anchor substitution, and source identities that are not development releases of the declared next RC;
-- `tests/test_release_development_state.py` regression-tests the accepted ordering and representative invalid states;
-- `scripts/quality.sh` runs the provenance validator before the broader test and conformance gates;
-- `docs/RELEASE_PROCESS.md` defines the development identity separately from actual RC/stable publication authorization.
+Exact-head CI #444 (`32206904808`) passed Python 3.11/3.12/3.13 Quality, reproducible package construction, built-wheel metadata and identity, clean consumer install, reference smoke, installed-wheel full registered TCK conformance, and release-evidence build/verification. Governance #479 and Ready Governance #480 also passed. PR #62 was explicitly authorized and squash-merged as `042d891bbe02f3c3d81a7e419de1d140d0bf5511`.
 
-This candidate deliberately does **not** publish `v0.3.0-rc.2`, create or move a release tag, authorize stable `v0.3.0`, publish to a package index, or alter normative protocol/TCK semantics. `0.3.0rc2.dev0` means only "unreleased repository state after rc1 while stabilizing toward a possible rc2".
+### RRA-009 — Core mandatory normal-path probe does not execute the runtime lifecycle
 
-RRA-008 becomes RESOLVED only after this candidate is independently validated on its exact head and explicitly accepted through the normal PR governance/merge process. A subsequent public `rc2` remains a separate release decision.
+Status: **BLOCKING — REMEDIATION CANDIDATE**
+
+`AVP-TCK-LIFECYCLE-NORMAL-001` is a mandatory Core case for AVP-CORE-001, AVP-CORE-008, and AVP-CORE-009. Its vector requires the ordered normal lifecycle path from `CREATED` through `COMPLETED`, and its expectation requires `accepted: true` with terminal state `COMPLETED`.
+
+The current reference adapter validates that case by passing each vector pair to the reference implementation's `assert_transition()` relation and then returning PASS when all pairs are statically allowed. It does not create an Episode, invoke `ReferenceRuntime.provision()`, `run_subject()`, or `verify()`, inspect runtime-produced transition records, or observe the actual terminal state.
+
+That is insufficient conformance evidence for this mandatory positive execution case. A defect in the runtime orchestration path could prevent an Episode from reaching `COMPLETED` while the adapter would still report PASS because the underlying transition table remained unchanged.
+
+Remediation rule:
+
+- the TCK vector and Core requirements remain unchanged and authoritative;
+- the reference adapter MUST execute the normal path through the actual reference runtime;
+- PASS requires runtime-produced ordered `Episode.transition_records` to match the TCK vector exactly and the actual terminal state to match `expect.terminalState`;
+- malformed TCK expectation shape remains a runner/adapter error rather than a protocol FAIL;
+- an implementation that executes but terminates on a different legal path must report FAIL;
+- runtime resources MUST be released after observation, including FAIL outcomes;
+- regression coverage MUST prove that an implementation with an unchanged transition table but a deliberately aborting verification pipeline cannot PASS the normal-path case.
+
+The current remediation candidate reuses the existing `_run_to_completion()` runtime path, compares canonical Episode transition records and terminal state against the case document, and adds a deliberately aborting runtime test double. It does not modify the normative Core specification, requirement index, schemas, TCK case data, lifecycle transition relation, or conformance report semantics.
 
 ## TCK adapter audit notes
 
-The reference TCK architecture dispatches registered cases through domain adapters. Mandatory and mixed cases cannot be reported as `SKIP`; conditional cases require an explicit capability condition. Reviewed Core, Evidence, Subject, MCP, OpenTelemetry, Artifact Trust, Oracle, and replay paths exercise reference behavior rather than rewriting expected results into passes.
+The runner contract requires mandatory and mixed cases to execute and forbids implementation gaps from being represented as `SKIP`. An adapter translates TCK actions into implementation-specific calls and observations; it does not gain authority to replace an execution assertion with a weaker implementation-internal proxy.
 
-`TCKRunner.for_reference()` consumes only runtime implementation identity from discovery. Selected profiles and declared conditional capabilities remain explicit runner inputs, so RRA-008 changes distribution provenance only and does not alter protocol applicability or TCK semantics.
+Static relation inspection remains appropriate evidence where a case explicitly tests the implementation's supported state projection or transition relation. RRA-009 is intentionally narrower: the mandatory normal-path positive case declares acceptance and a terminal execution result, so its reference probe must observe execution rather than only the relation that execution is expected to use.
+
+`TCKRunner.for_reference()` continues to consume only runtime implementation identity from discovery. Selected profiles and declared conditional capabilities remain explicit runner inputs. No new conditional capability is advertised by this remediation.
 
 The CI package job must continue installing the built wheel into clean consumer/conformance environments and execute every registered TCK profile on the exact remediation head.
 
 ## Remaining scope
 
-After RRA-008 is resolved on `main`, continue independently for:
+After RRA-009 is resolved on `main`, continue independently for:
 
+- whether other mandatory positive TCK cases rely on implementation-internal proxies where their case semantics require observable execution;
 - any remaining bundled-component identity semantics where evidence demonstrates an actual release-identity defect, without assuming resource/API/component versions must equal the distribution version;
 - implementation-only convenience behavior, packaging/runtime boundaries, optional component wiring, and any mandatory normative requirement not genuinely exercised by the reference implementation path;
 - final Reference Runtime Alignment acceptance before any separate stable `v0.3.0` release decision.
