@@ -3,6 +3,7 @@ import unittest
 from contextlib import contextmanager
 from dataclasses import replace
 
+from avp_ref import __version__
 from avp_ref.canonical import digest
 from avp_ref.oracle import (
     broken_oracle_package,
@@ -19,6 +20,7 @@ from avp_ref.oracle_runner import (
     ProjectionSnapshot,
     SubprocessOracleRunner,
 )
+from avp_ref.oracle_runner.protocol import PROTOCOL_VERSION
 
 
 @contextmanager
@@ -71,6 +73,14 @@ class OracleIsolationTest(unittest.TestCase):
         self.assertTrue(description.worker_code_digest.startswith("sha256:"))
         self.assertEqual(("avp_ref.",), description.allowed_module_prefixes)
         self.assertTrue(description.identity_digest.startswith("sha256:"))
+
+    def test_runner_release_identity_matches_distribution_without_relabeling_protocol(self):
+        description = _runner().describe()
+        self.assertEqual(__version__, description.version)
+        self.assertEqual(PROTOCOL_VERSION, description.protocol_version)
+
+        stale_release_identity = replace(description, version="0.2.0-alpha.8")
+        self.assertNotEqual(description.identity_digest, stale_release_identity.identity_digest)
 
     def test_oracle_crash_is_classified_and_artifacted(self):
         execution = _execute(_runner(), broken_oracle_package())
