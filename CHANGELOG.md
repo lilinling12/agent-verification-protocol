@@ -22,6 +22,7 @@ All notable changes to AVP protocol candidates, conformance assets, and the refe
 - Added a fail-closed published-release ledger and explicit development/release provenance states so future RC or stable release commits can be selected without disabling post-release version-identity protection.
 - Generalized the published-release Actions path so future prerelease or stable GitHub Releases can be validated from explicit tag/commit/version/class inputs while pull requests continue to regression-test immutable RC1 bytes.
 - Selected `0.3.0rc2` in governed release mode and added RC2 candidate notes; publication remains separately authorized only after the squash-merged `main` release commit passes its exact-commit gates.
+- Published `v0.3.0-rc.2` from exact `main` commit `9cfbdb7f72b3418aa960100f33845249db73fbcf`, passed external-consumer Release Validation #26 (`32294651642`), resolved SRD-003, and returned release provenance to a distinct post-RC2 development identity without authorizing stable `v0.3.0`.
 
 ## [0.3.0-rc.1] - 2026-08-16
 
