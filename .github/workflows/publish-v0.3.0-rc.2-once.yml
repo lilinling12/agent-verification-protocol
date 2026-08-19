@@ -1,0 +1,203 @@
+name: Publish authorized AVP v0.3.0-rc.2
+
+on:
+  push:
+    branches:
+      - ci/publish-v0.3.0-rc.2
+    paths:
+      - .github/workflows/publish-v0.3.0-rc.2-once.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Publish exact RC2 prerelease
+    if: github.repository == 'lilinling12/agent-verification-protocol' && github.ref == 'refs/heads/ci/publish-v0.3.0-rc.2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.3.0-rc.2
+      VERSION: 0.3.0rc2
+      TARGET: 9cfbdb7f72b3418aa960100f33845249db73fbcf
+      SOURCE_RUN: '32236927283'
+      ARTIFACT_NAME: avp-release-evidence-9cfbdb7f72b3418aa960100f33845249db73fbcf
+
+    steps:
+      - name: Checkout exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TARGET }}
+          path: release-source
+          persist-credentials: false
+
+      - name: Publish validated draft and promote to prerelease
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          mutation_started=0
+          cleanup_on_error() {
+            rc=$?
+            if (( rc != 0 && mutation_started == 1 )); then
+              echo "publication failed after mutation began; cleaning draft release and tag" >&2
+              release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.id' 2>/dev/null || true)"
+              if [[ -n "${release_id}" ]]; then
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null 2>&1 || true
+              fi
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" >/dev/null 2>&1 || true
+            fi
+            exit "${rc}"
+          }
+          trap cleanup_on_error EXIT
+
+          echo "Verifying release-source freeze..."
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "${actual_main}" != "${TARGET}" ]]; then
+            echo "main drift: expected ${TARGET}, got ${actual_main}" >&2
+            exit 1
+          fi
+          actual_checkout="$(git -C release-source rev-parse HEAD)"
+          if [[ "${actual_checkout}" != "${TARGET}" ]]; then
+            echo "exact source checkout drift: expected ${TARGET}, got ${actual_checkout}" >&2
+            exit 1
+          fi
+
+          echo "Verifying exact-main CI source run..."
+          run_event="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.event')"
+          run_branch="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.head_branch')"
+          run_sha="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.head_sha')"
+          run_status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.status')"
+          run_conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.conclusion')"
+          if [[ "${run_event}" != "push" || "${run_branch}" != "main" || "${run_sha}" != "${TARGET}" || "${run_status}" != "completed" || "${run_conclusion}" != "success" ]]; then
+            echo "source CI run is not the successful exact-main push gate" >&2
+            printf 'event=%s branch=%s sha=%s status=%s conclusion=%s\n' \
+              "${run_event}" "${run_branch}" "${run_sha}" "${run_status}" "${run_conclusion}" >&2
+            exit 1
+          fi
+
+          echo "Failing closed if publication identity already exists..."
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            echo "tag ${TAG} already exists; refusing duplicate publication" >&2
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null 2>&1; then
+            echo "release ${TAG} already exists; refusing duplicate publication" >&2
+            exit 1
+          fi
+
+          echo "Downloading exact-main release evidence from CI run ${SOURCE_RUN}..."
+          mkdir -p release-bundle
+          gh run download "${SOURCE_RUN}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "${ARTIFACT_NAME}" \
+            --dir release-bundle
+
+          echo "Verifying release evidence bytes and identity..."
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('release-bundle')
+          expected = {
+              'avp_reference-0.3.0rc2-py3-none-any.whl',
+              'avp_reference-0.3.0rc2.tar.gz',
+              'MANIFEST.json',
+              'SHA256SUMS',
+          }
+          actual = {path.name for path in root.iterdir() if path.is_file()}
+          if actual != expected:
+              raise SystemExit(f'release asset set mismatch: expected {sorted(expected)}, found {sorted(actual)}')
+
+          manifest = json.loads((root / 'MANIFEST.json').read_text(encoding='utf-8'))
+          if manifest.get('schemaVersion') != 'avp-release-evidence/v1':
+              raise SystemExit('release manifest schema mismatch')
+          if manifest.get('source') != {
+              'commit': '9cfbdb7f72b3418aa960100f33845249db73fbcf',
+              'repository': 'lilinling12/agent-verification-protocol',
+          }:
+              raise SystemExit('release manifest source identity mismatch')
+          if manifest.get('distribution') != {'name': 'avp-reference', 'version': '0.3.0rc2'}:
+              raise SystemExit('release manifest distribution identity mismatch')
+          PY
+          (
+            cd release-bundle
+            sha256sum -c SHA256SUMS
+          )
+
+          echo "Rendering public release notes without mutating the release source..."
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('release-source/docs/releases/v0.3.0-rc.2.md')
+          output = Path('public-release-notes.md')
+          text = source.read_text(encoding='utf-8')
+          text = text.replace('Status: **SELECTED — NOT PUBLISHED**', 'Status: **PUBLISHED PRERELEASE**', 1)
+          old_source = '- Exact release source: established only after the release-selection PR is squash-merged to `main` and the resulting `main` commit passes its push-triggered CI/package/conformance gates'
+          new_source = '- Exact release source: `9cfbdb7f72b3418aa960100f33845249db73fbcf`'
+          if old_source not in text:
+              raise SystemExit('expected pre-publication source-status line not found')
+          text = text.replace(old_source, new_source, 1)
+          old_boundary = 'Creating `v0.3.0-rc.2`, creating a GitHub prerelease, attaching artifacts, or publishing to any package index requires a separate explicit maintainer authorization after the final squash-merged `main` release commit has passed all required exact-commit gates.'
+          new_boundary = 'Publication of `v0.3.0-rc.2` and its GitHub prerelease was explicitly maintainer-authorized after exact-main CI run `32236927283` passed for `9cfbdb7f72b3418aa960100f33845249db73fbcf`. This publication does not authorize PyPI or any other package-index publication.'
+          if old_boundary not in text:
+              raise SystemExit('expected pre-publication authorization boundary not found')
+          text = text.replace(old_boundary, new_boundary, 1)
+          output.write_text(text, encoding='utf-8')
+          PY
+
+          echo "Creating draft prerelease on exact commit..."
+          mutation_started=1
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${TARGET}" \
+            --title "AVP v0.3.0-rc.2" \
+            --notes-file public-release-notes.md \
+            --prerelease \
+            --draft \
+            release-bundle/avp_reference-0.3.0rc2-py3-none-any.whl \
+            release-bundle/avp_reference-0.3.0rc2.tar.gz \
+            release-bundle/MANIFEST.json \
+            release-bundle/SHA256SUMS
+
+          echo "Verifying draft identity before publication..."
+          tag_type="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.type')"
+          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.sha')"
+          release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.draft')"
+          release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.prerelease')"
+          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.target_commitish')"
+          if [[ "${tag_type}" != "commit" || "${tag_sha}" != "${TARGET}" || "${release_draft}" != "true" || "${release_prerelease}" != "true" || "${release_target}" != "${TARGET}" ]]; then
+            echo "draft release identity verification failed" >&2
+            printf 'tag_type=%s tag_sha=%s draft=%s prerelease=%s target=%s\n' \
+              "${tag_type}" "${tag_sha}" "${release_draft}" "${release_prerelease}" "${release_target}" >&2
+            exit 1
+          fi
+
+          mapfile -t asset_names < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets[].name' | sort)
+          expected_assets=(MANIFEST.json SHA256SUMS avp_reference-0.3.0rc2-py3-none-any.whl avp_reference-0.3.0rc2.tar.gz)
+          if [[ "${asset_names[*]}" != "${expected_assets[*]}" ]]; then
+            echo "draft asset set mismatch" >&2
+            printf 'actual: %s\nexpected: %s\n' "${asset_names[*]}" "${expected_assets[*]}" >&2
+            exit 1
+          fi
+
+          echo "Publishing validated draft as prerelease..."
+          gh release edit "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false \
+            --prerelease
+
+          echo "Verifying public prerelease identity..."
+          release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.draft')"
+          release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.prerelease')"
+          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.target_commitish')"
+          if [[ "${release_draft}" != "false" || "${release_prerelease}" != "true" || "${release_target}" != "${TARGET}" ]]; then
+            echo "public prerelease identity verification failed" >&2
+            exit 1
+          fi
+
+          mutation_started=0
+          trap - EXIT
+          echo "published ${TAG} -> ${TARGET} as a GitHub prerelease"
