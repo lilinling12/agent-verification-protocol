@@ -42,6 +42,29 @@ After the prerelease has been published and its actual consumer artifacts have p
 
 A stable release that presents those normative changes as the stable conformance baseline MUST reference the governing AEPs as `Final` before publication. This ordering prevents a lifecycle cycle in which Final requires released evidence while the evidence-producing release would itself require Final first.
 
+### Development identity after a published RC
+
+Once an RC version has been published, `main` and pull-request builds MUST NOT continue to reuse that published distribution version for materially different source bytes.
+
+While stabilizing toward the next RC, AVP uses a PEP 440 development release of that next RC as the repository source version. For example, after published `0.3.0rc1` and before publication of `0.3.0rc2`:
+
+```text
+0.3.0rc1 < 0.3.0rc2.dev0 < 0.3.0rc2 < 0.3.0
+```
+
+The repository records this state in `docs/releases/release-development-state.json`, and `scripts/validate_release_development_state.py` enforces the ordering and immutable published-release anchor.
+
+This development identity has deliberately narrow meaning:
+
+- it identifies unreleased repository artifacts built after the previous RC;
+- it does not authorize publication of the next RC;
+- it does not authorize stable release publication;
+- it does not alter normative protocol semantics or AEP lifecycle state;
+- it MUST remain strictly newer than the latest published release and strictly older than the declared next release;
+- it MUST be a development release of the declared next RC, not a development release of the already-published RC.
+
+Advancing from `rcN.devM` to a published `rcN` remains a separate release decision and must follow the full release procedure below. After any new release is published, the release-development state and immutable published-release anchor must be advanced in the same governed transition before further development artifacts are produced.
+
 ## Release readiness
 
 Every release requires:

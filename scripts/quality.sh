@@ -12,6 +12,9 @@ python scripts/validate_dependencies.py
 echo "== Release metadata =="
 python scripts/validate_release_metadata.py
 
+echo "== Release development provenance =="
+python scripts/validate_release_development_state.py
+
 echo "== Historical design baseline integrity =="
 python scripts/validate_design_baseline.py
 
