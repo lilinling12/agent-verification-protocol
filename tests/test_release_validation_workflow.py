@@ -40,9 +40,17 @@ class ReleaseValidationWorkflowTests(unittest.TestCase):
         self.assertIn('if [[ "${EXPECTED_RELEASE_CLASS}" == "stable" ]]', self.text)
         self.assertIn("args+=(--stable)", self.text)
 
-    def test_full_tck_remains_dynamic_over_registered_profiles(self) -> None:
-        self.assertIn("profiles=(conformance/tck/profiles/*.yaml)", self.text)
+    def test_exact_release_source_is_checked_out_and_verified(self) -> None:
+        self.assertIn("ref: ${{ env.EXPECTED_COMMIT }}", self.text)
+        self.assertIn("path: release-source", self.text)
+        self.assertIn("git -C release-source rev-parse HEAD", self.text)
+        self.assertIn('if [[ "${actual}" != "${EXPECTED_COMMIT}" ]]', self.text)
+
+    def test_full_tck_uses_exact_release_source(self) -> None:
+        self.assertIn("profiles=(release-source/conformance/tck/profiles/*.yaml)", self.text)
+        self.assertIn("--repository-root release-source", self.text)
         self.assertIn("avp tck run", self.text)
+        self.assertNotIn("profiles=(conformance/tck/profiles/*.yaml)", self.text)
 
 
 if __name__ == "__main__":
