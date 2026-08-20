@@ -1,0 +1,55 @@
+name: Audit exact-main 0b2fb0e gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    name: Verify exact-main push CI
+    if: github.repository == 'lilinling12/agent-verification-protocol' && github.head_ref == 'ci/audit-main-0b2fb0e'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: 0b2fb0e73dffe37c74033f164dd2c07f0348f594
+      EXPECTED_ARTIFACT: avp-release-evidence-0b2fb0e73dffe37c74033f164dd2c07f0348f594
+
+    steps:
+      - name: Verify exact-main push CI evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          [[ "${actual_main}" == "${TARGET_SHA}" ]] || { echo "main drift: ${actual_main}" >&2; exit 1; }
+
+          runs_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs" -f event=push -f branch=main -f head_sha="${TARGET_SHA}" -f per_page=100)"
+          run_id="$(jq -r '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_branch == "main" and .head_sha == env.TARGET_SHA)] | sort_by(.run_number) | last | .id // empty' <<<"${runs_json}")"
+          [[ -n "${run_id}" ]] || { echo "no exact-main push CI" >&2; exit 1; }
+
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+          [[ "$(jq -r '.status' <<<"${run_json}")" == "completed" && "$(jq -r '.conclusion' <<<"${run_json}")" == "success" ]] || { echo "exact-main CI not successful" >&2; exit 1; }
+          echo "CI run: id=${run_id} number=$(jq -r '.run_number' <<<"${run_json}") event=$(jq -r '.event' <<<"${run_json}") branch=$(jq -r '.head_branch' <<<"${run_json}") sha=$(jq -r '.head_sha' <<<"${run_json}") conclusion=$(jq -r '.conclusion' <<<"${run_json}")"
+
+          jobs_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" -f per_page=100)"
+          for job in 'Quality / Python 3.11' 'Quality / Python 3.12' 'Quality / Python 3.13' 'Package / Python 3.13'; do
+            [[ "$(jq -r --arg n "${job}" '[.jobs[] | select(.name == $n)] | last | .conclusion // empty' <<<"${jobs_json}")" == "success" ]] || { echo "job failed/missing: ${job}" >&2; exit 1; }
+          done
+
+          package_json="$(jq -c '[.jobs[] | select(.name == "Package / Python 3.13")] | last' <<<"${jobs_json}")"
+          for step in 'Verify reproducible distribution bytes' 'Validate built-wheel metadata' 'Install base wheel in an unconstrained clean consumer environment' 'Verify installed-wheel identity' 'Installed-wheel full TCK conformance' 'Build release evidence' 'Verify release evidence' 'Stage release evidence bundle' 'Upload release evidence bundle'; do
+            [[ "$(jq -r --arg n "${step}" '[.steps[] | select(.name == $n)] | last | .conclusion // empty' <<<"${package_json}")" == "success" ]] || { echo "step failed/missing: ${step}" >&2; exit 1; }
+          done
+
+          artifacts_json="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" -f per_page=100)"
+          count="$(jq -r --arg n "${EXPECTED_ARTIFACT}" '[.artifacts[] | select(.name == $n and .expired == false)] | length' <<<"${artifacts_json}")"
+          [[ "${count}" == "1" ]] || { echo "release evidence artifact missing/ambiguous" >&2; exit 1; }
+          digest="$(jq -r --arg n "${EXPECTED_ARTIFACT}" '.artifacts[] | select(.name == $n and .expired == false) | .digest // ""' <<<"${artifacts_json}")"
+          echo "Quality jobs: PASS"
+          echo "Package + full TCK + release evidence: PASS"
+          echo "Release evidence digest: ${digest}"
+          echo "EXACT_MAIN_GATE=PASS"
