@@ -71,6 +71,22 @@ class ReleaseDevelopmentStateTests(unittest.TestCase):
         state["sourceVersion"] = "0.3.0"
         self.validate(state, source_version="0.3.0")
 
+    def test_accepts_post_rc2_stable_release_selection(self) -> None:
+        ledger = copy.deepcopy(VALID_LEDGER)
+        ledger["releases"].append(copy.deepcopy(RC2))
+
+        state = copy.deepcopy(VALID_STATE)
+        state["mode"] = "release"
+        state["latestPublished"] = {
+            "version": RC2["version"],
+            "tag": RC2["tag"],
+            "commit": RC2["commit"],
+        }
+        state["nextRelease"] = {"version": "0.3.0", "tag": "v0.3.0"}
+        state["sourceVersion"] = "0.3.0"
+
+        self.validate(state, source_version="0.3.0", ledger=ledger)
+
     def test_rejects_release_mode_version_drift(self) -> None:
         state = copy.deepcopy(VALID_STATE)
         state["mode"] = "release"
