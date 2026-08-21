@@ -256,7 +256,8 @@ jobs:
             --commit "${TARGET}" \
             --version "${VERSION}" \
             --output-dir published-release \
-            --token "${GH_TOKEN}"
+            --token "${GH_TOKEN}" \
+            --stable
 
           echo "Dispatching governed stable external-consumer Release Validation workflow..."
           before_ids="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow release-validation.yml --event workflow_dispatch --limit 20 --json databaseId --jq '.[].databaseId')"
