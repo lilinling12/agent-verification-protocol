@@ -1,0 +1,296 @@
+name: Publish authorized AVP v0.3.0 stable
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-v0.3.0-stable-once.yml
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: publish-avp-v0.3.0-stable
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish exact stable v0.3.0
+    if: >-
+      github.repository == 'lilinling12/agent-verification-protocol' &&
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'ci/publish-v0.3.0-stable' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.3.0
+      VERSION: 0.3.0
+      TARGET: 7be045f47f59b259b32865be8b30005e4caa40f6
+      SOURCE_RUN: '32435703455'
+      ARTIFACT_NAME: avp-release-evidence-7be045f47f59b259b32865be8b30005e4caa40f6
+      RELEASE_TITLE: AVP v0.3.0
+
+    steps:
+      - name: Checkout exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TARGET }}
+          path: release-source
+          persist-credentials: false
+
+      - name: Publish and externally validate exact stable release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          release_id=""
+          created_draft=0
+          cleanup_draft_on_error() {
+            rc=$?
+            if (( rc != 0 && created_draft == 1 )) && [[ -n "${release_id}" ]]; then
+              echo "publication failed while controlled draft still exists; deleting draft only" >&2
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null 2>&1 || true
+            fi
+            # The exact lightweight tag is deliberately retained once created because
+            # it is explicitly authorized and verified to resolve to TARGET.
+            exit "${rc}"
+          }
+          trap cleanup_draft_on_error EXIT
+
+          echo "Verifying release-source freeze..."
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          actual_checkout="$(git -C release-source rev-parse HEAD)"
+          if [[ "${actual_main}" != "${TARGET}" || "${actual_checkout}" != "${TARGET}" ]]; then
+            echo "release-source drift detected" >&2
+            printf 'main=%s checkout=%s expected=%s\n' "${actual_main}" "${actual_checkout}" "${TARGET}" >&2
+            exit 1
+          fi
+
+          echo "Verifying exact-main CI source run..."
+          run_event="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.event')"
+          run_branch="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.head_branch')"
+          run_sha="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.head_sha')"
+          run_status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.status')"
+          run_conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}" --jq '.conclusion')"
+          if [[ "${run_event}" != "push" || "${run_branch}" != "main" || "${run_sha}" != "${TARGET}" || "${run_status}" != "completed" || "${run_conclusion}" != "success" ]]; then
+            echo "source CI run is not the successful exact-main push gate" >&2
+            exit 1
+          fi
+
+          echo "Downloading and verifying exact-main release evidence..."
+          mkdir -p release-bundle
+          gh run download "${SOURCE_RUN}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "${ARTIFACT_NAME}" \
+            --dir release-bundle
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('release-bundle')
+          expected = {
+              'avp_reference-0.3.0-py3-none-any.whl',
+              'avp_reference-0.3.0.tar.gz',
+              'MANIFEST.json',
+              'SHA256SUMS',
+          }
+          actual = {path.name for path in root.iterdir() if path.is_file()}
+          if actual != expected:
+              raise SystemExit(f'release asset set mismatch: expected {sorted(expected)}, found {sorted(actual)}')
+          manifest = json.loads((root / 'MANIFEST.json').read_text(encoding='utf-8'))
+          if manifest.get('schemaVersion') != 'avp-release-evidence/v1':
+              raise SystemExit('release manifest schema mismatch')
+          if manifest.get('source') != {
+              'commit': '7be045f47f59b259b32865be8b30005e4caa40f6',
+              'repository': 'lilinling12/agent-verification-protocol',
+          }:
+              raise SystemExit('release manifest source identity mismatch')
+          if manifest.get('distribution') != {'name': 'avp-reference', 'version': '0.3.0'}:
+              raise SystemExit('release manifest distribution identity mismatch')
+          PY
+          (cd release-bundle && sha256sum -c SHA256SUMS)
+
+          echo "Rendering public stable release notes without mutating release source..."
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('release-source/docs/releases/v0.3.0.md')
+          output = Path('public-release-notes.md')
+          text = source.read_text(encoding='utf-8')
+
+          replacements = {
+              'Status: **SELECTED — NOT PUBLISHED**': 'Status: **PUBLISHED STABLE RELEASE**',
+              '`v0.3.0` is the first intended stable AVP Alpha 2 conformance release. This file records the governed selection of the stable release identity only. It does not create or authorize the public tag, GitHub Release, or package-index publication.': '`v0.3.0` is the first stable AVP Alpha 2 conformance release. The Git tag and GitHub Release were explicitly maintainer-authorized after exact-main release gates passed. Package-index publication remains outside this release authorization.',
+              'The stable release source is **not yet established by this selection branch**. The feature-branch head must never be used as the release source.': 'The stable release source is exact `main` commit `7be045f47f59b259b32865be8b30005e4caa40f6`. CI #475 / run `32435703455` passed as a push-triggered exact-main gate for this commit.',
+              'Only after those gates succeed may a maintainer separately authorize creation of `v0.3.0` and a non-prerelease GitHub Release. The published stable artifacts must then pass the governed public external-consumer Release Validation path against the exact published identity.': 'Those exact-main gates succeeded in CI #475 / run `32435703455`. Publication of `v0.3.0` as a non-prerelease GitHub Release and Latest release was explicitly maintainer-authorized. The published stable artifacts are then required to pass the governed public external-consumer Release Validation path against this exact identity.',
+              'The repository is currently selecting stable `v0.3.0` only.\n\nCreating the tag, publishing the GitHub Release, marking it as the stable/Latest release, or publishing to a package index requires a separate explicit maintainer authorization after the squash-merged exact `main` release commit passes all required gates.': 'Stable `v0.3.0` publication was explicitly maintainer-authorized for exact source `7be045f47f59b259b32865be8b30005e4caa40f6`, including the Git tag, non-prerelease GitHub Release, Latest status, and the four CI #475 release-evidence assets. This authorization does **not** include PyPI or any other package index, signing/attestation, or Alpha 3.'
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'expected pre-publication release-note text not found: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          stale_markers = (
+              'SELECTED — NOT PUBLISHED',
+              'The stable release source is **not yet established',
+              'The repository is currently selecting stable `v0.3.0` only.',
+          )
+          for marker in stale_markers:
+              if marker in text:
+                  raise SystemExit(f'stale pre-publication marker remains: {marker}')
+
+          output.write_text(text, encoding='utf-8')
+          PY
+
+          echo "Reconciling prior controlled draft attempts..."
+          mapfile -t matching_releases < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"${TAG}\") | [.id, .draft, .prerelease, .target_commitish, .name] | @tsv")
+          public_release_id=""
+          for row in "${matching_releases[@]:-}"; do
+            [[ -z "${row}" ]] && continue
+            IFS=$'\t' read -r existing_id existing_draft existing_prerelease existing_target existing_name <<< "${row}"
+            if [[ "${existing_draft}" == "true" && "${existing_target}" == "${TARGET}" && "${existing_name}" == "${RELEASE_TITLE}" ]]; then
+              echo "deleting exact orphan draft release id=${existing_id}"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${existing_id}" >/dev/null
+            elif [[ "${existing_draft}" == "false" && "${existing_prerelease}" == "false" && "${existing_target}" == "${TARGET}" && "${existing_name}" == "${RELEASE_TITLE}" ]]; then
+              public_release_id="${existing_id}"
+            else
+              echo "conflicting release identity ${TAG} exists; refusing overwrite" >&2
+              exit 1
+            fi
+          done
+
+          echo "Verifying or creating immutable lightweight tag..."
+          if tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" 2>/dev/null)"; then
+            tag_type="$(jq -r '.object.type' <<< "${tag_json}")"
+            tag_sha="$(jq -r '.object.sha' <<< "${tag_json}")"
+            if [[ "${tag_type}" != "commit" || "${tag_sha}" != "${TARGET}" ]]; then
+              echo "existing tag does not resolve directly to exact release commit" >&2
+              exit 1
+            fi
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${TAG}" \
+              -f sha="${TARGET}" >/dev/null
+            tag_type="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.type')"
+            tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq '.object.sha')"
+            if [[ "${tag_type}" != "commit" || "${tag_sha}" != "${TARGET}" ]]; then
+              echo "new tag does not resolve directly to exact release commit" >&2
+              exit 1
+            fi
+          fi
+
+          if [[ -z "${public_release_id}" ]]; then
+            echo "Creating controlled draft stable release..."
+            gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --target "${TARGET}" \
+              --title "${RELEASE_TITLE}" \
+              --notes-file public-release-notes.md \
+              --draft \
+              release-bundle/avp_reference-0.3.0-py3-none-any.whl \
+              release-bundle/avp_reference-0.3.0.tar.gz \
+              release-bundle/MANIFEST.json \
+              release-bundle/SHA256SUMS >/dev/null
+
+            mapfile -t draft_ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true and .target_commitish == \"${TARGET}\" and .name == \"${RELEASE_TITLE}\") | .id")
+            if (( ${#draft_ids[@]} != 1 )); then
+              echo "expected exactly one controlled draft release, found ${#draft_ids[@]}" >&2
+              exit 1
+            fi
+            release_id="${draft_ids[0]}"
+            created_draft=1
+
+            release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.draft')"
+            release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.prerelease')"
+            release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.target_commitish')"
+            if [[ "${release_draft}" != "true" || "${release_prerelease}" != "false" || "${release_target}" != "${TARGET}" ]]; then
+              echo "draft stable release identity verification failed" >&2
+              exit 1
+            fi
+
+            mapfile -t asset_names < <(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.assets[].name' | sort)
+            expected_assets=(MANIFEST.json SHA256SUMS avp_reference-0.3.0-py3-none-any.whl avp_reference-0.3.0.tar.gz)
+            if [[ "${asset_names[*]}" != "${expected_assets[*]}" ]]; then
+              echo "draft asset set mismatch" >&2
+              exit 1
+            fi
+
+            echo "Publishing validated draft as stable Latest release..."
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=false \
+              -f make_latest=true >/dev/null
+            created_draft=0
+            public_release_id="${release_id}"
+          else
+            echo "matching public stable release already exists; validating idempotently"
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${public_release_id}" \
+              -f make_latest=true >/dev/null
+          fi
+
+          echo "Verifying stable public metadata and Latest status..."
+          release_draft="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${public_release_id}" --jq '.draft')"
+          release_prerelease="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${public_release_id}" --jq '.prerelease')"
+          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${public_release_id}" --jq '.target_commitish')"
+          release_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${public_release_id}" --jq '.tag_name')"
+          latest_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.id')"
+          latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+          if [[ "${release_draft}" != "false" || "${release_prerelease}" != "false" || "${release_target}" != "${TARGET}" || "${release_tag}" != "${TAG}" || "${latest_id}" != "${public_release_id}" || "${latest_tag}" != "${TAG}" ]]; then
+            echo "stable public release metadata or Latest status mismatch" >&2
+            exit 1
+          fi
+
+          echo "Running repository-owned published-release validator against public bytes..."
+          rm -rf published-release
+          python release-source/scripts/validate_published_release.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${TAG}" \
+            --commit "${TARGET}" \
+            --version "${VERSION}" \
+            --output-dir published-release \
+            --token "${GH_TOKEN}"
+
+          echo "Dispatching governed stable external-consumer Release Validation workflow..."
+          before_ids="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow release-validation.yml --event workflow_dispatch --limit 20 --json databaseId --jq '.[].databaseId')"
+          gh workflow run release-validation.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref main \
+            -f tag="${TAG}" \
+            -f commit="${TARGET}" \
+            -f version="${VERSION}" \
+            -f release_class=stable
+
+          validation_run=""
+          for attempt in {1..30}; do
+            sleep 2
+            while read -r candidate; do
+              [[ -z "${candidate}" ]] && continue
+              if ! grep -qx "${candidate}" <<< "${before_ids}"; then
+                validation_run="${candidate}"
+                break 2
+              fi
+            done < <(gh run list --repo "${GITHUB_REPOSITORY}" --workflow release-validation.yml --event workflow_dispatch --limit 20 --json databaseId --jq '.[].databaseId')
+          done
+          if [[ -z "${validation_run}" ]]; then
+            echo "unable to identify dispatched stable Release Validation run" >&2
+            exit 1
+          fi
+          echo "Stable Release Validation run: ${validation_run}"
+          gh run watch "${validation_run}" --repo "${GITHUB_REPOSITORY}" --exit-status
+
+          validation_conclusion="$(gh run view "${validation_run}" --repo "${GITHUB_REPOSITORY}" --json conclusion --jq '.conclusion')"
+          if [[ "${validation_conclusion}" != "success" ]]; then
+            echo "stable external-consumer Release Validation did not succeed" >&2
+            exit 1
+          fi
+
+          trap - EXIT
+          echo "published stable Latest and externally accepted ${TAG} -> ${TARGET}; release validation run ${validation_run}"
