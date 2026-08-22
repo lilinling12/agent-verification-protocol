@@ -48,6 +48,18 @@ Historical design restoration is provenance-only and preserves archived source b
 Reference implementation availability above is evidence for reconciliation, not protocol authority.
 
 ## Alpha 3 — Environment Fabric
+
+Alpha 3 design was explicitly authorized by the protocol maintainer on 2026-08-23. The phase begins with a protocol-first Environment Fabric composition/capability design; backend implementation remains gated on reviewed portable semantics and executable conformance coverage.
+
+### Foundation / protocol design
+- [x] authorize Alpha 3 design phase
+- [ ] AEP-0009 Environment Fabric composition/capability review
+- [ ] normative gap matrix against Environment v0.1 / Core / Security / Evidence
+- [ ] Environment Fabric normative specification and requirement index
+- [ ] Environment Fabric schema(s)
+- [ ] base Environment Fabric TCK, including runtime-execution negative cases
+
+### Resource implementations
 - [ ] PostgreSQL/MySQL State adapters
 - [ ] Playwright browser runtime
 - [ ] network fault proxy
@@ -55,4 +67,4 @@ Reference implementation availability above is evidence for reconciliation, not 
 - [ ] container runtime
 - [ ] microVM experiment
 
-Alpha 3 remains unstarted and separately governed. Post-`v0.3.0` maintenance development does not authorize Alpha 3 work.
+No resource backend is considered an official Alpha 3 implementation of new portable semantics until the corresponding authority chain is reviewable in the order `Normative Spec -> Schema -> TCK -> Reference Runtime`. Alpha 3 work does not select a release, publish `0.3.1`, authorize package-index publication, or authorize signing/attestation publication.
