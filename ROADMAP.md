@@ -49,12 +49,12 @@ Reference implementation availability above is evidence for reconciliation, not 
 
 ## Alpha 3 — Environment Fabric
 
-Alpha 3 design was explicitly authorized by the protocol maintainer on 2026-08-23. The phase begins with a protocol-first Environment Fabric composition/capability design; backend implementation remains gated on reviewed portable semantics and executable conformance coverage.
+Alpha 3 design was explicitly authorized by the protocol maintainer on 2026-08-23. AEP-0009's Environment Fabric direction was explicitly Accepted on 2026-08-23 after protocol review. Acceptance authorizes downstream normative closure; backend implementation remains gated on reviewed portable semantics, machine-readable contracts where required, and executable conformance coverage.
 
 ### Foundation / protocol design
 - [x] authorize Alpha 3 design phase
-- [ ] AEP-0009 Environment Fabric composition/capability review
-- [ ] normative gap matrix against Environment v0.1 / Core / Security / Evidence
+- [x] AEP-0009 Environment Fabric composition/capability protocol review and Accepted direction
+- [x] normative gap matrix against Environment v0.1 / Core / Scenario / Security / Evidence
 - [ ] Environment Fabric normative specification and requirement index
 - [ ] Environment Fabric schema(s)
 - [ ] base Environment Fabric TCK, including runtime-execution negative cases
