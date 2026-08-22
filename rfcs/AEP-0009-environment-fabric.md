@@ -1,6 +1,6 @@
 # AEP-0009 — Environment Fabric Composition and Capability Contract
 
-- Status: Draft
+- Status: Proposed
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-23
 - Target AVP version: Unselected future protocol version
@@ -432,22 +432,23 @@ The following patterns are explicitly rejected for governed Alpha 3 implementati
 
 ## Governance and release boundary
 
-This AEP is a Draft proposal and is not normative merely because the user authorized the Alpha 3 design phase.
+This AEP is a Proposed proposal and is not normative. `Proposed` means the design is sufficiently complete for protocol review; it does not mean the direction is Accepted or Final.
 
-Alpha 3 design authorization does not:
+Alpha 3 design/proposal review does not:
 
 - select a public AVP release;
 - change `docs/releases/release-development-state.json` into release mode;
 - authorize `v0.3.1` or another tag;
 - authorize package-index publication;
 - authorize signing/attestation publication;
-- make any reference implementation behavior normative.
+- make any reference implementation behavior normative;
+- authorize backend implementation of unaccepted portable semantics.
 
 Because AVP's current release policy says a pre-1.0 PATCH release must not intentionally introduce breaking normative changes, the eventual release vehicle for Alpha 3 protocol work must be chosen separately after the normative scope and compatibility impact are known. This AEP deliberately does not assign Alpha 3 to the currently planned `0.3.1` maintenance release.
 
 ## Proposed work decomposition
 
-After this AEP reaches sufficient review maturity, work should proceed in authority order.
+If this AEP is later Accepted, work should proceed in authority order.
 
 ### Foundation
 
@@ -474,7 +475,7 @@ This decomposition avoids both extremes: one oversized AEP that permanently coup
 
 ## Acceptance criteria for moving beyond Draft
 
-AEP-0009 should not advance from Draft until review demonstrates all of the following:
+The following criteria were used to determine Proposed readiness and remain review invariants:
 
 1. no proposed semantic duplicates or weakens Environment v0.1;
 2. no proposed assurance semantic duplicates SecurityAssurance;
@@ -488,6 +489,8 @@ AEP-0009 should not advance from Draft until review demonstrates all of the foll
 10. negative TCK design proves runtime execution rather than metadata self-certification;
 11. cleanup retry safety has explicit base-Fabric requirement ownership and observable conformance semantics;
 12. release/version selection remains a separate governance decision.
+
+Advancing to `Proposed` does not satisfy the stronger criteria for `Accepted` or `Final`.
 
 ## References and standards alignment
 
