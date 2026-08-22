@@ -1,18 +1,19 @@
 # AEP-0009 — Environment Fabric Composition and Capability Contract
 
-- Status: Proposed
+- Status: Accepted
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-23
+- Accepted: 2026-08-23
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric
 
 ## Summary
 
-This AEP proposes the portable composition model for AVP Alpha 3 Environment Fabric.
+This AEP defines the accepted portable composition direction for AVP Alpha 3 Environment Fabric.
 
 AVP Environment v0.1 already defines authoritative environment ownership, ScenarioInstance binding, reset semantics, environment-scoped logical time, actor-scoped observations, evaluator projections and digests, snapshot/restore honesty, semantic diff binding, fault lifecycle semantics, and fail-closed stale-handle behavior. Alpha 3 MUST extend that contract rather than replace it.
 
-The proposed Environment Fabric model represents one AVP Environment as a composition of identified resources that expose explicit portable capabilities. A resource may be backed by a relational database, browser context, network control point, time-control mechanism, OCI-compatible compute runtime, or another implementation technology, but product and vendor APIs do not become AVP protocol semantics merely because a reference adapter uses them.
+The Environment Fabric model represents one AVP Environment as a composition of identified resources that expose explicit portable capabilities. A resource may be backed by a relational database, browser context, network control point, time-control mechanism, OCI-compatible compute runtime, or another implementation technology, but product and vendor APIs do not become AVP protocol semantics merely because a reference adapter uses them.
 
 The central rule is:
 
@@ -122,7 +123,7 @@ Environment Fabric MAY have internal resource lifecycle states, but those states
 
 Alpha 3 MUST NOT introduce a competing Episode state machine.
 
-## Proposed portable model
+## Portable model direction
 
 ### Environment Fabric
 
@@ -155,7 +156,7 @@ Resource kinds provide coarse interoperability classification. The base Fabric d
 - time;
 - compute.
 
-The exact registered vocabulary belongs in the normative specification/schema work following AEP acceptance. Vendor/product names MUST NOT be used as the primary portable resource kind.
+The exact registered vocabulary belongs in the normative specification/schema work following this AEP acceptance. Vendor/product names MUST NOT be used as the primary portable resource kind.
 
 ### Resource Capability declaration
 
@@ -176,7 +177,7 @@ Rules:
 5. a capability table, class inheritance relation, backend name, or fixture alone is not conformance evidence;
 6. Resource Capability support MUST NOT widen the materialized Subject Capability projection.
 
-The base AEP intentionally avoids freezing a large capability catalog. Domain profile work will define exact Resource Capability identifiers only when their portable semantics and tests are sufficiently precise.
+The accepted base direction intentionally avoids freezing a large capability catalog. Domain profile work will define exact Resource Capability identifiers only when their portable semantics and tests are sufficiently precise.
 
 A future Fabric-level capability may describe genuinely cross-resource semantics, such as a precisely defined coordinated consistency property, but such a capability is distinct from ordinary Resource Capability support and requires its own portable contract and conformance evidence.
 
@@ -432,9 +433,23 @@ The following patterns are explicitly rejected for governed Alpha 3 implementati
 
 ## Governance and release boundary
 
-This AEP is a Proposed proposal and is not normative. `Proposed` means the design is sufficiently complete for protocol review; it does not mean the direction is Accepted or Final.
+This AEP is **Accepted**. Acceptance approves the Environment Fabric direction for downstream normative closure. It does not itself make this AEP `Final`, does not make downstream draft specifications normative merely by existence, and does not authorize backend-first implementation.
 
-Alpha 3 design/proposal review does not:
+Acceptance authorizes the project to proceed in authority order with:
+
+```text
+Accepted AEP direction
+  -> normative specification
+  -> requirement index
+  -> schema where serialized protocol resources require it
+  -> execution-sensitive TCK
+  -> reference implementation
+  -> vendor/backend adapters
+```
+
+The specification/schema/TCK closure remains independently reviewable and must preserve the accepted boundaries in this AEP.
+
+Acceptance does not:
 
 - select a public AVP release;
 - change `docs/releases/release-development-state.json` into release mode;
@@ -442,13 +457,13 @@ Alpha 3 design/proposal review does not:
 - authorize package-index publication;
 - authorize signing/attestation publication;
 - make any reference implementation behavior normative;
-- authorize backend implementation of unaccepted portable semantics.
+- authorize bypassing specification/schema/TCK work with backend implementation precedent.
 
 Because AVP's current release policy says a pre-1.0 PATCH release must not intentionally introduce breaking normative changes, the eventual release vehicle for Alpha 3 protocol work must be chosen separately after the normative scope and compatibility impact are known. This AEP deliberately does not assign Alpha 3 to the currently planned `0.3.1` maintenance release.
 
-## Proposed work decomposition
+## Accepted work decomposition
 
-If this AEP is later Accepted, work should proceed in authority order.
+Work proceeds in authority order.
 
 ### Foundation
 
@@ -473,30 +488,29 @@ Expected domains:
 
 This decomposition avoids both extremes: one oversized AEP that permanently couples unrelated technologies, and one AEP per vendor integration.
 
-## Acceptance criteria for moving beyond Draft
+## Accepted invariants
 
-The following criteria were used to determine Proposed readiness and remain review invariants:
+The following invariants are accepted direction and must be preserved by downstream normative closure unless a later governed AEP changes them:
 
-1. no proposed semantic duplicates or weakens Environment v0.1;
-2. no proposed assurance semantic duplicates SecurityAssurance;
-3. Fabric identity composes cleanly with Evidence/Artifact identity;
-4. Core lifecycle projection remains unambiguous;
+1. no Fabric semantic duplicates or weakens Environment v0.1 without an explicit governed change;
+2. SecurityAssurance remains the security-assurance model; Fabric does not add an isolation-level ladder;
+3. Fabric identity composes with existing Evidence/Artifact identity rather than replacing it;
+4. Core lifecycle projection remains unambiguous and no Fabric Episode state machine is introduced;
 5. Resource Capability negotiation and semantic revision binding are language-neutral and distinct from Subject Capability authorization;
 6. required/optional participation is fixed by the materialized execution contract rather than backend availability;
 7. aggregate snapshot/restore semantics cannot overclaim atomicity or fidelity;
-8. security boundaries for privileged resource control are explicit;
-9. mandatory vs conditional TCK boundaries are testable by independent implementations;
-10. negative TCK design proves runtime execution rather than metadata self-certification;
+8. privileged Fabric controls remain separated from Subject routes and credentials;
+9. mandatory vs conditional TCK boundaries must be testable by independent implementations;
+10. negative TCK design must prove runtime execution rather than metadata self-certification;
 11. cleanup retry safety has explicit base-Fabric requirement ownership and observable conformance semantics;
-12. release/version selection remains a separate governance decision.
-
-Advancing to `Proposed` does not satisfy the stronger criteria for `Accepted` or `Final`.
+12. release/version selection remains a separate governance decision;
+13. backend implementation remains downstream of portable semantics, schema where required, and executable conformance coverage.
 
 ## References and standards alignment
 
 The normative specification phase should continue to prefer established external standards for mechanisms they already own.
 
-Primary references informing this proposal include:
+Primary references informing this direction include:
 
 - PostgreSQL transaction isolation and synchronized snapshot documentation: https://www.postgresql.org/docs/current/transaction-iso.html and https://www.postgresql.org/docs/current/functions-admin.html
 - MySQL transaction isolation / consistent read documentation: https://dev.mysql.com/doc/refman/8.4/en/innodb-consistent-read.html and https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html
