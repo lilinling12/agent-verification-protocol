@@ -11,6 +11,14 @@ Before opening a change, read:
 - `docs/RELEASE_PROCESS.md` for versioning and release requirements;
 - `SECURITY.md` for vulnerability reporting.
 
+## Contribution licensing
+
+Unless a contribution explicitly states otherwise before submission and the maintainers agree to different terms, contributions submitted to this repository are provided under the same Apache License 2.0 terms as the project.
+
+By opening a pull request or otherwise submitting code, documentation, tests, schemas, conformance assets, or other repository content, you represent that you have the right to contribute that material under those terms.
+
+This project does not currently require a Contributor License Agreement (CLA). If contribution scale, organizational requirements, or intellectual-property policy later justify additional contributor attestation, that change must be documented through normal repository governance before it becomes a contribution requirement.
+
 ## Contribution paths
 
 - **Bug or ambiguity**: use the bug issue form and include a minimal reproducer when possible.
