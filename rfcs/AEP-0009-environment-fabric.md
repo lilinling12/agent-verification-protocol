@@ -86,7 +86,7 @@ Environment Fabric MUST NOT imply that all resources can be atomically snapshott
 
 When an operation spans multiple resources, the portable result MUST preserve per-resource outcomes and MUST NOT report stronger aggregate fidelity or atomicity than the weakest relevant resource can demonstrate.
 
-An implementation MAY offer stronger atomic coordination as a declared capability when that property has portable semantics and conformance evidence. It MUST NOT be assumed by the base Fabric contract.
+An implementation MAY offer stronger atomic coordination through a separately specified cross-resource capability when that property has portable semantics and conformance evidence. It MUST NOT be assumed by the base Fabric contract.
 
 ### 3. Honest reproducibility dimensions
 
@@ -138,7 +138,7 @@ A portable resource description contains at least:
 
 - a stable resource identifier within the Environment instance;
 - a portable resource kind;
-- the declared portable capability identifiers for that resource;
+- the declared Resource Capability identifiers and semantic revision/profile bindings for that resource;
 - immutable identity material required by the selected resource profile;
 - the ScenarioInstance / Environment ownership binding needed to reject foreign or stale use;
 - optional namespaced implementation metadata that does not redefine protocol semantics.
@@ -157,21 +157,36 @@ Resource kinds provide coarse interoperability classification. The base Fabric d
 
 The exact registered vocabulary belongs in the normative specification/schema work following AEP acceptance. Vendor/product names MUST NOT be used as the primary portable resource kind.
 
-### Capability declaration
+### Resource Capability declaration
 
-A **Fabric Capability** is a namespaced identifier bound to a normative capability contract.
+A **Resource Capability** is a portable, conformance-bearing behavior that an Environment Resource implementation claims it can provide. It answers what portable Environment behavior the resource can satisfy; it does not answer what the Subject is authorized to call or observe.
 
-A capability declaration means the implementation claims the observable semantics required by that capability. It is not a discovery hint with no conformance consequence.
+A **Subject Capability** retains its existing Scenario/Security meaning: the operation or access surface exposed to the Subject by the materialized actor capability projection. Resource Capability support MUST NOT grant, expand, or substitute for Subject Capability authorization.
+
+A **Resource Capability Declaration** binds a Resource Capability identifier to a governed protocol/profile revision, or another reviewed semantic-version identity, sufficient to make the applicable requirements and TCK obligations unambiguous. A stable capability name MUST NOT silently acquire incompatible mandatory semantics under an unchanged declaration identity. Exact serialized version/revision fields belong to subsequent normative schema work.
+
+A Resource Capability Declaration means the implementation claims the observable semantics required by that capability revision. It is not a discovery hint with no conformance consequence.
 
 Rules:
 
-1. an undeclared optional capability MUST NOT be assumed;
-2. a request for an undeclared capability MUST fail closed or be rejected during Scenario/Fabric compatibility validation before the requested side effect occurs;
-3. when a capability is declared, all mandatory requirements for that capability become applicable;
+1. an undeclared optional Resource Capability MUST NOT be assumed;
+2. a required Resource Capability absent from the implementation MUST cause compatibility/provisioning failure before the requested side effect occurs;
+3. when a Resource Capability is declared, all mandatory requirements for the bound capability revision/profile become applicable;
 4. the corresponding TCK cases MUST execute the real adapter/runtime operation needed to observe the behavior;
-5. a capability table, class inheritance relation, backend name, or fixture alone is not conformance evidence.
+5. a capability table, class inheritance relation, backend name, or fixture alone is not conformance evidence;
+6. Resource Capability support MUST NOT widen the materialized Subject Capability projection.
 
-The base AEP intentionally avoids freezing a large capability catalog. Domain profile work will define exact capability identifiers only when their portable semantics and tests are sufficiently precise.
+The base AEP intentionally avoids freezing a large capability catalog. Domain profile work will define exact Resource Capability identifiers only when their portable semantics and tests are sufficiently precise.
+
+A future Fabric-level capability may describe genuinely cross-resource semantics, such as a precisely defined coordinated consistency property, but such a capability is distinct from ordinary Resource Capability support and requires its own portable contract and conformance evidence.
+
+### Required and optional participation
+
+Whether a resource or Resource Capability is required is determined by the **materialized execution contract**: the bound ScenarioInstance together with the selected governed profile/capability requirements. That required/optional classification is immutable for the lifetime of the bound Fabric instance.
+
+Backend availability MAY satisfy or fail that materialized contract. It MUST NOT rewrite a required resource/capability into an optional one because support is absent, and it MUST NOT silently promote an available optional backend feature into required Scenario semantics.
+
+An optional resource or capability that is not required by the materialized execution contract does not become mandatory merely because the implementation can provide it.
 
 ## Fabric identity and manifest
 
@@ -182,8 +197,9 @@ The follow-up normative specification SHOULD define an `EnvironmentFabricManifes
 - the owning Environment instance identity;
 - the ScenarioInstance identity required by Environment v0.1;
 - the ordered or canonically represented resource membership set;
-- each resource's portable kind and declared capabilities;
+- each resource's portable kind and declared Resource Capability revision/profile bindings;
 - each resource's immutable identity references required by its profile;
+- required/optional participation as derived from the materialized execution contract where representation is needed;
 - optional namespaced implementation metadata;
 - the manifest representation's AVP Artifact identity when retained as Evidence.
 
@@ -197,12 +213,12 @@ Two Fabric instances MUST NOT be treated as the same verification input merely b
 
 Fabric provisioning occurs within the existing `PROVISIONING` phase.
 
-Before the Episode becomes `READY`, all resources required by the selected Scenario/profile MUST either:
+Before the Episode becomes `READY`, all resources and Resource Capabilities required by the materialized execution contract MUST either:
 
-- be provisioned and bound to the Environment instance; or
+- be provisioned and bound to the Environment instance with the required semantics; or
 - cause provisioning to fail closed with an infrastructure/protocol-validity result appropriate to the existing Core contracts.
 
-Optional resources that are not required by the negotiated profile do not become mandatory merely because a reference implementation can provision them.
+Backend availability cannot weaken or rewrite those requirements. Optional resources and capabilities that are not required by the materialized execution contract do not become mandatory merely because a reference implementation can provision them.
 
 ### Reset
 
@@ -241,7 +257,9 @@ After entering `QUIESCING`, no new Subject-requested side effect may be initiate
 
 ### Release / cleanup
 
-Resource cleanup MUST be safe to retry and MUST preserve stale-handle fail-closed behavior.
+Resource cleanup MUST be safe to retry at the protocol-observable level and MUST preserve stale-handle fail-closed behavior. Repeating cleanup after successful release MUST NOT resurrect the resource, establish a new authoritative resource under the stale reference, or initiate a new Subject-visible side effect solely because cleanup was retried.
+
+Cleanup retry safety is a distinct Fabric composition requirement candidate; it is not inferred solely from stale-handle rejection.
 
 Cleanup failure is an infrastructure condition, not a Task Verdict. A cleanup failure MUST NOT be rewritten as Agent task failure.
 
@@ -326,6 +344,7 @@ Required security properties include:
 6. Network-control implementations MUST not introduce unintended unrestricted egress or privileged-host routes.
 7. Cleanup must be robust against untrusted Subject behavior and must not trust Subject cooperation to release privileged resources.
 8. Snapshot/restore material must be ownership-bound and integrity-checked so one Environment cannot restore another Environment's privileged state by reference substitution.
+9. Resource Capability support metadata MUST NOT be interpreted as Subject authorization; Subject Capability remains derived from the materialized actor projection and enforced by existing Security semantics.
 
 ## Alternatives considered
 
@@ -343,7 +362,7 @@ Rejected.
 
 A large interface containing `snapshot_database`, `open_browser`, `inject_network_fault`, `advance_clock`, `start_container`, and similar methods would produce backend-dependent nullability and scattered `supports_*` booleans. It would be difficult for independent implementations to negotiate or test capabilities consistently.
 
-The Fabric uses explicit resource composition and declarative capability contracts instead.
+The Fabric uses explicit resource composition and declarative Resource Capability contracts instead.
 
 ### Alternative C — one mandatory full-stack `avp-environment-fabric` profile
 
@@ -363,7 +382,7 @@ The existing SecurityAssurance model already separates API capability, credentia
 
 Rejected for the base contract.
 
-Different resources have materially different snapshot semantics. A database transaction snapshot, browser storage-state capture, filesystem snapshot, container checkpoint, and VM snapshot are not automatically one atomic consistency point. Stronger coordination may be introduced only as an explicit capability with evidence.
+Different resources have materially different snapshot semantics. A database transaction snapshot, browser storage-state capture, filesystem snapshot, container checkpoint, and VM snapshot are not automatically one atomic consistency point. Stronger coordination may be introduced only as an explicit cross-resource capability with evidence.
 
 ## Conformance strategy
 
@@ -372,18 +391,20 @@ The base Fabric TCK should remain language-neutral and test observable compositi
 Mandatory base cases should cover at least:
 
 - resource inventory and stable ownership binding;
-- capability declaration honesty;
-- rejection of an undeclared required capability before its requested side effect;
+- Resource Capability declaration/revision honesty;
+- rejection of an undeclared required Resource Capability before its requested side effect;
+- Resource Capability versus Subject Capability authorization separation;
+- required/optional participation derived from the materialized execution contract rather than backend availability;
 - Fabric/Scenario binding;
 - multi-resource operation result completeness;
 - snapshot composition identity and tamper/foreign-resource rejection;
 - restore-fidelity non-inflation;
 - stale/released resource failure;
-- cleanup idempotency and infrastructure-failure separation.
+- cleanup retry safety/idempotency and infrastructure-failure separation.
 
-Resource-profile TCK cases become mandatory only when the corresponding capability/profile is claimed.
+Resource-profile TCK cases become mandatory only when the corresponding Resource Capability/profile revision is claimed.
 
-Negative tests MUST include implementations that advertise the same static capability metadata as a conforming adapter but fail actual runtime behavior. Such implementations MUST fail conformance. This prevents capability-table inspection from becoming a substitute for execution evidence.
+Negative tests MUST include implementations that advertise the same static Resource Capability metadata as a conforming adapter but fail actual runtime behavior. Such implementations MUST fail conformance. This prevents capability-table inspection from becoming a substitute for execution evidence.
 
 Built-wheel CI MUST continue discovering registered TCK profiles dynamically rather than maintaining a hard-coded profile allowlist.
 
@@ -400,7 +421,7 @@ The following patterns are explicitly rejected for governed Alpha 3 implementati
 - backend-first APIs that are promised to be generalized later;
 - temporary compatibility shims for pre-release internal layouts;
 - public `dict[str, Any]` bags used instead of a reviewed schema for protocol resources;
-- scattered `supports_*` booleans instead of declarative capability contracts;
+- scattered `supports_*` booleans instead of declarative Resource Capability contracts;
 - a global `deterministic` boolean;
 - a numeric/ordinal isolation level duplicating SecurityAssurance;
 - hard-coded backend-name branches in language-neutral TCK semantics;
@@ -459,12 +480,14 @@ AEP-0009 should not advance from Draft until review demonstrates all of the foll
 2. no proposed assurance semantic duplicates SecurityAssurance;
 3. Fabric identity composes cleanly with Evidence/Artifact identity;
 4. Core lifecycle projection remains unambiguous;
-5. resource/capability negotiation is language-neutral;
-6. aggregate snapshot/restore semantics cannot overclaim atomicity or fidelity;
-7. security boundaries for privileged resource control are explicit;
-8. mandatory vs conditional TCK boundaries are testable by independent implementations;
-9. negative TCK design proves runtime execution rather than metadata self-certification;
-10. release/version selection remains a separate governance decision.
+5. Resource Capability negotiation and semantic revision binding are language-neutral and distinct from Subject Capability authorization;
+6. required/optional participation is fixed by the materialized execution contract rather than backend availability;
+7. aggregate snapshot/restore semantics cannot overclaim atomicity or fidelity;
+8. security boundaries for privileged resource control are explicit;
+9. mandatory vs conditional TCK boundaries are testable by independent implementations;
+10. negative TCK design proves runtime execution rather than metadata self-certification;
+11. cleanup retry safety has explicit base-Fabric requirement ownership and observable conformance semantics;
+12. release/version selection remains a separate governance decision.
 
 ## References and standards alignment
 
