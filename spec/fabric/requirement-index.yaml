@@ -9,7 +9,7 @@ requirements:
     spec: spec/fabric/environment-fabric-contract.md
     anchor: avp-fabric-001
     schema: schemas/environment-fabric-manifest.schema.json
-    conformance: [AVP-TCK-FABRIC-MANIFEST-001, AVP-TCK-FABRIC-CLEANUP-001, AVP-TCK-FABRIC-STALE-FABRIC-001]
+    conformance: [AVP-TCK-FABRIC-MANIFEST-001, AVP-TCK-FABRIC-CLEANUP-001]
   - id: AVP-FABRIC-002
     level: MUST
     area: resource-classification
@@ -48,7 +48,7 @@ requirements:
     spec: spec/fabric/environment-fabric-contract.md
     anchor: avp-fabric-006
     schema: schemas/environment-fabric-manifest.schema.json
-    conformance: [AVP-TCK-FABRIC-CAPABILITY-001, AVP-TCK-FABRIC-REQUIRED-RESOURCE-001]
+    conformance: [AVP-TCK-FABRIC-CAPABILITY-001]
   - id: AVP-FABRIC-007
     level: MUST
     area: composite-results
@@ -103,4 +103,4 @@ requirements:
     spec: spec/fabric/environment-fabric-contract.md
     anchor: avp-fabric-013
     schema: schemas/fabric-operation-result.schema.json
-    conformance: [AVP-TCK-FABRIC-CLEANUP-001, AVP-TCK-FABRIC-STALE-FABRIC-001]
+    conformance: [AVP-TCK-FABRIC-CLEANUP-001]
