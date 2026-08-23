@@ -20,10 +20,12 @@ vector:
     revision: "0.1"
     participation: OPTIONAL
   negativeControls:
+    - required-resource-absent
     - required-capability-absent
     - required-capability-revision-mismatch
 expect:
   compatibleProvisionSucceeds: true
+  missingRequiredResourceFailsBeforeSideEffect: true
   missingRequiredCapabilityFailsBeforeSideEffect: true
   incompatibleRequiredCapabilityFailsBeforeSideEffect: true
   missingOptionalCapabilityDoesNotRewriteContract: true
