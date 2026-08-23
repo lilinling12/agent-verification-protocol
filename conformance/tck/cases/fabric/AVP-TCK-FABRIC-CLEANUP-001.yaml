@@ -13,11 +13,13 @@ vector:
     - provision
     - release
     - release-again
-    - operate-through-stale-reference
+    - read-through-stale-fabric-reference
+    - operate-through-stale-resource-reference
   cleanupFailureControl:
     classification: INFRASTRUCTURE
 expect:
   retryDoesNotResurrectResource: true
   retryDoesNotCreateSubjectSideEffect: true
-  staleReferenceRejected: true
+  staleFabricReferenceRejected: true
+  staleResourceReferenceRejected: true
   cleanupFailureNotTaskVerdict: true
