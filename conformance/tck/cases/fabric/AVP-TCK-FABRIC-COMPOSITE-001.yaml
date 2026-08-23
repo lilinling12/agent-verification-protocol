@@ -1,0 +1,30 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-COMPOSITE-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-007, AVP-FABRIC-008, AVP-FABRIC-010]
+applicability: mandatory
+type: semantic
+vector:
+  operation: RESET
+  resources:
+    - resourceId: primary-state
+      participation: REQUIRED
+    - resourceId: subject-browser
+      participation: REQUIRED
+    - resourceId: network-control
+      participation: OPTIONAL
+  failureControl:
+    resourceId: subject-browser
+  optionalNonParticipation:
+    resourceId: network-control
+expect:
+  allRequiredSuccessAggregatesSuccess: true
+  everyResourceInScopeHasResult: true
+  requiredFailureAggregatesFailure: true
+  optionalNonParticipationPermitted: true
+  partialEstablishedEffectsRemainObservable: true
+  noAtomicityClaim: true
