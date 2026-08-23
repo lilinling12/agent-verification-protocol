@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-STALE-FABRIC-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-001, AVP-FABRIC-013]
+applicability: mandatory
+type: negative
+vector:
+  lifecycle:
+    - provision
+    - release
+    - read-manifest-through-released-fabric
+    - execute-through-released-fabric
+expect:
+  releasedFabricManifestRejected: true
+  releasedFabricOperationRejected: true
+  releasedFabricDoesNotBecomeReady: true
+  releasedResourcesRemainReleased: true
