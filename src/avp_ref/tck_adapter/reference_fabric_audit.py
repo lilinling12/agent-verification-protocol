@@ -1,8 +1,9 @@
-"""Focused execution controls for Environment Fabric completeness invariants.
+"""Focused execution controls layered onto the Environment Fabric TCK.
 
-These cases stay separate from the broader Fabric vectors so missing required
-resource handling and released-Fabric fail-closed behavior remain directly
-auditable conformance obligations.
+The broad Fabric adapter executes every registered vector first. This wrapper
+adds two requirement-specific fail-closed controls to the existing capability
+and cleanup case identities, avoiding duplicate registry entries while keeping
+all conformance behavior executable from the packaged wheel.
 """
 
 from __future__ import annotations
@@ -24,35 +25,42 @@ from avp_ref.fabric import (
 )
 
 from .models import TCKAdapterError, TCKCaseResult, TCKStatus
+from .reference_fabric import ReferenceFabricTCKAdapter
 
 
 class ReferenceFabricAuditTCKAdapter:
-    """Execute focused fail-closed controls omitted from aggregate Fabric cases."""
+    """Execute registered Fabric vectors plus focused completeness assertions."""
 
-    _REQUIRED_RESOURCE = "AVP-TCK-FABRIC-REQUIRED-RESOURCE-001"
-    _STALE_FABRIC = "AVP-TCK-FABRIC-STALE-FABRIC-001"
+    _CAPABILITY = "AVP-TCK-FABRIC-CAPABILITY-001"
+    _CLEANUP = "AVP-TCK-FABRIC-CLEANUP-001"
+
+    def __init__(self) -> None:
+        self._delegate = ReferenceFabricTCKAdapter()
 
     @property
     def supported_case_ids(self) -> frozenset[str]:
-        return frozenset({self._REQUIRED_RESOURCE, self._STALE_FABRIC})
+        return self._delegate.supported_case_ids
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
-        case_id = self._case_id(case)
-        vector = self._mapping(case.get("vector"), f"{case_id}.vector")
-        if case_id == self._REQUIRED_RESOURCE:
-            passed, detail = self._required_resource(vector)
-        elif case_id == self._STALE_FABRIC:
-            passed, detail = self._stale_fabric(vector)
-        else:
-            raise TCKAdapterError(f"unsupported Fabric audit case: {case_id}")
-        return TCKCaseResult(case_id, TCKStatus.PASS if passed else TCKStatus.FAIL, detail)
+        baseline = self._delegate.evaluate(case)
+        if baseline.status is not TCKStatus.PASS:
+            return baseline
 
-    def _required_resource(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        environment_id = "env-required-resource"
-        present_id = self._string(vector.get("presentResourceId"), "presentResourceId")
-        missing_id = self._string(
-            vector.get("missingRequiredResourceId"), "missingRequiredResourceId"
-        )
+        case_id = baseline.case_id
+        vector = self._mapping(case.get("vector"), f"{case_id}.vector")
+        if case_id == self._CAPABILITY:
+            passed, detail = self._required_resource_absence(vector)
+        elif case_id == self._CLEANUP:
+            passed, detail = self._released_fabric_reference()
+        else:
+            return baseline
+
+        if not passed:
+            return TCKCaseResult(case_id, TCKStatus.FAIL, detail)
+        return TCKCaseResult(case_id, TCKStatus.PASS, f"{baseline.detail}; {detail}")
+
+    def _required_resource_absence(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        environment_id = "env-required-resource-control"
         capability_doc = self._mapping(vector.get("requiredCapability"), "requiredCapability")
         required = ResourceCapabilityDeclaration(
             self._string(capability_doc.get("capabilityId"), "capabilityId"),
@@ -61,11 +69,11 @@ class ReferenceFabricAuditTCKAdapter:
             Participation(self._string(capability_doc.get("participation"), "participation")),
         )
         if required.participation is not Participation.REQUIRED:
-            raise TCKAdapterError("required-resource vector must select REQUIRED participation")
+            raise TCKAdapterError("Fabric capability vector must keep requiredCapability REQUIRED")
 
         present = InMemoryFabricResource(
             EnvironmentResourceDescriptor(
-                resource_id=present_id,
+                resource_id="primary-state",
                 environment_id=environment_id,
                 resource_kind=ResourceKind.STATE,
                 participation=Participation.REQUIRED,
@@ -75,7 +83,9 @@ class ReferenceFabricAuditTCKAdapter:
             environment_id=environment_id,
             scenario_instance_digest=self._digest("f"),
             resources=(present,),
-            capability_requirements=(CapabilityRequirement(missing_id, required),),
+            capability_requirements=(
+                CapabilityRequirement("required-resource-not-present", required),
+            ),
         )
         try:
             fabric.provision()
@@ -83,20 +93,15 @@ class ReferenceFabricAuditTCKAdapter:
         except FabricCompatibilityError:
             rejected = True
 
-        passed = (
-            rejected
-            and present.provision_side_effects == 0
-            and not fabric.ready
-            and not present.released
-        )
+        passed = rejected and present.provision_side_effects == 0 and not fabric.ready
         return passed, (
-            "missing required resource rejects provisioning before any existing-resource side effect"
+            "missing required resource fails before any present-resource provision side effect"
             if passed
             else "missing required resource was downgraded, partially provisioned, or reached READY"
         )
 
-    def _stale_fabric(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        environment_id = "env-stale-fabric"
+    def _released_fabric_reference(self) -> tuple[bool, str]:
+        environment_id = "env-stale-fabric-control"
         resource = InMemoryFabricResource(
             EnvironmentResourceDescriptor(
                 resource_id="primary-state",
@@ -133,7 +138,7 @@ class ReferenceFabricAuditTCKAdapter:
             and resource.provision_side_effects == 1
         )
         return passed, (
-            "released Fabric and owned resource references remain stale and fail closed"
+            "released Fabric reference rejects reads and operations without resurrecting owned resources"
             if passed
             else "released Fabric reference remained usable or resurrected owned resources"
         )
@@ -141,14 +146,6 @@ class ReferenceFabricAuditTCKAdapter:
     @staticmethod
     def _digest(character: str) -> str:
         return "sha256:" + character * 64
-
-    @staticmethod
-    def _case_id(case: Mapping[str, Any]) -> str:
-        metadata = case.get("metadata")
-        case_id = metadata.get("id") if isinstance(metadata, Mapping) else None
-        if not isinstance(case_id, str) or not case_id:
-            raise TCKAdapterError("Fabric audit TCK case metadata.id is missing")
-        return case_id
 
     @staticmethod
     def _mapping(value: Any, context: str) -> Mapping[str, Any]:
