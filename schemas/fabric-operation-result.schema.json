@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:fabric-operation-result:0.1",
+  "title": "AVP Fabric Operation Result",
+  "description": "Machine-readable aggregate and per-resource result for a base Environment Fabric operation.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "operationId", "operation", "environmentId", "status", "resourceResults"],
+  "properties": {
+    "apiVersion": {"const": "avp.fabric/v0.1"},
+    "kind": {"const": "FabricOperationResult"},
+    "operationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "operation": {
+      "enum": ["RESET", "SNAPSHOT", "RESTORE", "RELEASE"]
+    },
+    "environmentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "status": {
+      "enum": ["SUCCEEDED", "FAILED"]
+    },
+    "aggregateRestoreFidelity": {
+      "enum": ["EXACT", "STATE_EQUIVALENT", "NON_EQUIVALENT"]
+    },
+    "resourceResults": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["resourceId", "participation", "status"],
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "participation": {
+            "enum": ["REQUIRED", "OPTIONAL"]
+          },
+          "status": {
+            "enum": ["SUCCEEDED", "FAILED", "NOT_PARTICIPATING"]
+          },
+          "restoreFidelity": {
+            "enum": ["EXACT", "STATE_EQUIVALENT", "NON_EQUIVALENT"]
+          },
+          "failureCode": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "RESTORE"}}, "required": ["operation"]},
+      "then": {"required": ["aggregateRestoreFidelity"]},
+      "else": {"not": {"required": ["aggregateRestoreFidelity"]}}
+    }
+  ],
+  "additionalProperties": false
+}
