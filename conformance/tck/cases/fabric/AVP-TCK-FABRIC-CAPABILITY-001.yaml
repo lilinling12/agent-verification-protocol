@@ -1,0 +1,29 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-CAPABILITY-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-003, AVP-FABRIC-006]
+applicability: mandatory
+type: negative
+vector:
+  requiredCapability:
+    capabilityId: state.snapshot
+    profile: avp-state-v0.1
+    revision: "0.1"
+    participation: REQUIRED
+  optionalCapability:
+    capabilityId: state.diff
+    profile: avp-state-v0.1
+    revision: "0.1"
+    participation: OPTIONAL
+  negativeControls:
+    - required-capability-absent
+    - required-capability-revision-mismatch
+expect:
+  compatibleProvisionSucceeds: true
+  missingRequiredCapabilityFailsBeforeSideEffect: true
+  incompatibleRequiredCapabilityFailsBeforeSideEffect: true
+  missingOptionalCapabilityDoesNotRewriteContract: true
