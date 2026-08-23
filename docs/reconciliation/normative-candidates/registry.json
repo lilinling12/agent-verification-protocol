@@ -1,5 +1,24 @@
 {
   "registry_version": "1.0",
   "authority": "non-normative-governance-evidence",
-  "candidates": []
+  "candidates": [
+    {
+      "domain": "fabric",
+      "lineage": {
+        "type": "accepted-aep",
+        "path": "rfcs/AEP-0009-environment-fabric.md"
+      },
+      "spec": [
+        "spec/fabric/environment-fabric-contract.md"
+      ],
+      "requirement_index": "spec/fabric/requirement-index.yaml",
+      "profile": "avp-environment-fabric-v0.1",
+      "owned_schemas": [
+        "schemas/environment-fabric-manifest.schema.json",
+        "schemas/environment-resource.schema.json",
+        "schemas/fabric-operation-result.schema.json",
+        "schemas/resource-capability-declaration.schema.json"
+      ]
+    }
+  ]
 }
