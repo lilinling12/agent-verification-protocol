@@ -10,6 +10,7 @@ from .reference_aligned import AlignedReferenceTCKAdapter
 from .reference_environment import ReferenceEnvironmentTCKAdapter
 from .reference_evidence import ReferenceEvidenceTCKAdapter
 from .reference_fabric import ReferenceFabricTCKAdapter
+from .reference_fabric_audit import ReferenceFabricAuditTCKAdapter
 from .reference_mcp import ReferenceMCPTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
@@ -50,6 +51,7 @@ class ReferenceConformanceAdapter:
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceFabricTCKAdapter(),
+            ReferenceFabricAuditTCKAdapter(),
             ReferenceMCPTCKAdapter(),
             ReferenceSubjectTCKAdapter(),
             ReferenceArtifactTrustTCKAdapter(capabilities=capability_set),
