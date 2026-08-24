@@ -64,9 +64,10 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 ### Relational State resource profile
 - [x] AEP-0010 Draft problem/scope and standards analysis
 - [x] relational portability design audit
-- [ ] close RS-BR-001..RS-BR-008 Draft → Proposed blockers
-- [ ] AEP-0010 Proposed protocol review
-- [ ] explicit AEP-0010 Accepted decision
+- [x] close RS-BR-001..RS-BR-008 Draft → Proposed blockers
+- [x] reconcile AEP-0010 and complete Draft → Proposed readiness audit
+- [x] AEP-0010 status advanced to Proposed for formal protocol review
+- [ ] complete Proposed protocol review and record explicit AEP-0010 Accepted decision
 - [ ] relational normative specification and requirement index
 - [ ] `RelationalStateManifest` / `RelationalStateImage` schemas
 - [ ] execution-sensitive `avp-relational-state-v0.1` TCK
@@ -74,7 +75,7 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
-AEP-0010 is Draft only. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
+AEP-0010 is **Proposed, not Accepted**. Its current direction is reviewable but non-normative. No relational normative candidate surface or database adapter is authorized until an explicit protocol-maintainer Accepted decision is recorded. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
 ### Other resource implementations
 - [ ] Playwright browser runtime
