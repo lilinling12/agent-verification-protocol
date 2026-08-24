@@ -27,7 +27,8 @@
         "path": "rfcs/AEP-0010-relational-state-resource-profile.md"
       },
       "spec": [
-        "spec/relational/relational-state-contract.md"
+        "spec/relational/relational-state-contract.md",
+        "spec/relational/manifest-integrity-contract.md"
       ],
       "requirement_index": "spec/relational/requirement-index.yaml",
       "profile": "avp-relational-state-v0.1",
