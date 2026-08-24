@@ -12,6 +12,8 @@ vector:
   validManifestAccepted: true
   invalidControls:
     - duplicate-relation-id
+    - duplicate-column-id
+    - duplicate-row-key-column
     - duplicate-projection-id
     - duplicate-projection-relation
     - unknown-projection-relation
