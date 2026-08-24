@@ -12,6 +12,8 @@ from .reference_evidence import ReferenceEvidenceTCKAdapter
 from .reference_fabric_audit import ReferenceFabricAuditTCKAdapter
 from .reference_mcp import ReferenceMCPTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
+from .reference_relational import ReferenceRelationalTCKAdapter
+from .reference_relational_manifest import ReferenceRelationalManifestTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
 from .reference_security import ReferenceSecurityTCKAdapter
 from .reference_security_assurance import ReferenceSecurityAssuranceTCKAdapter
@@ -50,6 +52,8 @@ class ReferenceConformanceAdapter:
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceFabricAuditTCKAdapter(),
+            ReferenceRelationalTCKAdapter(),
+            ReferenceRelationalManifestTCKAdapter(),
             ReferenceMCPTCKAdapter(),
             ReferenceSubjectTCKAdapter(),
             ReferenceArtifactTrustTCKAdapter(capabilities=capability_set),

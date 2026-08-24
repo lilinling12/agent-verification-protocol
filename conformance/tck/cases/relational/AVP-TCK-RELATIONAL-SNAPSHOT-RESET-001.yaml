@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-011, AVP-RELATIONAL-012]
+applicability: mandatory
+type: semantic
+vector:
+  environmentId: env-relational
+  resourceId: primary-state
+  baselineRows: [{id: 1, value: before}]
+  mutationRows: [{id: 1, value: after}]
+  foreignSnapshotEnvironmentId: env-other
+  staleSameIdReplacement: true
+expect:
+  snapshotBindsOwnerInstanceAndCanonicalState: true
+  foreignSnapshotRejected: true
+  staleSameIdSnapshotRejected: true
+  resetReprojectsExactBaseline: true
+  commandSuccessAloneInsufficient: true

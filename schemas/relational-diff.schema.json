@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:relational-diff:0.1",
+  "title": "AVP Relational Semantic Diff",
+  "type": "object",
+  "required": ["apiVersion", "kind", "manifestDigest", "scope", "beforeDigest", "afterDigest", "changes"],
+  "properties": {
+    "apiVersion": {"const": "avp.relational/v0.1"},
+    "kind": {"const": "RelationalDiff"},
+    "manifestDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "scope": {
+      "oneOf": [
+        {"type": "object", "required": ["kind"], "properties": {"kind": {"const": "full"}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "projectionId"], "properties": {"kind": {"const": "projection"}, "projectionId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"}}, "additionalProperties": false}
+      ]
+    },
+    "beforeDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "afterDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "changes": {"type": "array", "items": {"$ref": "#/$defs/change"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"},
+    "key": {"type": "object", "minProperties": 1, "propertyNames": {"$ref": "#/$defs/identifier"}, "additionalProperties": {"$ref": "relational-value.schema.json"}},
+    "values": {"type": "object", "propertyNames": {"$ref": "#/$defs/identifier"}, "additionalProperties": {"$ref": "relational-value.schema.json"}},
+    "change": {
+      "type": "object",
+      "required": ["relationId", "change", "key"],
+      "properties": {
+        "relationId": {"$ref": "#/$defs/identifier"},
+        "change": {"enum": ["INSERT", "DELETE", "UPDATE"]},
+        "key": {"$ref": "#/$defs/key"},
+        "before": {"$ref": "#/$defs/values"},
+        "after": {"$ref": "#/$defs/values"}
+      },
+      "additionalProperties": false
+    }
+  }
+}
