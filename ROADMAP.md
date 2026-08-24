@@ -70,7 +70,7 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [x] complete formal Proposed protocol review
 - [x] absorb RS-PR-001..RS-PR-003 acceptance-blocker decisions into AEP-0010 and record Draft-design supersession
 - [x] complete acceptance-oriented re-review with no remaining semantic blocker
-- [ ] record explicit protocol-maintainer AEP-0010 Proposed → Accepted decision
+- [x] record explicit protocol-maintainer AEP-0010 Proposed → Accepted decision
 - [ ] relational normative specification and requirement index
 - [ ] `RelationalStateManifest` / `RelationalStateImage` schemas
 - [ ] execution-sensitive `avp-relational-state-v0.1` TCK
@@ -78,11 +78,13 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
-AEP-0010 remains **Proposed, not Accepted**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
+AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
 
-Those decisions are incorporated into AEP-0010. Exact-head acceptance-oriented re-review at `4dd656ebaa34b3284c6fff5a6044d3696b164b30` (PR review `5004370426`) found all three blockers closed and no new cross-contract semantic blocker. The direction is therefore **ACCEPTANCE-READY**, while `Accepted` remains an explicit protocol-maintainer lifecycle decision that has not been authorized.
+Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review at `4dd656ebaa34b3284c6fff5a6044d3696b164b30` (PR review `5004370426`) found all three blockers closed and no new cross-contract semantic blocker. Final pre-acceptance head `ad79ca158fce56851ce2fd545735bd86794baadb` passed CI #526, Governance #572/#573, and Release Validation #62; review `5004379749` confirmed the semantic re-review-to-final-head delta was ROADMAP-only.
 
-`docs/design/alpha3-relational-state-proposed-review-blockers.md` records the blocker disposition and explicitly marks conflicting Draft-era design wording as historical/superseded for those review topics. No relational normative candidate surface or database adapter is authorized until an explicit protocol-maintainer Accepted decision is recorded. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
+The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. Acceptance authorizes the next governed Relational State authority slice: normative specification → requirement index → closed schemas where required → execution-sensitive TCK → reference interface/runtime → PostgreSQL/MySQL adapters. It does not authorize backend-first implementation, PR merge, Final, release selection, `0.3.1` publication, package-index publication, signing, or attestation.
+
+PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
 ### Other resource implementations
 - [ ] Playwright browser runtime
