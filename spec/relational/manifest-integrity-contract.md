@@ -7,7 +7,7 @@ This companion specification closes cross-reference constraints that are semanti
 Normative keywords MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are conformance requirement terms.
 
 <a id="avp-relational-017"></a>
-## AVP-RELATIONAL-017 — Manifest identifiers and references are unambiguous
+### AVP-RELATIONAL-017 — Manifest identifiers and references are unambiguous
 
 A `RelationalStateManifest` MUST define an unambiguous logical graph before the resource is provisioned or any Subject-requested relational side effect is admitted.
 
