@@ -68,7 +68,7 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [x] reconcile AEP-0010 and complete Draft → Proposed readiness audit
 - [x] AEP-0010 status advanced to Proposed for formal protocol review
 - [x] complete formal Proposed protocol review
-- [ ] absorb RS-PR-001..RS-PR-003 acceptance-blocker decisions into AEP-0010 and supporting design surfaces
+- [x] absorb RS-PR-001..RS-PR-003 acceptance-blocker decisions into AEP-0010 and record Draft-design supersession
 - [ ] complete acceptance-oriented re-review with no remaining semantic blocker
 - [ ] record explicit protocol-maintainer AEP-0010 Proposed → Accepted decision
 - [ ] relational normative specification and requirement index
@@ -78,7 +78,9 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
-AEP-0010 remains **Proposed, not Accepted**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003). The decisions are recorded in `docs/design/alpha3-relational-state-proposed-review-blockers.md` and must be absorbed into AEP-0010 before acceptance-oriented re-review.
+AEP-0010 remains **Proposed, not Accepted**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
+
+Those three decisions are now incorporated into AEP-0010. `docs/design/alpha3-relational-state-proposed-review-blockers.md` records their disposition and explicitly marks conflicting Draft-era design wording as historical/superseded for those review topics. The next gate is exact-head validation followed by a short acceptance-oriented protocol re-review. A clean re-review may establish **ACCEPTANCE-READY** direction, but it still does not itself authorize `Proposed -> Accepted`.
 
 No relational normative candidate surface or database adapter is authorized until an explicit protocol-maintainer Accepted decision is recorded. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
