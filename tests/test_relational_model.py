@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import unittest
 from pathlib import Path
+from typing import Any
 
-from jsonschema import Draft202012Validator, RefResolver
+from jsonschema import Draft202012Validator
 
 from avp_ref.relational import (
     ColumnDefinition,
@@ -24,6 +25,21 @@ from avp_ref.relational import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _inline_relational_value_schema(node: Any, value_schema: dict[str, Any]) -> Any:
+    """Inline the local normative value schema without network resolution."""
+
+    if isinstance(node, dict):
+        if node == {"$ref": "relational-value.schema.json"}:
+            return value_schema
+        return {
+            key: _inline_relational_value_schema(value, value_schema)
+            for key, value in node.items()
+        }
+    if isinstance(node, list):
+        return [_inline_relational_value_schema(item, value_schema) for item in node]
+    return node
 
 
 class RelationalModelTest(unittest.TestCase):
@@ -129,7 +145,6 @@ class RelationalModelTest(unittest.TestCase):
         relations = document["relations"]
         self.assertIsInstance(relations, list)
         row = relations[0]["rows"][0]
-
         self.assertEqual(
             {"id": {"type": "integer", "value": "1"}},
             row["key"],
@@ -161,7 +176,6 @@ class RelationalModelTest(unittest.TestCase):
         resource = self._resource(instance_id="instance-before")
         snapshot = resource.snapshot()
         resource.release()
-
         replacement = self._resource(instance_id="instance-after")
         with self.assertRaises(RelationalReferenceError):
             replacement.restore(snapshot)
@@ -174,10 +188,8 @@ class RelationalModelTest(unittest.TestCase):
             (self._row("1", "2.00", "changed"),),
         )
         resource.settle_subject_mutation(pending, commit=True)
-
         self.assertNotEqual(snapshot.state.digest, resource.state_image().digest)
         fidelity = resource.restore(snapshot)
-
         self.assertIs(RestoreFidelity.STATE_EQUIVALENT, fidelity)
         self.assertEqual(snapshot.state.digest, resource.state_image().digest)
 
@@ -190,8 +202,8 @@ class RelationalModelTest(unittest.TestCase):
         )
         resource.settle_subject_mutation(pending, commit=True)
         after = resource.state_image()
-
         document = resource.diff(before, after).as_document()
+
         diff_schema = json.loads(
             (ROOT / "schemas" / "relational-diff.schema.json").read_text(
                 encoding="utf-8"
@@ -202,11 +214,8 @@ class RelationalModelTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        resolver = RefResolver.from_schema(
-            diff_schema,
-            store={"relational-value.schema.json": value_schema},
-        )
-        Draft202012Validator(diff_schema, resolver=resolver).validate(document)
+        resolved_schema = _inline_relational_value_schema(diff_schema, value_schema)
+        Draft202012Validator(resolved_schema).validate(document)
 
         self.assertEqual(resource.manifest_digest, document["manifestDigest"])
         self.assertEqual(before.digest, document["beforeDigest"])
