@@ -17,10 +17,14 @@ vector:
   identityMediaTypes:
     - application/vnd.avp.relational-state-manifest+json
     - application/vnd.avp.relational-state-image+json
-  manifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  baselineManifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   manifestContainsBaselineReference: false
+  tamperControls:
+    - manifest-artifact-digest
+    - baseline-artifact-digest
 expect:
   compatible: true
   identityRolesByMediaType: true
+  canonicalManifestDigestDerived: true
+  canonicalBaselineDigestDerived: true
+  tamperedIdentityRejected: true
   acyclicIdentity: true

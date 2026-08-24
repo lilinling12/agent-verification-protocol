@@ -86,9 +86,56 @@ class ReferenceRelationalTCKAdapter:
 
     def _identity(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
         capability = self._mapping(vector.get("capability"), "identity capability")
-        media_types = self._string_tuple(vector.get("identityMediaTypes"), "identity media types")
-        resource = self._simple_resource()
-        state = resource.state_image()
+        media_types = self._string_tuple(
+            vector.get("identityMediaTypes"),
+            "identity media types",
+        )
+        tamper_controls = set(
+            self._string_tuple(vector.get("tamperControls"), "tamper controls")
+        )
+        manifest = self._simple_manifest()
+        baseline = {"records": (self._simple_row("1", "baseline"),)}
+        manifest_digest, baseline_digest = InMemoryRelationalResource.identity_artifacts(
+            manifest,
+            baseline,
+        )
+        resource = self._resource(
+            manifest=manifest,
+            baseline=baseline,
+            instance_id="identity-good",
+        )
+
+        rejected: set[str] = set()
+        if "manifest-artifact-digest" in tamper_controls:
+            try:
+                InMemoryRelationalResource(
+                    environment_id="env-identity-tamper",
+                    resource_id="state",
+                    resource_instance_id="identity-bad-manifest",
+                    manifest=manifest,
+                    manifest_artifact_digest=self._different_digest(manifest_digest),
+                    baseline=baseline,
+                    baseline_artifact_digest=baseline_digest,
+                    execution_input_identity=self._digest("b"),
+                )
+            except RelationalCompatibilityError:
+                rejected.add("manifest-artifact-digest")
+        if "baseline-artifact-digest" in tamper_controls:
+            try:
+                InMemoryRelationalResource(
+                    environment_id="env-identity-tamper",
+                    resource_id="state",
+                    resource_instance_id="identity-bad-baseline",
+                    manifest=manifest,
+                    manifest_artifact_digest=manifest_digest,
+                    baseline=baseline,
+                    baseline_artifact_digest=self._different_digest(baseline_digest),
+                    execution_input_identity=self._digest("b"),
+                )
+            except RelationalCompatibilityError:
+                rejected.add("baseline-artifact-digest")
+
+        manifest_doc = manifest.as_document()
         passed = (
             vector.get("resourceKind") == "state"
             and capability.get("capabilityId") == "state.relational"
@@ -100,13 +147,15 @@ class ReferenceRelationalTCKAdapter:
                 "application/vnd.avp.relational-state-image+json",
             )
             and vector.get("manifestContainsBaselineReference") is False
-            and state.manifest_digest == vector.get("baselineManifestDigest")
-            and vector.get("manifestDigest") == vector.get("baselineManifestDigest")
+            and manifest_doc.get("kind") == "RelationalStateManifest"
+            and resource.manifest_digest == manifest_digest
+            and resource.baseline_digest == baseline_digest
+            and rejected == tamper_controls
         )
         return passed, (
-            "relational profile and acyclic Manifest/baseline identity binding verified"
+            "canonical Manifest/baseline Artifact identities are derived and tamper controls fail closed"
             if passed
-            else "relational state identity/profile binding diverged from the candidate contract"
+            else "relational content-address identity binding was trusted or incomplete"
         )
 
     def _canonical(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
@@ -115,46 +164,77 @@ class ReferenceRelationalTCKAdapter:
             self._canonical_row("2", "2.50", "e\u0301"),
             self._canonical_row("1", "1.00", "é"),
         )
-        resource = InMemoryRelationalResource(
+        resource = self._resource(
             environment_id="env-canonical",
             resource_id="state",
+            instance_id="canonical",
             manifest=manifest,
-            manifest_digest=self._digest("d"),
             baseline={"records": rows},
             execution_input_identity=self._digest("e"),
         )
-        ordered = [row.value_map()["id"].value for row in resource.state_image().relations[0][1]]
+        ordered = [
+            row.value_map()["id"].value
+            for row in resource.state_image().relations[0][1]
+        ]
 
-        rejected = 0
+        valid_controls = vector.get("validControls")
         invalid_controls = vector.get("invalidControls")
+        invalid_type_controls = vector.get("invalidTypeControls")
+        if not isinstance(valid_controls, list):
+            raise TCKAdapterError("canonical validControls must be a list")
         if not isinstance(invalid_controls, list):
             raise TCKAdapterError("canonical invalidControls must be a list")
-        column = manifest.relation("records").columns[0]
+        if not isinstance(invalid_type_controls, list):
+            raise TCKAdapterError("canonical invalidTypeControls must be a list")
+
+        accepted = 0
+        for item in valid_controls:
+            control = self._mapping(item, "canonical valid control")
+            column, value = self._scalar_control(control)
+            InMemoryRelationalResource._validate_value(column, value)
+            accepted += 1
+
+        rejected = 0
         for item in invalid_controls:
             control = self._mapping(item, "canonical invalid control")
             try:
-                InMemoryRelationalResource._validate_value(
-                    column,
-                    RelationalValue(ValueType(self._string(control.get("type"), "invalid type")), control.get("value")),
-                )
+                column, value = self._scalar_control(control)
+                InMemoryRelationalResource._validate_value(column, value)
             except (RelationalCompatibilityError, ValueError):
                 rejected += 1
 
-        text_values = [row.value_map()["text"].value for row in resource.state_image().relations[0][1]]
-        passed = ordered == ["1", "2"] and rejected == len(invalid_controls) and len(set(text_values)) == 2
+        rejected_types = 0
+        for item in invalid_type_controls:
+            control = self._mapping(item, "canonical invalid type control")
+            try:
+                self._column_type(control)
+            except (RelationalCompatibilityError, ValueError):
+                rejected_types += 1
+
+        text_values = [
+            row.value_map()["text"].value
+            for row in resource.state_image().relations[0][1]
+        ]
+        passed = (
+            ordered == ["1", "2"]
+            and accepted == len(valid_controls)
+            and rejected == len(invalid_controls)
+            and rejected_types == len(invalid_type_controls)
+            and len(set(text_values)) == 2
+        )
         return passed, (
-            "typed canonical values, logical-key ordering, and exact Unicode identity verified"
+            "complete closed scalar vocabulary, parameter boundaries, logical-key ordering, and exact Unicode identity verified"
             if passed
-            else "canonical value validation/order/Unicode identity failed"
+            else "mandatory scalar/canonical execution coverage failed"
         )
 
     def _projection(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._consistency_resource(InMemoryRelationalResource)
+        resource = self._consistency_resource(InMemoryRelationalResource, "projection-good")
         projection = resource.project("consistency.pair")
         observed = self._epochs(projection)
         allowed = {(1, 1), (2, 2)}
 
-        torn = self._consistency_resource(TornProjectionResource)
+        torn = self._consistency_resource(TornProjectionResource, "projection-torn")
         torn_observed = self._epochs(torn.project("consistency.pair"))
         passed = observed in allowed and torn_observed not in allowed
         return passed, (
@@ -164,7 +244,7 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _quiescing(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        commit_resource = self._simple_resource()
+        commit_resource = self._simple_resource(instance_id="quiescing-commit")
         replacement = (self._simple_row("1", "committed"),)
         pending = commit_resource.begin_subject_mutation("records", replacement)
         commit_resource.enter_quiescing()
@@ -182,17 +262,26 @@ class ReferenceRelationalTCKAdapter:
         final = commit_resource.final_projection("records.all")
         committed_observed = self._projection_text(final) == "committed"
 
-        rollback_resource = self._simple_resource()
+        rollback_resource = self._simple_resource(instance_id="quiescing-rollback")
         rollback = rollback_resource.begin_subject_mutation(
-            "records", (self._simple_row("1", "rolled"),)
+            "records",
+            (self._simple_row("1", "rolled"),),
         )
         rollback_resource.enter_quiescing()
         rollback_resource.settle_subject_mutation(rollback, commit=False)
-        rolled_back_hidden = self._projection_text(
-            rollback_resource.final_projection("records.all")
-        ) == "baseline"
+        rolled_back_hidden = (
+            self._projection_text(
+                rollback_resource.final_projection("records.all")
+            )
+            == "baseline"
+        )
 
-        passed = rejected_new and unresolved_blocked and committed_observed and rolled_back_hidden
+        passed = (
+            rejected_new
+            and unresolved_blocked
+            and committed_observed
+            and rolled_back_hidden
+        )
         return passed, (
             "QUIESCING closes admission and waits for commit/rollback settlement without fabrication"
             if passed
@@ -200,7 +289,7 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _drift(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        logical = self._simple_resource()
+        logical = self._simple_resource(instance_id="drift-logical")
         logical.set_logical_binding_valid(False)
         try:
             logical.state_image()
@@ -208,10 +297,10 @@ class ReferenceRelationalTCKAdapter:
         except RelationalCompatibilityError:
             logical_rejected = True
 
-        irrelevant = self._simple_resource()
+        irrelevant = self._simple_resource(instance_id="drift-irrelevant")
         irrelevant_ok = bool(irrelevant.state_image().digest)
 
-        execution = self._simple_resource()
+        execution = self._simple_resource(instance_id="drift-execution")
         execution.set_execution_input_identity(self._digest("f"))
         try:
             execution.state_image()
@@ -219,11 +308,19 @@ class ReferenceRelationalTCKAdapter:
         except RelationalCompatibilityError:
             execution_rejected = True
 
-        negative = self._simple_resource(resource_type=ExecutionInputDriftResource)
+        negative = self._simple_resource(
+            resource_type=ExecutionInputDriftResource,
+            instance_id="drift-negative",
+        )
         negative.set_execution_input_identity(self._digest("f"))
         negative_wrongly_accepts = bool(negative.state_image().digest)
 
-        passed = logical_rejected and irrelevant_ok and execution_rejected and negative_wrongly_accepts
+        passed = (
+            logical_rejected
+            and irrelevant_ok
+            and execution_rejected
+            and negative_wrongly_accepts
+        )
         return passed, (
             "logical binding and execution-input drift fail closed without raw catalog equality"
             if passed
@@ -231,17 +328,22 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _snapshot_reset(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._simple_resource()
+        resource = self._simple_resource(instance_id="snapshot-owner")
         snapshot = resource.snapshot()
-        mutation = resource.begin_subject_mutation("records", (self._simple_row("1", "changed"),))
+        mutation = resource.begin_subject_mutation(
+            "records",
+            (self._simple_row("1", "changed"),),
+        )
         resource.settle_subject_mutation(mutation, commit=True)
         changed = resource.state_image().digest != snapshot.state.digest
         reset = resource.reset()
-        reset_equal = reset.digest == snapshot.state.digest
+        reset_equal = reset.digest == resource.baseline_digest
+
         foreign = RelationalSnapshot(
             snapshot.snapshot_id,
             "env-other",
             snapshot.resource_id,
+            snapshot.resource_instance_id,
             snapshot.state,
         )
         try:
@@ -249,25 +351,41 @@ class ReferenceRelationalTCKAdapter:
             foreign_rejected = False
         except RelationalReferenceError:
             foreign_rejected = True
-        return (
-            changed and reset_equal and foreign_rejected,
-            "snapshot ownership and independently verified reset-to-baseline behavior passed"
-            if changed and reset_equal and foreign_rejected
-            else "snapshot ownership or reset verification failed",
+
+        resource.release()
+        replacement = self._simple_resource(instance_id="snapshot-replacement")
+        try:
+            replacement.restore(snapshot)
+            stale_rejected = False
+        except RelationalReferenceError:
+            stale_rejected = True
+
+        passed = changed and reset_equal and foreign_rejected and stale_rejected
+        return passed, (
+            "snapshot owner-instance binding, stale-reference rejection, and independently verified reset passed"
+            if passed
+            else "snapshot ownership/staleness or reset verification failed"
         )
 
     def _restore(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._simple_resource()
+        resource = self._simple_resource(instance_id="restore-good")
         snapshot = resource.snapshot()
-        mutation = resource.begin_subject_mutation("records", (self._simple_row("1", "changed"),))
+        mutation = resource.begin_subject_mutation(
+            "records",
+            (self._simple_row("1", "changed"),),
+        )
         resource.settle_subject_mutation(mutation, commit=True)
         fidelity = resource.restore(snapshot)
         restored = resource.state_image().digest == snapshot.state.digest
 
-        false_resource = self._simple_resource(resource_type=FalseRestoreResource)
+        false_resource = self._simple_resource(
+            resource_type=FalseRestoreResource,
+            instance_id="restore-false",
+        )
         false_snapshot = false_resource.snapshot()
         false_mutation = false_resource.begin_subject_mutation(
-            "records", (self._simple_row("1", "changed"),)
+            "records",
+            (self._simple_row("1", "changed"),),
         )
         false_resource.settle_subject_mutation(false_mutation, commit=True)
         false_claim = false_resource.restore(false_snapshot)
@@ -275,7 +393,11 @@ class ReferenceRelationalTCKAdapter:
             false_claim is RestoreFidelity.STATE_EQUIVALENT
             and false_resource.state_image().digest != false_snapshot.state.digest
         )
-        passed = fidelity is RestoreFidelity.STATE_EQUIVALENT and restored and false_detected
+        passed = (
+            fidelity is RestoreFidelity.STATE_EQUIVALENT
+            and restored
+            and false_detected
+        )
         return passed, (
             "successful restore proves StateImage equality at exact STATE_EQUIVALENT fidelity and false restore is detectable"
             if passed
@@ -294,37 +416,76 @@ class ReferenceRelationalTCKAdapter:
         resource.settle_subject_mutation(pending, commit=True)
         after = resource.state_image()
         diff = resource.diff(before, after)
-        by_change: dict[str, list[str]] = {"INSERT": [], "DELETE": [], "UPDATE": []}
-        relation = resource.manifest.relation("records")
+        document = diff.as_document()
+
+        by_change: dict[str, list[str]] = {
+            "INSERT": [],
+            "DELETE": [],
+            "UPDATE": [],
+        }
+        change_shape_valid = True
         for change in diff.changes:
-            key_text = change.key_bytes.decode("utf-8")
-            for candidate in ("1", "2", "3", "4", "5"):
-                if f'"value":"{candidate}"' in key_text:
-                    by_change[change.change].append(candidate)
-                    break
+            key = dict(change.key)
+            identifier = key["id"].value
+            if isinstance(identifier, str):
+                by_change[change.change].append(identifier)
+            if change.change == "INSERT":
+                change_shape_valid &= change.before is None and change.after is not None
+            elif change.change == "DELETE":
+                change_shape_valid &= change.before is not None and change.after is None
+            elif change.change == "UPDATE":
+                change_shape_valid &= change.before is not None and change.after is not None
+            else:
+                change_shape_valid = False
+
+        required = {
+            "apiVersion",
+            "kind",
+            "manifestDigest",
+            "scope",
+            "beforeDigest",
+            "afterDigest",
+            "changes",
+        }
         passed = (
-            by_change["UPDATE"] == ["1"]
+            set(document) == required
+            and document["manifestDigest"] == resource.manifest_digest
+            and document["scope"] == {"kind": "full"}
+            and document["beforeDigest"] == before.digest
+            and document["afterDigest"] == after.digest
+            and by_change["UPDATE"] == ["1"]
             and by_change["DELETE"] == ["2", "4"]
             and by_change["INSERT"] == ["3", "5"]
-            and relation.row_key == ("id",)
+            and change_shape_valid
         )
         return passed, (
-            "semantic diff uses deterministic logical row identity including delete+insert key change"
+            "schema-shaped semantic diff binds Manifest/scope/before/after identity and deterministic logical changes"
             if passed
-            else "relational diff did not match logical insert/delete/update semantics"
+            else "relational diff protocol shape or identity/change semantics diverged"
         )
 
     def _security(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._security_resource(InMemoryRelationalResource)
+        resource = self._security_resource(
+            InMemoryRelationalResource,
+            "security-good",
+        )
         complete = resource.state_image()
-        subject = resource.subject_view({("records", "id"), ("records", "public_value")})
+        subject = resource.subject_view(
+            {("records", "id"), ("records", "public_value")}
+        )
         subject_values = subject["records"][0].value_map()
-        private_preserved = "hidden_evaluator_value" in complete.relations[0][1][0].value_map()
+        private_preserved = (
+            "hidden_evaluator_value" in complete.relations[0][1][0].value_map()
+        )
         hidden_excluded = "hidden_evaluator_value" not in subject_values
 
-        leakage = self._security_resource(HiddenStateLeakResource)
-        leaked = leakage.subject_view({("records", "id"), ("records", "public_value")})
-        leak_detected = "hidden_evaluator_value" in leaked["records"][0].value_map()
+        leakage = self._security_resource(HiddenStateLeakResource, "security-leak")
+        leaked = leakage.subject_view(
+            {("records", "id"), ("records", "public_value")}
+        )
+        leak_detected = (
+            "hidden_evaluator_value" in leaked["records"][0].value_map()
+        )
 
         try:
             resource.subject_view({("records", "hidden_evaluator_value")})
@@ -332,7 +493,12 @@ class ReferenceRelationalTCKAdapter:
         except RelationalVisibilityError:
             explicit_private_rejected = True
 
-        passed = private_preserved and hidden_excluded and leak_detected and explicit_private_rejected
+        passed = (
+            private_preserved
+            and hidden_excluded
+            and leak_detected
+            and explicit_private_rejected
+        )
         return passed, (
             "evaluator-private authoritative state is preserved while Subject visibility remains fail closed"
             if passed
@@ -340,13 +506,20 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _executed_capability(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        torn = self._consistency_resource(TornProjectionResource)
-        torn_failed = self._epochs(torn.project("consistency.pair")) not in {(1, 1), (2, 2)}
+        torn = self._consistency_resource(TornProjectionResource, "executed-torn")
+        torn_failed = self._epochs(torn.project("consistency.pair")) not in {
+            (1, 1),
+            (2, 2),
+        }
 
-        false_restore = self._simple_resource(resource_type=FalseRestoreResource)
+        false_restore = self._simple_resource(
+            resource_type=FalseRestoreResource,
+            instance_id="executed-false-restore",
+        )
         snapshot = false_restore.snapshot()
         mutation = false_restore.begin_subject_mutation(
-            "records", (self._simple_row("1", "changed"),)
+            "records",
+            (self._simple_row("1", "changed"),),
         )
         false_restore.settle_subject_mutation(mutation, commit=True)
         claim = false_restore.restore(snapshot)
@@ -355,11 +528,16 @@ class ReferenceRelationalTCKAdapter:
             and false_restore.state_image().digest != snapshot.state.digest
         )
 
-        leak = self._security_resource(HiddenStateLeakResource)
-        leaked = leak.subject_view({("records", "id"), ("records", "public_value")})
+        leak = self._security_resource(HiddenStateLeakResource, "executed-leak")
+        leaked = leak.subject_view(
+            {("records", "id"), ("records", "public_value")}
+        )
         leak_failed = "hidden_evaluator_value" in leaked["records"][0].value_map()
 
-        drift = self._simple_resource(resource_type=ExecutionInputDriftResource)
+        drift = self._simple_resource(
+            resource_type=ExecutionInputDriftResource,
+            instance_id="executed-drift",
+        )
         drift.set_execution_input_identity(self._digest("f"))
         drift_failed = bool(drift.state_image().digest)
 
@@ -382,7 +560,12 @@ class ReferenceRelationalTCKAdapter:
         )
         return RelationalManifest(
             (relation,),
-            (ProjectionDefinition("records.all", (ProjectionRelation("records", ("id", "value")),)),),
+            (
+                ProjectionDefinition(
+                    "records.all",
+                    (ProjectionRelation("records", ("id", "value")),),
+                ),
+            ),
         )
 
     @staticmethod
@@ -391,7 +574,10 @@ class ReferenceRelationalTCKAdapter:
             "records",
             (
                 ColumnDefinition("id", ColumnType(ValueType.INTEGER)),
-                ColumnDefinition("amount", ColumnType(ValueType.DECIMAL, precision=65, scale=2)),
+                ColumnDefinition(
+                    "amount",
+                    ColumnType(ValueType.DECIMAL, precision=65, scale=2),
+                ),
                 ColumnDefinition("text", ColumnType(ValueType.TEXT)),
             ),
             ("id",),
@@ -421,30 +607,34 @@ class ReferenceRelationalTCKAdapter:
         self,
         *,
         resource_type: type[InMemoryRelationalResource] = InMemoryRelationalResource,
+        instance_id: str,
     ) -> InMemoryRelationalResource:
-        return resource_type(
+        manifest = self._simple_manifest()
+        baseline = {"records": (self._simple_row("1", "baseline"),)}
+        return self._resource(
+            resource_type=resource_type,
             environment_id="env-relational",
             resource_id="primary-state",
-            manifest=self._simple_manifest(),
-            manifest_digest=self._digest("a"),
-            baseline={"records": (self._simple_row("1", "baseline"),)},
-            execution_input_identity=self._digest("b"),
+            instance_id=instance_id,
+            manifest=manifest,
+            baseline=baseline,
         )
 
     def _diff_resource(self) -> InMemoryRelationalResource:
-        return InMemoryRelationalResource(
+        manifest = self._simple_manifest()
+        baseline = {
+            "records": (
+                self._simple_row("1", "a"),
+                self._simple_row("2", "b"),
+                self._simple_row("4", "key-before"),
+            )
+        }
+        return self._resource(
             environment_id="env-diff",
             resource_id="primary-state",
-            manifest=self._simple_manifest(),
-            manifest_digest=self._digest("a"),
-            baseline={
-                "records": (
-                    self._simple_row("1", "a"),
-                    self._simple_row("2", "b"),
-                    self._simple_row("4", "key-before"),
-                )
-            },
-            execution_input_identity=self._digest("b"),
+            instance_id="diff",
+            manifest=manifest,
+            baseline=baseline,
         )
 
     @staticmethod
@@ -470,7 +660,9 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _consistency_resource(
-        self, resource_type: type[InMemoryRelationalResource]
+        self,
+        resource_type: type[InMemoryRelationalResource],
+        instance_id: str,
     ) -> InMemoryRelationalResource:
         row = RelationalRow.from_mapping(
             {
@@ -478,25 +670,34 @@ class ReferenceRelationalTCKAdapter:
                 "epoch": RelationalValue(ValueType.INTEGER, "1"),
             }
         )
-        return resource_type(
+        manifest = self._consistency_manifest()
+        baseline = {
+            "consistency.left": (row,),
+            "consistency.right": (row,),
+        }
+        return self._resource(
+            resource_type=resource_type,
             environment_id="env-consistency",
             resource_id="state",
-            manifest=self._consistency_manifest(),
-            manifest_digest=self._digest("c"),
-            baseline={"consistency.left": (row,), "consistency.right": (row,)},
-            execution_input_identity=self._digest("b"),
+            instance_id=instance_id,
+            manifest=manifest,
+            baseline=baseline,
         )
 
-    @staticmethod
     def _security_resource(
+        self,
         resource_type: type[InMemoryRelationalResource],
+        instance_id: str,
     ) -> InMemoryRelationalResource:
         relation = RelationDefinition(
             "records",
             (
                 ColumnDefinition("id", ColumnType(ValueType.INTEGER)),
                 ColumnDefinition("public_value", ColumnType(ValueType.TEXT)),
-                ColumnDefinition("hidden_evaluator_value", ColumnType(ValueType.TEXT)),
+                ColumnDefinition(
+                    "hidden_evaluator_value",
+                    ColumnType(ValueType.TEXT),
+                ),
             ),
             ("id",),
         )
@@ -508,33 +709,104 @@ class ReferenceRelationalTCKAdapter:
                 "hidden_evaluator_value": RelationalValue(ValueType.TEXT, "secret"),
             }
         )
-        return resource_type(
+        return self._resource(
+            resource_type=resource_type,
             environment_id="env-security",
             resource_id="state",
+            instance_id=instance_id,
             manifest=manifest,
-            manifest_digest=ReferenceRelationalTCKAdapter._digest("a"),
             baseline={"records": (row,)},
-            execution_input_identity=ReferenceRelationalTCKAdapter._digest("b"),
             evaluator_private_columns={("records", "hidden_evaluator_value")},
         )
+
+    def _resource(
+        self,
+        *,
+        manifest: RelationalManifest,
+        baseline: Mapping[str, tuple[RelationalRow, ...]],
+        instance_id: str,
+        environment_id: str = "env-relational",
+        resource_id: str = "state",
+        execution_input_identity: str | None = None,
+        evaluator_private_columns: set[tuple[str, str]] | None = None,
+        resource_type: type[InMemoryRelationalResource] = InMemoryRelationalResource,
+    ) -> InMemoryRelationalResource:
+        manifest_digest, baseline_digest = InMemoryRelationalResource.identity_artifacts(
+            manifest,
+            baseline,
+        )
+        return resource_type(
+            environment_id=environment_id,
+            resource_id=resource_id,
+            resource_instance_id=instance_id,
+            manifest=manifest,
+            manifest_artifact_digest=manifest_digest,
+            baseline=baseline,
+            baseline_artifact_digest=baseline_digest,
+            execution_input_identity=execution_input_identity or self._digest("b"),
+            evaluator_private_columns=evaluator_private_columns or (),
+        )
+
+    def _scalar_control(
+        self,
+        control: Mapping[str, Any],
+    ) -> tuple[ColumnDefinition, RelationalValue]:
+        column_type = self._column_type(control)
+        nullable = control.get("nullable", False)
+        if not isinstance(nullable, bool):
+            raise TCKAdapterError("scalar nullable must be boolean")
+        column = ColumnDefinition("value", column_type, nullable=nullable)
+        value = RelationalValue(column_type.kind, control.get("value"))
+        return column, value
+
+    def _column_type(self, control: Mapping[str, Any]) -> ColumnType:
+        kind = ValueType(self._string(control.get("type"), "scalar type"))
+        if kind is ValueType.DECIMAL:
+            return ColumnType(
+                kind,
+                precision=self._integer(control.get("precision"), "precision"),
+                scale=self._integer(control.get("scale"), "scale"),
+            )
+        if kind in {
+            ValueType.TIME_LOCAL,
+            ValueType.TIMESTAMP_LOCAL,
+            ValueType.TIMESTAMP_INSTANT,
+        }:
+            return ColumnType(
+                kind,
+                fractional_precision=self._integer(
+                    control.get("fractionalPrecision"),
+                    "fractionalPrecision",
+                ),
+            )
+        return ColumnType(kind)
 
     @staticmethod
     def _epochs(projection: Mapping[str, object]) -> tuple[int, int]:
         relations = projection.get("relations")
         if not isinstance(relations, list) or len(relations) != 2:
-            raise TCKAdapterError("consistency projection must contain exactly two relations")
+            raise TCKAdapterError(
+                "consistency projection must contain exactly two relations"
+            )
         epochs: list[int] = []
         for relation in relations:
             if not isinstance(relation, Mapping):
                 raise TCKAdapterError("projection relation must be a mapping")
             rows = relation.get("rows")
-            if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
+            if (
+                not isinstance(rows, list)
+                or len(rows) != 1
+                or not isinstance(rows[0], Mapping)
+            ):
                 raise TCKAdapterError("consistency relation must contain one row")
             values = rows[0].get("values")
             if not isinstance(values, Mapping):
                 raise TCKAdapterError("projection row values missing")
             epoch = values.get("epoch")
-            if not isinstance(epoch, Mapping) or not isinstance(epoch.get("value"), str):
+            if not isinstance(epoch, Mapping) or not isinstance(
+                epoch.get("value"),
+                str,
+            ):
                 raise TCKAdapterError("projection epoch missing")
             epochs.append(int(epoch["value"]))
         return epochs[0], epochs[1]
@@ -542,7 +814,11 @@ class ReferenceRelationalTCKAdapter:
     @staticmethod
     def _projection_text(projection: Mapping[str, object]) -> str:
         relations = projection.get("relations")
-        if not isinstance(relations, list) or not relations or not isinstance(relations[0], Mapping):
+        if (
+            not isinstance(relations, list)
+            or not relations
+            or not isinstance(relations[0], Mapping)
+        ):
             raise TCKAdapterError("records projection missing relation")
         rows = relations[0].get("rows")
         if not isinstance(rows, list) or not rows or not isinstance(rows[0], Mapping):
@@ -564,15 +840,32 @@ class ReferenceRelationalTCKAdapter:
     @staticmethod
     def _string(value: Any, context: str) -> str:
         if not isinstance(value, str) or not value:
-            raise TCKAdapterError(f"relational TCK {context} must be a non-empty string")
+            raise TCKAdapterError(
+                f"relational TCK {context} must be a non-empty string"
+            )
+        return value
+
+    @staticmethod
+    def _integer(value: Any, context: str) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TCKAdapterError(f"relational TCK {context} must be an integer")
         return value
 
     @staticmethod
     def _string_tuple(value: Any, context: str) -> tuple[str, ...]:
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-            raise TCKAdapterError(f"relational TCK {context} must be a string list")
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise TCKAdapterError(
+                f"relational TCK {context} must be a string list"
+            )
         return tuple(value)
 
     @staticmethod
     def _digest(character: str) -> str:
         return "sha256:" + character * 64
+
+    @staticmethod
+    def _different_digest(digest: str) -> str:
+        replacement = "0" if digest[-1] != "0" else "1"
+        return digest[:-1] + replacement

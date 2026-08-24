@@ -8,11 +8,14 @@ from typing import Any
 from avp_ref.relational import (
     ColumnDefinition,
     ColumnType,
+    InMemoryRelationalResource,
     ProjectionDefinition,
     ProjectionRelation,
     RelationDefinition,
     RelationalCompatibilityError,
     RelationalManifest,
+    RelationalRow,
+    RelationalValue,
     ValueType,
 )
 from avp_ref.relational_manifest import validate_manifest_integrity
@@ -40,13 +43,19 @@ class ReferenceRelationalManifestTCKAdapter:
         if not isinstance(vector, Mapping):
             raise TCKAdapterError("Manifest integrity vector must be an object")
         controls = vector.get("invalidControls")
-        if not isinstance(controls, list) or not all(isinstance(item, str) for item in controls):
-            raise TCKAdapterError("Manifest integrity invalidControls must be a string list")
+        if not isinstance(controls, list) or not all(
+            isinstance(item, str) for item in controls
+        ):
+            raise TCKAdapterError(
+                "Manifest integrity invalidControls must be a string list"
+            )
 
         validate_manifest_integrity(self._valid_manifest())
         builders = self._invalid_builders()
         if set(controls) != set(builders):
-            raise TCKAdapterError("Manifest integrity case/control implementation mismatch")
+            raise TCKAdapterError(
+                "Manifest integrity case/control implementation mismatch"
+            )
 
         rejected: list[str] = []
         for control in controls:
@@ -56,11 +65,12 @@ class ReferenceRelationalManifestTCKAdapter:
             except RelationalCompatibilityError:
                 rejected.append(control)
 
-        passed = len(rejected) == len(controls)
+        admission_rejected = self._invalid_resource_admission_rejected()
+        passed = len(rejected) == len(controls) and admission_rejected
         detail = (
-            "valid Manifest accepted and every duplicate/dangling/key-incomplete control rejected"
+            "valid Manifest accepted, every duplicate/dangling/key-incomplete control rejected, and invalid graph rejected at resource admission"
             if passed
-            else f"Manifest integrity controls not rejected: {sorted(set(controls) - set(rejected))}"
+            else "Manifest integrity semantic or resource-admission control failed"
         )
         return TCKCaseResult(
             self.CASE_ID,
@@ -90,6 +100,30 @@ class ReferenceRelationalManifestTCKAdapter:
                 ),
             ),
         )
+
+    @classmethod
+    def _invalid_resource_admission_rejected(cls) -> bool:
+        manifest = cls._duplicate_relation_id()
+        row = RelationalRow.from_mapping(
+            {
+                "id": RelationalValue(ValueType.INTEGER, "1"),
+                "value": RelationalValue(ValueType.TEXT, "baseline"),
+            }
+        )
+        try:
+            InMemoryRelationalResource(
+                environment_id="env-invalid-manifest",
+                resource_id="state",
+                resource_instance_id="invalid-manifest-instance",
+                manifest=manifest,
+                manifest_artifact_digest="sha256:" + "a" * 64,
+                baseline={"records": (row,)},
+                baseline_artifact_digest="sha256:" + "b" * 64,
+                execution_input_identity="sha256:" + "c" * 64,
+            )
+        except RelationalCompatibilityError:
+            return True
+        return False
 
     @classmethod
     def _invalid_builders(cls) -> dict[str, Callable[[], RelationalManifest]]:

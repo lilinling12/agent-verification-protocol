@@ -7,7 +7,7 @@ metadata:
 profile: avp-relational-state-v0.1
 requirements: [AVP-RELATIONAL-004, AVP-RELATIONAL-014]
 applicability: mandatory
-type: semantic
+type: schema-and-semantic
 vector:
   before:
     - {id: 1, value: a}
@@ -18,8 +18,13 @@ vector:
     - {id: 3, value: c}
     - {id: 5, value: key-before}
 expect:
+  scope: {kind: full}
+  manifestDigestBound: true
+  beforeDigestBound: true
+  afterDigestBound: true
   updates: [1]
   deletes: [2, 4]
   inserts: [3, 5]
+  changeBeforeAfterSemantics: true
   keyChangeRepresentedAsDeleteInsert: true
   deterministicLogicalOrder: true

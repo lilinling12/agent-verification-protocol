@@ -15,11 +15,44 @@ vector:
     - key: {id: {type: integer, value: "1"}}
       values: {id: {type: integer, value: "1"}, amount: {type: decimal, value: "1.00"}, text: {type: text, value: "é"}}
   logicalKey: [id]
+  validControls:
+    - {type: boolean, value: true}
+    - {type: integer, value: "99999999999999999999999999999999999999999999999999999999999999999"}
+    - {type: decimal, precision: 5, scale: 2, value: "123.45"}
+    - {type: text, value: "é"}
+    - {type: binary, value: "AQID"}
+    - {type: date, value: "2024-02-29"}
+    - {type: time-local, fractionalPrecision: 0, value: "23:59:59"}
+    - {type: time-local, fractionalPrecision: 6, value: "23:59:59.123456"}
+    - {type: timestamp-local, fractionalPrecision: 6, value: "2024-02-29T23:59:59.123456"}
+    - {type: timestamp-instant, fractionalPrecision: 6, value: "2024-02-29T23:59:59.123456Z"}
+    - {type: uuid, value: "550e8400-e29b-41d4-a716-446655440000"}
   invalidControls:
+    - {type: boolean, value: "true"}
     - {type: integer, value: "01"}
     - {type: integer, value: "-0"}
-    - {type: decimal, value: "1e2"}
+    - {type: integer, value: "999999999999999999999999999999999999999999999999999999999999999999"}
+    - {type: decimal, precision: 5, scale: 2, value: "1e2"}
+    - {type: decimal, precision: 5, scale: 2, value: "1.2"}
+    - {type: decimal, precision: 5, scale: 2, value: "-0.00"}
+    - {type: decimal, precision: 5, scale: 2, value: "1234.56"}
+    - {type: binary, value: "AQID="}
+    - {type: binary, value: "A"}
+    - {type: date, value: "2026-02-30"}
+    - {type: time-local, fractionalPrecision: 0, value: "24:00:00"}
+    - {type: time-local, fractionalPrecision: 0, value: "12:00:00.1"}
+    - {type: time-local, fractionalPrecision: 0, value: "23:59:60"}
+    - {type: timestamp-local, fractionalPrecision: 0, value: "2024-01-01T00:00:00Z"}
+    - {type: timestamp-instant, fractionalPrecision: 0, value: "2024-01-01T00:00:00"}
+    - {type: uuid, value: "550E8400-E29B-41D4-A716-446655440000"}
+  invalidTypeControls:
+    - {type: decimal, precision: 2, scale: 3}
+    - {type: decimal, precision: 66, scale: 2}
+    - {type: time-local, fractionalPrecision: 7}
+    - {type: timestamp-instant, fractionalPrecision: -1}
 expect:
   canonicalKeyOrder: ["1", "2"]
   unicodeNormalizationApplied: false
+  completeScalarVocabularyExecuted: true
   invalidControlsRejected: true
+  invalidTypeParametersRejected: true
