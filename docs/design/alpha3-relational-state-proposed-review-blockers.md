@@ -1,114 +1,122 @@
 # Alpha 3 Relational State Proposed Review Blockers
 
-Status: **PROPOSED REVIEW — ACCEPTANCE BLOCKED**
+Status: **BLOCKER EDITS INCORPORATED — ACCEPTANCE RE-REVIEW REQUIRED**
 
 Proposal: AEP-0010 — Relational State Resource Profile v0.1
-Review baseline: `29586a050a758a7058e1489df8c0b75e1d7088ca`
+Formal review baseline: `29586a050a758a7058e1489df8c0b75e1d7088ca`
 PR review: `5004337751`
 
 ## Purpose
 
-This record captures protocol-semantic blockers found during the formal Proposed review of AEP-0010. It does not itself amend AEP-0010, change lifecycle state, authorize downstream normative closure, or authorize PostgreSQL/MySQL implementation.
+This record tracks the three protocol-semantic blockers found during formal Proposed review of AEP-0010 and their disposition.
 
-AEP-0010 remains `Proposed` until these decisions are absorbed into the AEP text and the resulting exact head is re-reviewed.
+The review decisions have now been incorporated into the current AEP-0010 `Proposed` text. That incorporation does **not** change AEP lifecycle state, authorize downstream normative closure, authorize PostgreSQL/MySQL implementation, or constitute the explicit protocol-maintainer `Accepted` decision.
+
+The next gate is an exact-head acceptance-oriented re-review after repository validation completes.
 
 ## RS-PR-001 — Hidden evaluator state visibility
 
-### Finding
+### Original finding
 
-The current AEP text says portable Manifest/Projection/StateImage/Diff material must not contain hidden evaluator data. That rule is too strong relative to the existing AVP Security/Evidence model.
+The reviewed AEP text prohibited hidden evaluator data from portable Manifest/Projection/StateImage/Diff material. That was stronger than the existing AVP Security/Evidence model, which permits evaluator-private verification material while prohibiting unauthorized Subject disclosure.
 
-AVP Security permits the Evaluator Plane to hold evaluator-only authoritative state, private benchmark fixtures, hidden verification material, and verification-only Evidence. The normative restriction is on **disclosure to Subject-visible routes and contexts**, not on evaluator-confidential Artifact content itself.
+### Incorporated decision
 
-### Required correction
+AEP-0010 now explicitly defines visibility/access-scoped confidentiality:
 
-The relational profile must adopt visibility/access-scoped confidentiality:
+1. relational Artifacts MAY contain evaluator-private authoritative state when required by verification;
+2. the full authoritative StateImage is not weakened by deleting hidden rows/columns merely to make it Subject-safe;
+3. Subject-visible relational observations/routes/results/context/locators MUST NOT disclose evaluator-private state unless the materialized Scenario explicitly authorizes it;
+4. opaque Artifact identities may be exposed only under existing Security rules and do not grant retrieval authority;
+5. relational Evidence reuses existing `evaluator-confidential`, `secret`, `regulated`, and other Evidence classifications;
+6. Subject-scoped/redacted representations are distinct Artifact bytes with their own identity;
+7. the future relational TCK must include evaluator-private state non-disclosure through Subject-visible relational surfaces.
 
-1. `RelationalStateManifest`, `RelationalProjection`, `RelationalStateImage`, and relational Diff Artifacts MAY contain evaluator-private authoritative state when required by the selected verification contract.
-2. Subject observations, Subject tool/results/routes, Subject execution context, and Subject-visible Artifact locators MUST NOT disclose evaluator-private relational content unless the materialized Scenario explicitly promotes that content into the Subject-visible contract.
-3. An Artifact digest MAY be exposed only under the existing Security rule that the opaque identity itself does not disclose protected content and does not grant retrieval authority.
-4. Relational Evidence uses existing Evidence classifications such as `evaluator-confidential`, `secret`, or `regulated`; Relational State must not create a competing secrecy taxonomy.
-5. A full authoritative StateImage must not be weakened by deleting evaluator-private rows/columns merely to make the Artifact Subject-safe. Access control/classification is the correct boundary.
-6. Relational security TCK direction must include hidden-state non-disclosure through Subject-visible relational surfaces.
+This preserves `AVP-SECURITY-004`, Environment actor-scoped observation, and Evidence classification semantics.
 
-### Compatibility rationale
-
-This preserves `AVP-SECURITY-004`, Environment actor-scoped observation, and Evidence classification semantics. It prevents the relational profile from narrowing evaluator authority that existing contracts explicitly allow.
-
-**RS-PR-001: DECISION DEFINED — AEP TEXT UPDATE REQUIRED.**
+**RS-PR-001: EDIT INCORPORATED — PENDING ACCEPTANCE RE-REVIEW.**
 
 ## RS-PR-002 — Execution-relevant database program/config identity
 
-### Finding
+### Original finding
 
-AEP-0010 correctly excludes raw database catalogs, DDL strings, triggers, defaults, generated expressions, constraints, routines, sequence configuration, SQL modes, session settings, and similar backend mechanisms from the **logical relational state identity**.
+Logical Manifest/StateImage identity intentionally excluded raw database programs/configuration, but some excluded mechanisms can materially alter Episode behavior while the same logical state bytes remain unchanged.
 
-However, some of those mechanisms can materially change Episode execution while leaving the same `RelationalStateManifest` and baseline `RelationalStateImage` bytes.
+### Incorporated decision
 
-Example: identical logical rows plus a materially different trigger or default can cause the same Subject mutation to produce different authoritative state. If that behavior is neither represented in the Manifest nor identity-bound elsewhere, the verification input is under-specified.
+AEP-0010 now explicitly composes relational state identity with existing Scenario/Fabric execution-input identity:
 
-### Required correction
+1. `RelationalStateManifest` is portable logical **state interpretation** identity, not necessarily complete Environment execution identity;
+2. database programs/configuration outside the Manifest that materially affect the selected Scenario MUST be bound to profile-appropriate resolved immutable identity through existing Scenario/Fabric execution-input mechanisms;
+3. examples include execution-relevant triggers, defaults, generated expressions, constraints, routines, extensions, SQL modes, timezone/session configuration, and database schema-program revision;
+4. relevance is determined by the materialized execution contract, not by raw catalog existence;
+5. required identity that cannot be established fails materialization/provisioning before Episode execution;
+6. execution identities remain distinct from canonical relational state digests and cannot be replaced by backend product names or catalog fingerprints;
+7. runtime drift in a bound execution input invalidates the execution binding even if the logical Manifest remains structurally satisfiable;
+8. the future relational TCK must include execution-input binding/drift behavior.
 
-The relational profile must explicitly compose with Scenario external-reference identity and Fabric execution-input binding:
+This reuses `AVP-SCENARIO-008` / Fabric identity instead of inventing database-specific provenance.
 
-1. `RelationalStateManifest` identity describes the portable logical **state interpretation** contract; it is not necessarily the complete Environment execution identity.
-2. Any database program, configuration, schema program revision, extension, trigger/default/generated expression, constraint behavior, SQL mode, timezone/session configuration, or other database input that materially affects Scenario execution semantics MUST be bound to profile-appropriate resolved immutable identity through existing Scenario/Fabric execution-input identity mechanisms.
-3. The materialized Scenario/Fabric contract determines which such inputs are execution-relevant. The relational profile must not require raw equality for irrelevant backend metadata.
-4. If required execution-relevant identity cannot be established, Scenario materialization/provisioning must fail closed before Episode execution.
-5. These execution identities remain separate from canonical relational state digests and must not be inferred from backend product names or catalog fingerprints.
-6. Runtime drift in an execution-relevant bound input invalidates the existing execution binding even when the logical relational Manifest remains structurally satisfiable.
-
-### Compatibility rationale
-
-This reuses `AVP-SCENARIO-008` rather than inventing a second database-specific provenance system. It keeps `STATE_EQUIVALENT` narrow and useful while ensuring equal logical row state does not falsely imply equal execution semantics.
-
-**RS-PR-002: DECISION DEFINED — AEP TEXT UPDATE REQUIRED.**
+**RS-PR-002: EDIT INCORPORATED — PENDING ACCEPTANCE RE-REVIEW.**
 
 ## RS-PR-003 — Successful restore fidelity
 
-### Finding
+### Original finding
 
-The current AEP requires successful restore to independently re-project the full authoritative surface and re-establish the snapshot `RelationalStateImage` identity, but only says successful restore may report no stronger than `STATE_EQUIVALENT`.
+The reviewed AEP required a successful restore to re-establish the snapshot StateImage but only imposed an upper bound of `STATE_EQUIVALENT`, leaving successful `NON_EQUIVALENT` reporting semantically possible.
 
-Under the existing Environment fidelity model, re-establishing the same Manifest-bound authoritative relational state is exactly the condition for state equivalence. A successful conforming restore reporting `NON_EQUIVALENT` would under-report the semantic result and leave TCK behavior ambiguous.
+### Incorporated decision
 
-### Required correction
+AEP-0010 now defines the v0.1 relational restore result unambiguously:
 
-For `state.relational / avp-relational-state-v0.1 / 0.1`:
-
-1. restore is successful only after independent re-projection proves equality with the snapshot `RelationalStateImage` identity under the same Manifest;
-2. a successful restore MUST report resource restore fidelity exactly `STATE_EQUIVALENT`;
-3. failure to re-establish the snapshot state MUST produce a failed restore and `NON_EQUIVALENT` (or the equivalent failure representation required by the final operation schema);
+1. success requires independent re-projection proving equality with the owner-valid snapshot StateImage under the same Manifest;
+2. every successful conforming v0.1 relational restore reports resource fidelity exactly `STATE_EQUIVALENT`;
+3. failure to re-establish state is a failed restore and cannot report successful equivalence; fidelity is `NON_EQUIVALENT` or the equivalent failed representation selected by the eventual schema;
 4. `EXACT` remains invalid for the base relational capability;
-5. Fabric aggregate restore fidelity continues to compose through existing weakest-required-participant rules;
-6. TCK and cross-backend parity must assert the exact successful fidelity value rather than merely an upper bound.
+5. Fabric aggregate fidelity still uses the existing weakest-required-participant rule;
+6. future TCK and PostgreSQL/MySQL parity evidence must assert the exact successful fidelity rather than an upper bound.
 
-### Compatibility rationale
+This specializes Environment `AVP-ENVIRONMENT-008` without inflating fidelity.
 
-This specializes, rather than changes, Environment `AVP-ENVIRONMENT-008`. It removes ambiguity without inflating fidelity.
+**RS-PR-003: EDIT INCORPORATED — PENDING ACCEPTANCE RE-REVIEW.**
 
-**RS-PR-003: DECISION DEFINED — AEP TEXT UPDATE REQUIRED.**
+## Historical design-document disposition
+
+The detailed Draft-era design files remain non-normative provenance for how AEP-0010 reached Proposed:
+
+- `docs/design/alpha3-relational-state-canonical-model.md`;
+- `docs/design/alpha3-relational-state-surface-and-row-identity.md`;
+- `docs/design/alpha3-relational-state-quiescing-and-schema-drift.md`;
+- `docs/design/alpha3-relational-state-tck-and-parity.md`;
+- `docs/design/alpha3-relational-state-profile-design.md`;
+- `docs/design/alpha3-relational-state-proposed-readiness-audit.md`.
+
+Where any Draft-era wording conflicts with the current AEP-0010 Proposed text on RS-PR-001, RS-PR-002, or RS-PR-003, the current AEP text is the active proposal and this review record documents why the earlier design wording was superseded. Historical documents MUST NOT be used to reintroduce the superseded semantics into the future normative spec/schema/TCK.
+
+In particular, the Draft-era phrase that successful restore may report "no more than `STATE_EQUIVALENT`" is superseded: current Proposed semantics require successful v0.1 relational restore to report **exactly `STATE_EQUIVALENT`**.
 
 ## Acceptance gate
 
-AEP-0010 is not acceptance-ready until all of the following are true:
+AEP-0010 is acceptance-ready only if all of the following are true:
 
-1. RS-PR-001..003 decisions above are incorporated into AEP-0010 itself;
-2. no contradictory stale wording remains in canonical-model, quiescing/drift, TCK/parity, readiness, ROADMAP, or PR metadata surfaces;
-3. exact-head CI, Governance, and Release Validation are green;
-4. a short acceptance-oriented protocol re-review finds no remaining semantic blocker;
-5. the protocol maintainer separately and explicitly authorizes `Proposed -> Accepted`.
+1. RS-PR-001..003 edits are incorporated into AEP-0010 — **DONE**;
+2. ROADMAP and PR metadata reflect the review state — **DONE**;
+3. historical Draft design wording has an explicit supersession rule — **DONE in this record**;
+4. exact-head CI, Governance, and Release Validation are green — **PENDING FOR CURRENT HEAD**;
+5. a short acceptance-oriented protocol re-review finds no remaining semantic blocker — **PENDING**;
+6. the protocol maintainer separately and explicitly authorizes `Proposed -> Accepted` — **NOT AUTHORIZED**.
 
-Generic continuation does not satisfy item 5.
+Generic continuation does not satisfy item 6.
 
 ## Current conclusion
 
 ```text
 AEP-0010 lifecycle: Proposed
-Formal protocol review: completed
-RS-PR-001: blocker / decision defined / AEP update pending
-RS-PR-002: blocker / decision defined / AEP update pending
-RS-PR-003: blocker / decision defined / AEP update pending
+Formal Proposed review: completed
+RS-PR-001: edit incorporated / re-review pending
+RS-PR-002: edit incorporated / re-review pending
+RS-PR-003: edit incorporated / re-review pending
+Acceptance-oriented re-review: pending exact-head gates
 Accepted: NOT AUTHORIZED
 Relational normative surface: NOT AUTHORIZED
 PostgreSQL/MySQL official adapters: NOT AUTHORIZED
