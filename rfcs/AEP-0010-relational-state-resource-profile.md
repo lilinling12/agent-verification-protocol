@@ -1,8 +1,10 @@
 # AEP-0010 — Relational State Resource Profile v0.1
 
-- Status: Draft
+- Status: Proposed
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-24
+- Proposed: 2026-08-24
+- Proposed-readiness evidence: `docs/design/alpha3-relational-state-proposed-readiness-audit.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (Accepted)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Relational State
@@ -25,7 +27,7 @@ revision: "0.1"
 
 A v0.1 claim covers the mandatory logical state surface, canonical values, committed-view projection, logical snapshot/reset/restore, semantic diff, schema-binding honesty, QUIESCING composition, and Security/Evidence behavior defined by the eventual normative specification.
 
-This AEP is still **Draft**. It does not create the normative profile, schemas, TCK, PostgreSQL/MySQL adapters, a release version, or publication authority.
+This AEP is **Proposed** for formal protocol review. It is not normative and does not create the normative profile, schemas, TCK, PostgreSQL/MySQL adapters, a release version, or publication authority.
 
 ## Problem
 
@@ -264,7 +266,7 @@ It binds at minimum:
 - named projection definitions;
 - canonical representation version.
 
-Logical identifiers use a restricted lower-case ASCII vocabulary so identity/order does not depend on backend identifier folding, locale, or Unicode normalization. Exact regex/length constraints remain schema work, with the Draft direction using identifiers such as `^[a-z][a-z0-9._-]*$`.
+Logical identifiers use a restricted lower-case ASCII vocabulary so identity/order does not depend on backend identifier folding, locale, or Unicode normalization. Exact regex/length constraints remain schema work, with the Proposed direction using identifiers such as `^[a-z][a-z0-9._-]*$`.
 
 Backend table/column names, DSNs, migration paths, driver settings, and vendor catalog objects remain adapter/deployment bindings or separately retained implementation evidence.
 
@@ -767,9 +769,9 @@ Rejected because logical row equality does not prove sequence/auto-increment or 
 
 Rejected by Alpha 3's no-transitional-architecture gate.
 
-## Draft design decision record
+## Design decision evidence
 
-The initial Draft blockers recorded during AEP-0010 design are now closed as design decisions:
+The initial Draft blockers are closed as design decisions:
 
 - RS-BR-001 canonical scalar lexical encoding;
 - RS-BR-002 Manifest/StateImage identity;
@@ -780,37 +782,30 @@ The initial Draft blockers recorded during AEP-0010 design are now closed as des
 - RS-BR-007 cross-backend parity fixture;
 - RS-BR-008 language-neutral TCK execution interface.
 
-Supporting non-normative design evidence:
+Supporting non-normative evidence:
 
 - `docs/design/alpha3-relational-state-canonical-model.md`;
 - `docs/design/alpha3-relational-state-surface-and-row-identity.md`;
 - `docs/design/alpha3-relational-state-quiescing-and-schema-drift.md`;
 - `docs/design/alpha3-relational-state-tck-and-parity.md`;
-- `docs/design/alpha3-relational-state-profile-design.md`.
-
-Blocker closure does not automatically advance the AEP lifecycle.
+- `docs/design/alpha3-relational-state-profile-design.md`;
+- `docs/design/alpha3-relational-state-proposed-readiness-audit.md`.
 
 ## Governance boundary
 
-This AEP is **Draft**.
+This AEP is **Proposed** for formal protocol review.
 
-Before `Proposed`, a dedicated readiness audit must verify that:
+The Draft -> Proposed transition is supported by `docs/design/alpha3-relational-state-proposed-readiness-audit.md` and does not itself establish protocol authority.
 
-- problem/scope are complete;
-- alternatives and compatibility impact are explicit;
-- Security analysis is sufficient;
-- conformance can reject metadata-identical broken implementations;
-- no backend command/default/product identity is normative by accident;
-- no untyped transitional public structure remains;
-- the AEP is sufficiently complete for protocol review.
+`Proposed` does not authorize implementation or downstream normative closure. Before the relational normative candidate surface is created, AEP-0010 must receive an explicit recorded protocol-maintainer `Accepted` decision under repository governance.
 
-`Proposed` would still be non-normative and would not authorize implementation.
+If protocol review changes the portable semantics materially, the AEP must be amended (and may return to Draft if the design becomes incomplete) before acceptance.
 
-Advancing to `Accepted` requires an explicit recorded protocol-maintainer decision. Generic continuation instructions do not constitute that decision and do not authorize merge.
+Generic continuation instructions do not constitute `Accepted` or merge authorization.
 
 This AEP does not authorize:
 
-- relational normative spec/schema/TCK creation before the required lifecycle gate;
+- relational normative spec/schema/TCK registration;
 - PostgreSQL/MySQL backend implementation as official Alpha 3 adapters;
 - merging any stacked PR;
 - changing AEP-0009 to Final;
