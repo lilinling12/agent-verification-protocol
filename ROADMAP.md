@@ -59,8 +59,24 @@ Alpha 3 design was explicitly authorized by the protocol maintainer on 2026-08-2
 - [ ] Environment Fabric schema(s)
 - [ ] base Environment Fabric TCK, including runtime-execution negative cases
 
-### Resource implementations
-- [ ] PostgreSQL/MySQL State adapters
+The three unchecked Foundation items are implemented as a complete **unmerged stacked candidate** in PR #85. They remain unchecked here because `main` has not adopted that candidate and no merge authorization has been given.
+
+### Relational State resource profile
+- [x] AEP-0010 Draft problem/scope and standards analysis
+- [x] relational portability design audit
+- [ ] close RS-BR-001..RS-BR-008 Draft → Proposed blockers
+- [ ] AEP-0010 Proposed protocol review
+- [ ] explicit AEP-0010 Accepted decision
+- [ ] relational normative specification and requirement index
+- [ ] `RelationalStateManifest` / `RelationalStateImage` schemas
+- [ ] execution-sensitive `avp-relational-state-v0.1` TCK
+- [ ] PostgreSQL adapter against the portable TCK
+- [ ] MySQL/InnoDB adapter against the same portable TCK
+- [ ] PostgreSQL/MySQL canonical parity acceptance evidence
+
+AEP-0010 is Draft only. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
+
+### Other resource implementations
 - [ ] Playwright browser runtime
 - [ ] network fault proxy
 - [ ] virtual clock service
