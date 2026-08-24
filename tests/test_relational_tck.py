@@ -17,6 +17,7 @@ _RELATIONAL_CASES = (
     "AVP-TCK-RELATIONAL-DIFF-001",
     "AVP-TCK-RELATIONAL-SECURITY-001",
     "AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001",
+    "AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001",
 )
 
 
@@ -29,8 +30,8 @@ class ReferenceRelationalTCKTest(unittest.TestCase):
         )
 
         self.assertTrue(result.conformant)
-        self.assertEqual(10, result.report["summary"]["total"])
-        self.assertEqual(10, result.report["summary"]["passed"])
+        self.assertEqual(11, result.report["summary"]["total"])
+        self.assertEqual(11, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
         self.assertEqual(
@@ -44,8 +45,8 @@ class ReferenceRelationalTCKTest(unittest.TestCase):
         result = TCKRunner.for_reference(repository).run(profile="avp-relational-state-v0.1")
 
         self.assertTrue(result.conformant)
-        self.assertEqual(10, result.report["summary"]["total"])
-        self.assertEqual(10, result.report["summary"]["passed"])
+        self.assertEqual(11, result.report["summary"]["total"])
+        self.assertEqual(11, result.report["summary"]["passed"])
         self.assertEqual(0, result.report["summary"]["failed"])
         self.assertEqual(0, result.report["summary"]["skipped"])
 
