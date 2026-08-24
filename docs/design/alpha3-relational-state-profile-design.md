@@ -1,6 +1,6 @@
 # Alpha 3 Relational State Profile Design Audit
 
-Status: **DRAFT DESIGN — NOT READY FOR PROPOSED**
+Status: **DRAFT BLOCKERS CLOSED — AEP RECONCILIATION REQUIRED**
 
 Parent authority: AEP-0009 (Accepted)
 Proposal: AEP-0010 (Draft)
@@ -23,7 +23,7 @@ AEP-0010 Draft -> Proposed -> Accepted
   -> cross-backend parity evidence
 ```
 
-No database adapter is authorized by this audit.
+No database adapter or normative surface is authorized by this audit.
 
 ## 2. Existing authority reused
 
@@ -35,13 +35,13 @@ Relational State specializes rather than replaces existing contracts:
 - Evidence/Artifact owns exact retained-byte identity.
 - Core owns `QUIESCING`, Validity, infrastructure failure, and Task Verdict separation.
 
-No relational design decision may create a competing version of those concepts.
+No relational design decision creates a competing version of those concepts.
 
 ## 3. Current portable direction
 
 ### Capability
 
-One cohesive initial capability:
+One cohesive initial claim:
 
 ```text
 capabilityId: state.relational
@@ -49,173 +49,151 @@ profile: avp-relational-state-v0.1
 revision: "0.1"
 ```
 
-No temporary `supports_*` capability family is planned.
+No temporary `supports_*` capability family.
 
-### Identity resources
+### Canonical state and identity
 
-The base Fabric `EnvironmentResource` remains closed.
+- RFC 8785 JCS exact bytes.
+- Typed canonical relational values; high-precision numerics are strings, not JSON numbers.
+- Closed scalar portability intersection for PostgreSQL/MySQL reference targets.
+- Separate Manifest and StateImage Artifacts.
+- Manifest never references baseline StateImage; baseline contains Manifest digest, avoiding content-address cycles.
+- Fabric `identityArtifacts` binds Manifest + baseline by media type, not array position.
+- Runtime snapshot StateImage is Evidence bound to Environment/resource-owned SnapshotRef.
+- Existing Artifact SHA-256 identity is reused; no competing relational digest system.
 
-Relational profile identity is carried by exact-byte Artifacts:
+### State surface and row identity
 
-- one `RelationalStateManifest`;
-- one baseline `RelationalStateImage`.
+- one closed authoritative relation/column surface;
+- full StateImage always covers that whole surface;
+- named projections are static relation/column subsets over all rows;
+- no portable SQL/predicate/join/expression language in v0.1;
+- every relation has a logical non-null unique row key;
+- logical key identity is independent of backend PK/index names and order;
+- rows sort by canonical key bytes, not backend collation/physical order;
+- key mutation is semantic delete+insert.
 
-They are bound through the existing `EnvironmentResource.identityArtifacts` collection and distinguished by profile-defined media type, not array position.
+### Observation, quiescing, and drift
 
-The Manifest never points back to the baseline StateImage. The baseline image contains the Manifest Artifact digest, producing an acyclic content-addressed graph.
+- evaluator state is one committed logical view;
+- no dirty Subject state;
+- multi-relation output cannot be torn;
+- Core QUIESCING closes admission of new Subject mutations;
+- accepted activity may settle;
+- final projection requires a settlement barrier;
+- unresolved activity under the bound policy prevents accepted final verification and uses existing infrastructure/Validity semantics;
+- schema drift means the backend can no longer satisfy the immutable logical Manifest binding, not that raw DDL/catalog bytes changed;
+- irrelevant backend changes outside the selected binding are not automatically drift.
 
-Runtime snapshot StateImages are generated Evidence bound by the existing Environment/resource-owned SnapshotRef and do not mutate immutable Fabric identity inputs.
+### Reset and restore
 
-### Canonical state
+- reset is accepted only after canonical full-state equality with baseline;
+- snapshot stores canonical logical StateImage evidence;
+- restore is accepted only after re-projection proves snapshot state identity;
+- base relational restore may claim at most `STATE_EQUIVALENT`, never `EXACT`.
 
-Canonical relational structures use RFC 8785 JCS exact bytes. Relational high-precision numerics are typed strings rather than JSON number tokens. The initial scalar set is closed and deliberately limited to lossless PostgreSQL/MySQL-interoperable semantics.
+### TCK and parity
 
-Full-state and named-projection digests are SHA-256 over exact canonical bytes. When the same bytes are retained as AVP Artifacts, the existing Artifact digest is reused rather than inventing a separate relational hash scheme.
+- TCK cases are backend-neutral;
+- profile operations are separate from privileged fixture-control operations;
+- no `executeSql`, generic query, public transaction, DDL, or catalog API is required by the portable profile;
+- PostgreSQL and MySQL reference drivers run the same case vectors;
+- shared parity fixture covers all scalar types, composite keys, full/subset projections, two-relation non-torn observation, quiescing, drift, reset, restore, and diff;
+- exact canonical parity is required where scheduling does not legitimately choose different pre/post commit states;
+- `TornProjectionAdapter` and `FalseRestoreAdapter` style metadata-identical negative implementations must fail execution-sensitive TCK.
 
-### Authoritative surface
+## 4. Decision evidence
 
-One Manifest defines one closed authoritative relational surface. Every listed relation/column participates in logical state equivalence; backend state outside that Manifest is outside the v0.1 claim.
-
-A `RelationalStateImage` always covers the complete surface.
-
-Named projections are immutable Manifest-defined relation/column subsets and include all rows of each selected relation. v0.1 has no portable SQL text, predicates, joins, derived expressions, aggregates, limits, or backend-view semantics.
-
-### Row identity
-
-Every relation has a profile-owned logical row key made from one or more Manifest columns. Key columns are non-null and unique over AVP canonical typed values. Backend primary/unique constraints are implementation evidence, not protocol identity.
-
-Row-key declaration order is canonicalized by logical column identifier; backend index order is irrelevant. Rows are ordered by canonical JCS row-key bytes, not database collation or physical order.
-
-Changing a logical row key is represented as delete-old + insert-new in semantic diff.
-
-### Observation and restore
-
-Evaluator projection must correspond to one committed logical view and never expose uncommitted Subject state. Multi-relation projections may not be torn across incompatible visibility points.
-
-Reset success requires post-reset full-state verification against the bound baseline StateImage.
-
-Base relational restore is logical only and may claim at most `STATE_EQUIVALENT`; `EXACT` is excluded because sequence/auto-increment continuation, MVCC/session/lock/cache state, and physical storage identity are not standardized.
-
-## 4. Design-decision evidence
-
-### Canonical value / Artifact model
+### RS-BR-001 / RS-BR-002
 
 `docs/design/alpha3-relational-state-canonical-model.md`
 
-Owns the Draft decisions for:
+Defines canonical scalar lexical rules, JCS bytes, Artifact media roles, acyclic Manifest/baseline identity, and runtime snapshot binding.
 
-- RFC 8785 JCS exact-byte serialization;
-- typed scalar representation;
-- integer/decimal limits and lexical form;
-- text/binary/date/time/timestamp/UUID canonical form;
-- Manifest/StateImage media-type roles;
-- acyclic identity binding;
-- baseline versus runtime snapshot ownership.
-
-### Surface / row identity model
+### RS-BR-003 / RS-BR-004
 
 `docs/design/alpha3-relational-state-surface-and-row-identity.md`
 
-Owns the Draft decisions for:
+Defines the closed authoritative surface, named projection restrictions, logical identifiers, row keys, canonical row order, and diff identity.
 
-- closed authoritative surface;
-- full-state versus named projections;
-- no portable SQL query language;
-- logical identifiers;
-- portable row keys;
-- canonical row order;
-- key mutation/diff semantics.
+### RS-BR-005 / RS-BR-006
 
-## 5. PostgreSQL and MySQL remain implementation evidence
+`docs/design/alpha3-relational-state-quiescing-and-schema-drift.md`
 
-PostgreSQL and MySQL/InnoDB have different transaction visibility, snapshot, DDL, identity-generator, and storage behavior. Candidate mechanisms such as PostgreSQL Repeatable Read/exported snapshots or MySQL InnoDB consistent reads may satisfy portable requirements, but their commands/tokens/defaults are not AVP semantics.
+Defines QUIESCING settlement, no-auto-commit/no-dirty-read behavior, bounded failure composition, portable Manifest binding validity, drift/non-drift boundaries, and concurrent DDL handling.
 
-Server defaults are never sufficient conformance evidence. The eventual TCK tests observable committed-view, reset, restore, diff, ownership, and security properties.
+### RS-BR-007 / RS-BR-008
 
-## 6. Draft -> Proposed blocker ledger
+`docs/design/alpha3-relational-state-tck-and-parity.md`
 
-AEP-0010 remains Draft until every blocker is closed and a separate Proposed-readiness audit confirms that the AEP text itself incorporates the decisions without contradiction.
+Defines the common parity fixture, backend-neutral TCK operation boundary, privileged fixture driver, concurrency invariant, negative adapters, and reference-completion versus third-party conformance distinction.
 
-### RS-BR-001 — Scalar lexical encoding
+## 5. Draft -> Proposed blocker ledger
 
-Status: **CLOSED FOR DRAFT -> PROPOSED READINESS**
+| Blocker | Status | Decision evidence |
+| --- | --- | --- |
+| RS-BR-001 Scalar lexical encoding | **CLOSED** | canonical model |
+| RS-BR-002 Manifest/StateImage identity | **CLOSED** | canonical model |
+| RS-BR-003 Authoritative surface/projections | **CLOSED** | surface + row identity |
+| RS-BR-004 Row-key portability | **CLOSED** | surface + row identity |
+| RS-BR-005 QUIESCING/unsettled Subject activity | **CLOSED** | quiescing + drift |
+| RS-BR-006 Schema drift boundary | **CLOSED** | quiescing + drift |
+| RS-BR-007 Cross-backend parity fixture | **CLOSED** | TCK + parity |
+| RS-BR-008 Language-neutral TCK interface | **CLOSED** | TCK + parity |
 
-Evidence: `docs/design/alpha3-relational-state-canonical-model.md`.
+Blocker closure is design evidence only. It does not automatically change the AEP lifecycle.
 
-Resolved typed values, JCS bytes, exact integer/decimal lexical rules, text/binary/UUID rules, temporal precision and ranges, and fail-closed unsupported/lossy mappings.
+## 6. Required AEP reconciliation before Proposed
 
-### RS-BR-002 — Manifest versus StateImage identity
+AEP-0010 itself was written before the detailed decisions above. Before it can be judged `Proposed`, its text must be reconciled so it does not retain stale or ambiguous statements.
 
-Status: **CLOSED FOR DRAFT -> PROPOSED READINESS**
+At minimum reconcile:
 
-Evidence: `docs/design/alpha3-relational-state-canonical-model.md`.
+1. `integer` from unbounded/arbitrary precision language to the v0.1 common 65-digit portability boundary;
+2. `decimal` to explicit precision 1..65 and scale 0..30;
+3. temporal lexical/range/precision rules to the canonical model;
+4. baseline binding so the Manifest does not reference the baseline image and create a digest cycle;
+5. row-key definition from author-controlled ordering to canonical logical-column set/order;
+6. named projections to static all-row relation/column subsets only;
+7. QUIESCING settlement-barrier semantics and no auto-commit/dirty-read rule;
+8. portable schema-drift definition as binding failure rather than catalog equality;
+9. TCK interface separation between SUT profile operations and privileged fixture controls;
+10. exact cross-backend reference parity criteria and negative implementation controls.
 
-Resolved Manifest/StateImage Artifact roles, acyclic baseline identity, Fabric `identityArtifacts` binding, runtime SnapshotRef binding, and reuse of existing Artifact SHA-256 identity.
+## 7. Proposed-readiness audit criteria
 
-### RS-BR-003 — Authoritative surface versus named projections
+After AEP reconciliation, a separate audit must verify:
 
-Status: **CLOSED FOR DRAFT -> PROPOSED READINESS**
+- written problem and scope remain coherent;
+- alternatives and compatibility impact are explicit;
+- Security analysis covers Subject/Evaluator/Control credentials and evidence secrecy;
+- conformance strategy can reject metadata-identical broken behavior;
+- no requirement is derived from PostgreSQL/MySQL command syntax or default configuration;
+- no generic untyped public extension is introduced;
+- no backend implementation is required to define missing semantics;
+- AEP-0010 is sufficiently complete for protocol review while still non-normative.
 
-Evidence: `docs/design/alpha3-relational-state-surface-and-row-identity.md`.
+Only if those checks pass should the AEP status change from `Draft` to `Proposed`.
 
-Resolved one closed full surface, all-row relation/column-subset named projections, mandatory key columns, Manifest-owned definition identity, and explicit exclusion of SQL/predicate/join/expression semantics from v0.1.
-
-### RS-BR-004 — Row-key portability
-
-Status: **CLOSED FOR DRAFT -> PROPOSED READINESS**
-
-Evidence: `docs/design/alpha3-relational-state-surface-and-row-identity.md`.
-
-Resolved logical key semantics independent of backend PK names/order, canonical uniqueness, no hidden physical fallback identity, canonical row ordering, and delete+insert semantics for key mutation.
-
-### RS-BR-005 — Final observation under unsettled Subject transaction
-
-Status: **OPEN**
-
-Need exact composition with Core `QUIESCING`: accepted in-flight database work, bounded settlement, timeout/infrastructure failure, and evidence must be unambiguous without creating a second database lifecycle.
-
-### RS-BR-006 — Schema drift detection boundary
-
-Status: **OPEN**
-
-Need define which backend changes invalidate the logical Manifest binding and how conformance detects semantic drift without requiring raw system-catalog equality.
-
-### RS-BR-007 — Cross-backend canonical parity fixture
-
-Status: **OPEN**
-
-Need a concrete database-neutral fixture covering every mandatory scalar form, composite row identity, projection canonicalization, reset/restore, and concurrency observation behavior.
-
-### RS-BR-008 — Language-neutral TCK execution interface
-
-Status: **OPEN**
-
-Need define the minimum resource operations the TCK requires for provision/project/mutate/snapshot/restore/reset/diff/release without standardizing a general SQL client API or backend-specific branches.
-
-## 7. Gate conclusion
+## 8. Gate conclusion
 
 Current state:
 
 ```text
 AEP-0010: Draft
-RS-BR-001: CLOSED
-RS-BR-002: CLOSED
-RS-BR-003: CLOSED
-RS-BR-004: CLOSED
-RS-BR-005: OPEN
-RS-BR-006: OPEN
-RS-BR-007: OPEN
-RS-BR-008: OPEN
+RS-BR-001..008: CLOSED as design blockers
+AEP reconciliation: REQUIRED
+Proposed-readiness audit: NOT YET RUN
 ```
 
 Therefore:
 
-**DRAFT DIRECTION REMAINS JUSTIFIED.**
+**DRAFT DESIGN BLOCKERS ARE CLOSED.**
 
-**NOT READY FOR PROPOSED.**
+**AEP-0010 IS STILL DRAFT.**
+
+**NOT YET READY FOR PROPOSED.**
 
 **NOT READY FOR RELATIONAL NORMATIVE SPECIFICATION.**
 
 **NOT READY FOR POSTGRESQL OR MYSQL ADAPTER IMPLEMENTATION.**
-
-The next governed work is RS-BR-005 and RS-BR-006: lifecycle-consistent final observation and portable schema-drift detection. Only after those are closed should the design freeze the cross-backend fixture and language-neutral TCK operation contract.
