@@ -401,3 +401,53 @@ cases:
     profile: avp-environment-fabric-v0.1
     requirements: [AVP-FABRIC-001, AVP-FABRIC-013]
     applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-IDENTITY-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-IDENTITY-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-001, AVP-RELATIONAL-002, AVP-RELATIONAL-005]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-CANONICAL-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-CANONICAL-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-003, AVP-RELATIONAL-004, AVP-RELATIONAL-005]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-PROJECTION-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-PROJECTION-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-006, AVP-RELATIONAL-007]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-QUIESCING-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-QUIESCING-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-008]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-DRIFT-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-DRIFT-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-009, AVP-RELATIONAL-010]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-011, AVP-RELATIONAL-012]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-RESTORE-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-RESTORE-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-013]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-DIFF-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-DIFF-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-004, AVP-RELATIONAL-014]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-SECURITY-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-SECURITY-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-015]
+    applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-016]
+    applicability: mandatory
