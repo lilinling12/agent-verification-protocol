@@ -1,10 +1,14 @@
 # Alpha 3 Relational State Protocol Review Blockers
 
-Status: **OPEN — PR #87 PROTOCOL REVIEW BLOCKED**
+Status: **CLOSED — ACCEPTANCE-ORIENTED RE-REVIEW PASSED**
 
-Review baseline: `7eebeefa8f0187372970fa1ea8244bd1fed6986e`
+Formal review baseline: `7eebeefa8f0187372970fa1ea8244bd1fed6986e`
 
-Formal review: PR #87 review `5006694486`
+Formal blocking review: PR #87 review `5006694486`
+
+Semantic closure head: `07aeed2a7b056eb630d2371f8ebdee0ea7e45038`
+
+Acceptance-oriented re-review: PR #87 review `5006822376`
 
 Base authority: AEP-0010 Accepted at `2e86f8dd6eef8668b6e288e96347cb46088abc1a`
 
@@ -26,107 +30,140 @@ A green traceability or package gate is necessary but cannot close a semantic bl
 
 ## RSR-PR-001 — Canonical Manifest and baseline identity is trusted, not executed
 
-Status: **OPEN**
+Status: **CLOSED**
 
-### Finding
+### Original finding
 
-The reference resource accepts an externally supplied Manifest digest without proving that it is SHA-256 over the canonical `RelationalStateManifest` bytes. The baseline logical rows are also reconstructed internally without independently verifying the bound baseline `RelationalStateImage` Artifact identity.
+The pre-review reference resource accepted an externally supplied Manifest digest without proving that it was SHA-256 over canonical `RelationalStateManifest` bytes. The baseline logical rows were also reconstructed internally without independently verifying the bound baseline `RelationalStateImage` Artifact identity.
 
-The current identity TCK therefore proves equality among declared digest strings, but does not prove content-address binding.
+### Incorporated closure
 
-### Required closure
+- `RelationalManifest.as_document()` emits the profile-defined schema-shaped logical Manifest representation.
+- `RelationalManifest.digest` derives SHA-256 from canonical serialized bytes.
+- resource admission treats the bound Manifest Artifact digest as an expected identity and rejects mismatch.
+- baseline rows are validated and canonicalized into a `RelationalStateImage`; the bound baseline Artifact digest is verified against the resulting exact StateImage identity.
+- `AVP-TCK-RELATIONAL-IDENTITY-001` executes both Manifest-digest and baseline-digest tamper controls before the resource is usable.
 
-- provide schema-shaped canonical Manifest serialization;
-- derive the Manifest digest from those canonical bytes;
-- treat the externally bound Manifest Artifact digest only as an expected identity and reject mismatch;
-- derive the canonical baseline StateImage after semantic validation;
-- treat the bound baseline Artifact digest only as an expected identity and reject mismatch;
-- add positive and tampered-identity TCK controls that execute rejection before the resource becomes usable.
+The authority remains the Spec/Schema/TCK; the reference implementation only demonstrates that binding.
 
 ## RSR-PR-002 — Manifest semantic integrity is not enforced at resource admission
 
-Status: **OPEN**
+Status: **CLOSED**
 
-### Finding
+### Original finding
 
-`validate_manifest_integrity()` exists and the dedicated TCK calls it directly, but the reference resource admission path does not apply the same semantic graph validation.
+`validate_manifest_integrity()` existed and the dedicated TCK called it directly, but the pre-review reference resource admission path did not apply the same semantic graph validation.
 
-That leaves a gap between AVP-RELATIONAL-017 and the SUT boundary that is supposed to reject invalid manifests before ready state or Subject side effects.
+### Incorporated closure
 
-### Required closure
-
-- make Manifest semantic validation part of resource admission;
-- preserve the standalone validator as a downstream reference helper, not a second source of semantics;
-- prove an invalid Manifest cannot establish a usable resource.
+- `RelationalManifest.validate_integrity()` is the single reference implementation of the AVP-RELATIONAL-017 graph checks.
+- resource construction invokes that validation before identity binding, baseline establishment, ready use, or Subject side effects.
+- `relational_manifest.validate_manifest_integrity()` delegates to the same method rather than duplicating semantics.
+- `AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001` still executes all eight duplicate/dangling/key-incomplete controls and additionally proves an invalid graph is rejected at resource admission.
 
 ## RSR-PR-003 — Mandatory scalar conformance is incomplete
 
-Status: **OPEN**
+Status: **CLOSED**
 
-### Finding
+### Original finding
 
-AVP-RELATIONAL-003 defines a closed mandatory scalar vocabulary, but `AVP-TCK-RELATIONAL-CANONICAL-001` currently executes only integer/decimal/text values and three invalid lexical controls.
+AVP-RELATIONAL-003 defines a closed mandatory scalar vocabulary, while the pre-review canonical TCK exercised only integer/decimal/text plus a narrow invalid-control set.
 
-### Required closure
+### Incorporated closure
 
-The mandatory TCK must execute positive and fail-closed controls for the complete v0.1 scalar model and relevant declared parameters, including:
+The mandatory canonical case now executes positive and fail-closed behavior for the complete v0.1 scalar model and relevant parameters:
 
-- boolean;
-- integer boundary/canonical form;
-- decimal precision/scale and negative-zero rules;
-- text exact Unicode identity;
+- boolean value typing;
+- integer canonical form and 65-digit boundary;
+- decimal precision/scale, exact lexical scale, precision overflow, exponent rejection, and negative-zero rejection;
+- exact text/Unicode identity without normalization;
 - canonical unpadded base64url;
-- valid Gregorian date/range;
-- time-local precision and invalid 24:00/leap-second forms;
-- timestamp-local precision/no-zone semantics;
+- valid/invalid Gregorian dates;
+- time-local precision, 24:00 rejection, leap-second rejection, and precision mismatch;
+- timestamp-local precision and no-zone semantics;
 - timestamp-instant UTC `Z` semantics;
 - lowercase canonical UUID;
-- invalid decimal type parameters and invalid temporal precision.
+- nullable value acceptance only when the Manifest column is nullable;
+- invalid decimal and temporal type-parameter boundaries.
+
+The case remains backend-neutral and contains no PostgreSQL/MySQL behavior branch.
 
 ## RSR-PR-004 — Reference RelationalDiff is not the normative schema object
 
-Status: **OPEN**
+Status: **CLOSED**
 
-### Finding
+### Original finding
 
-`schemas/relational-diff.schema.json` requires Manifest/scope/before/after identity binding and canonical change objects. The current runtime exposes only internal `(relation_id, change, key_bytes)` records, and the TCK inspects that internal representation.
+The pre-review runtime exposed only internal `(relation_id, change, key_bytes)` records while `schemas/relational-diff.schema.json` defines a portable protocol object with explicit identity bindings.
 
-### Required closure
+### Incorporated closure
 
-- produce a schema-shaped `RelationalDiff` document;
-- bind `manifestDigest`, scope, `beforeDigest`, and `afterDigest`;
-- expose canonical key plus before/after row values where applicable;
-- validate the generated document against the normative schema in tests/TCK;
-- keep key-change semantics as delete-old plus insert-new.
+`RelationalDiff.as_document()` now emits the normative object surface:
+
+- `apiVersion` / `kind`;
+- `manifestDigest`;
+- full/projection `scope`;
+- `beforeDigest`;
+- `afterDigest`;
+- deterministic change records with canonical logical key;
+- INSERT `after`, DELETE `before`, and UPDATE `before` + `after` state values.
+
+The reference diff remains logical-key based, and a key change is represented as delete-old plus insert-new. Unit validation resolves the repository-owned relational value schema offline and validates the resulting document against the normative diff schema. The mandatory diff TCK also asserts Manifest/scope/before/after identity binding and change semantics.
 
 ## RSR-PR-005 — SnapshotRef owner-instance staleness is too weak
 
-Status: **OPEN**
+Status: **CLOSED**
 
-### Finding
+### Original finding
 
-Snapshot ownership currently compares public Environment/resource identifiers and Manifest digest. It does not distinguish two different resource instances that reuse those identifiers.
+Snapshot ownership previously compared public Environment/resource identifiers and Manifest digest only. A replacement resource with the same public ids and Manifest could therefore accept a stale snapshot.
 
-A snapshot created by a released instance can therefore be accepted by a replacement instance with the same ids and Manifest, violating reused Environment instance ownership/stale-reference semantics.
+### Incorporated closure
 
-### Required closure
+- reference snapshots now bind an opaque resource-instance identity in addition to public Environment/resource ids and the Manifest-bound StateImage.
+- restore rejects foreign Environment/resource ownership, resource-instance mismatch, and Manifest identity mismatch.
+- `AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001` executes a same-public-id replacement resource with a different instance identity and requires the old snapshot to fail closed.
+- the existing foreign-Environment negative control and exact baseline reset verification remain mandatory.
 
-- bind snapshots to an opaque resource-instance identity in the reference model;
-- reject same-id/same-Manifest snapshots created by a different instance;
-- retain foreign-environment rejection;
-- add the same-id replacement stale-snapshot negative control to mandatory TCK coverage.
+The opaque reference-model owner-instance value is implementation evidence, not a new portable backend identifier or public protocol property.
 
-## Closure gate
+## Acceptance-oriented re-review
 
-All five blockers must be incorporated before this document may become CLOSED.
+Exact semantic head:
 
-After incorporation:
+`07aeed2a7b056eb630d2371f8ebdee0ea7e45038`
 
-1. run exact-head CI on Python 3.11/3.12/3.13;
-2. require built-wheel full registered TCK success;
-3. require Governance and Release Validation success;
-4. reconcile the prior normative closure audit;
-5. perform acceptance-oriented protocol re-review against the exact semantic head;
-6. only then return PR #87 to Ready.
+Re-review `5006822376` found:
 
-Merge remains a separate explicit authorization boundary.
+- RSR-PR-001 CLOSED;
+- RSR-PR-002 CLOSED;
+- RSR-PR-003 CLOSED;
+- RSR-PR-004 CLOSED;
+- RSR-PR-005 CLOSED;
+- no new blocker against Accepted AEP-0010, Environment stale-reference semantics, Evidence content-address identity, Core QUIESCING, Security visibility, or the no-transitional-implementation gate.
+
+Exact semantic-head evidence:
+
+- CI #554: SUCCESS;
+- Quality / Python 3.11: SUCCESS;
+- Quality / Python 3.12: SUCCESS;
+- Quality / Python 3.13: SUCCESS;
+- Package / Python 3.13: SUCCESS;
+- reproducible distribution bytes: SUCCESS;
+- clean consumer install and identity/smoke: SUCCESS;
+- installed-wheel full registered TCK: SUCCESS;
+- release-evidence build/verify: SUCCESS;
+- Governance #606: SUCCESS;
+- Release Validation #70: SUCCESS.
+
+## Closure boundary
+
+The five formal protocol-review blockers are closed at the semantic head above. The remaining work on PR #87 is governance synchronization only:
+
+1. reconcile the earlier normative closure audit so it records the formal blocking review and re-review rather than presenting the pre-review READY conclusion as current;
+2. update PR metadata to the current state;
+3. require exact-head CI/Governance/Release Validation after those governance-only changes;
+4. verify base drift and review/comment/thread state;
+5. only then return PR #87 to Ready.
+
+Merge remains a separate explicit authorization boundary. Closing these blockers does not authorize Final, PostgreSQL/MySQL implementation, release selection/publication, package-index publication, signing, or attestation.
