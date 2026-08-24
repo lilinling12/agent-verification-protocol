@@ -124,3 +124,11 @@ requirements:
     spec: spec/relational/relational-state-contract.md
     anchor: avp-relational-016
     conformance: [AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001]
+  - id: AVP-RELATIONAL-017
+    level: MUST
+    area: manifest-integrity
+    statement: Manifest relation/projection identifiers and cross-references are unique, resolvable, key-complete, and fail closed before provisioning or Subject relational side effects.
+    spec: spec/relational/manifest-integrity-contract.md
+    anchor: avp-relational-017
+    schema: schemas/relational-state-manifest.schema.json
+    conformance: [AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001]
