@@ -59,7 +59,7 @@ class RestoreFidelity(str, Enum):
 
 
 _INTEGER_RE = re.compile(r"^(0|-?[1-9][0-9]{0,64})$")
-_DECIMAL_RE = re.compile(r"^(0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.([0-9]+))?$")
+_DECIMAL_RE = re.compile(r"^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.([0-9]+))?$")
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
