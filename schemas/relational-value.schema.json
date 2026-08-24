@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:relational-value:0.1",
+  "title": "AVP Relational Canonical Typed Value",
+  "oneOf": [
+    {"$ref": "#/$defs/booleanValue"},
+    {"$ref": "#/$defs/integerValue"},
+    {"$ref": "#/$defs/decimalValue"},
+    {"$ref": "#/$defs/textValue"},
+    {"$ref": "#/$defs/binaryValue"},
+    {"$ref": "#/$defs/dateValue"},
+    {"$ref": "#/$defs/timeLocalValue"},
+    {"$ref": "#/$defs/timestampLocalValue"},
+    {"$ref": "#/$defs/timestampInstantValue"},
+    {"$ref": "#/$defs/uuidValue"}
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    "booleanValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "boolean"}, "value": {"type": ["boolean", "null"]}}}
+      ]
+    },
+    "integerValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "integer"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^(0|-?[1-9][0-9]{0,64})$"}]}}}
+      ]
+    },
+    "decimalValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "decimal"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^(0|-[1-9][0-9]*|[1-9][0-9]*)(\\.[0-9]+)?$"}]}}}
+      ]
+    },
+    "textValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "text"}, "value": {"type": ["string", "null"]}}}
+      ]
+    },
+    "binaryValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "binary"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Za-z0-9_-]*$"}]}}}
+      ]
+    },
+    "dateValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "date"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$"}]}}}
+      ]
+    },
+    "timeLocalValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "time-local"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"}]}}}
+      ]
+    },
+    "timestampLocalValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "timestamp-local"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"}]}}}
+      ]
+    },
+    "timestampInstantValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "timestamp-instant"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?Z$"}]}}}
+      ]
+    },
+    "uuidValue": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {"properties": {"type": {"const": "uuid"}, "value": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}]}}}
+      ]
+    }
+  }
+}
