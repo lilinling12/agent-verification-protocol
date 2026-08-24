@@ -1,0 +1,22 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-017]
+applicability: mandatory
+type: semantic
+vector:
+  validManifestAccepted: true
+  invalidControls:
+    - duplicate-relation-id
+    - duplicate-projection-id
+    - duplicate-projection-relation
+    - unknown-projection-relation
+    - unknown-projection-column
+    - missing-projection-row-key
+expect:
+  everyInvalidControlRejectedBeforeReady: true
+  noFirstMatchOrBackendOrderFallback: true
