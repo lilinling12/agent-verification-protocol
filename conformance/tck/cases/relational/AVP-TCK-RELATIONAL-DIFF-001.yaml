@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-DIFF-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-004, AVP-RELATIONAL-014]
+applicability: mandatory
+type: semantic
+vector:
+  before:
+    - {id: 1, value: a}
+    - {id: 2, value: b}
+    - {id: 4, value: key-before}
+  after:
+    - {id: 1, value: updated}
+    - {id: 3, value: c}
+    - {id: 5, value: key-before}
+expect:
+  updates: [1]
+  deletes: [2, 4]
+  inserts: [3, 5]
+  keyChangeRepresentedAsDeleteInsert: true
+  deterministicLogicalOrder: true

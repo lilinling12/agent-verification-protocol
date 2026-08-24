@@ -1,0 +1,26 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-IDENTITY-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-001, AVP-RELATIONAL-002, AVP-RELATIONAL-005]
+applicability: mandatory
+type: schema-and-semantic
+vector:
+  resourceKind: state
+  capability:
+    capabilityId: state.relational
+    profile: avp-relational-state-v0.1
+    revision: "0.1"
+  identityMediaTypes:
+    - application/vnd.avp.relational-state-manifest+json
+    - application/vnd.avp.relational-state-image+json
+  manifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  baselineManifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  manifestContainsBaselineReference: false
+expect:
+  compatible: true
+  identityRolesByMediaType: true
+  acyclicIdentity: true

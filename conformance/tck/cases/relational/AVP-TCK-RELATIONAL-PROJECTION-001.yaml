@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-PROJECTION-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-006, AVP-RELATIONAL-007]
+applicability: mandatory
+type: semantic
+vector:
+  projectionId: consistency.pair
+  selectedColumns:
+    consistency.left: [id, epoch]
+    consistency.right: [id, epoch]
+  committedViews:
+    before: {left: 1, right: 1}
+    after: {left: 2, right: 2}
+  tornControl: {left: 1, right: 2}
+expect:
+  allRowsStructuralSubset: true
+  allowedViews: [[1, 1], [2, 2]]
+  tornControlRejected: true

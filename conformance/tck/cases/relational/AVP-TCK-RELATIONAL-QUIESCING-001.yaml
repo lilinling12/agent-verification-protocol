@@ -1,0 +1,21 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-QUIESCING-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-008]
+applicability: mandatory
+type: semantic
+vector:
+  acceptedMutationBeforeQuiescing: held
+  newMutationAfterQuiescing: requested
+  settleControls: [commit, rollback, unresolved]
+expect:
+  newMutationRejectedBeforeSideEffect: true
+  committedAcceptedWorkObserved: true
+  rolledBackWorkNotObserved: true
+  unresolvedBlocksFinalProjection: true
+  autoCommitForbidden: true
+  dirtyReadForbidden: true

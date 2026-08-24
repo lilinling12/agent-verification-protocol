@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-CANONICAL-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-003, AVP-RELATIONAL-004, AVP-RELATIONAL-005]
+applicability: mandatory
+type: semantic
+vector:
+  rows:
+    - key: {id: {type: integer, value: "2"}}
+      values: {id: {type: integer, value: "2"}, amount: {type: decimal, value: "2.50"}, text: {type: text, value: "é"}}
+    - key: {id: {type: integer, value: "1"}}
+      values: {id: {type: integer, value: "1"}, amount: {type: decimal, value: "1.00"}, text: {type: text, value: "é"}}
+  logicalKey: [id]
+  invalidControls:
+    - {type: integer, value: "01"}
+    - {type: integer, value: "-0"}
+    - {type: decimal, value: "1e2"}
+expect:
+  canonicalKeyOrder: ["1", "2"]
+  unicodeNormalizationApplied: false
+  invalidControlsRejected: true
