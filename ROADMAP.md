@@ -84,6 +84,8 @@ Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review a
 
 The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. Acceptance authorizes the next governed Relational State authority slice: normative specification → requirement index → closed schemas where required → execution-sensitive TCK → reference interface/runtime → PostgreSQL/MySQL adapters. It does not authorize backend-first implementation, PR merge, Final, release selection, `0.3.1` publication, package-index publication, signing, or attestation.
 
+The first Relational State authority slice is implemented as a complete **unmerged stacked candidate** in PR #87. Its semantic closure baseline `cbeaa01ae417a4bc0f04044a67c4eadd727d5180` contains `AVP-RELATIONAL-001..017`, five closed schemas, and 11 mandatory execution-sensitive Relational TCK cases; CI #548 and Governance #596 passed, including installed-wheel full registered TCK. Manual closure evidence is recorded in `docs/acceptance/alpha3-relational-state-normative-closure-audit.md`. The three specification/schema/TCK items above remain unchecked because `main` has not adopted PR #87 and no merge authorization has been given.
+
 PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
 ### Other resource implementations
