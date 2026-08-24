@@ -18,6 +18,21 @@ def validate_manifest_integrity(manifest: RelationalManifest) -> None:
         raise RelationalCompatibilityError("Manifest relationId values must be unique")
 
     relation_by_id = {relation.relation_id: relation for relation in manifest.relations}
+    for relation in manifest.relations:
+        column_ids = [column.column_id for column in relation.columns]
+        if len(column_ids) != len(set(column_ids)):
+            raise RelationalCompatibilityError(
+                f"relation {relation.relation_id} columnId values must be unique"
+            )
+        if len(relation.row_key) != len(set(relation.row_key)):
+            raise RelationalCompatibilityError(
+                f"relation {relation.relation_id} rowKey values must be unique"
+            )
+        unknown_key_columns = set(relation.row_key) - set(column_ids)
+        if unknown_key_columns:
+            raise RelationalCompatibilityError(
+                f"relation {relation.relation_id} rowKey references unknown columns: {sorted(unknown_key_columns)}"
+            )
 
     projection_ids = [projection.projection_id for projection in manifest.projections]
     if len(projection_ids) != len(set(projection_ids)):
