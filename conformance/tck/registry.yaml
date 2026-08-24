@@ -451,3 +451,8 @@ cases:
     profile: avp-relational-state-v0.1
     requirements: [AVP-RELATIONAL-016]
     applicability: mandatory
+  - id: AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001
+    path: conformance/tck/cases/relational/AVP-TCK-RELATIONAL-MANIFEST-INTEGRITY-001.yaml
+    profile: avp-relational-state-v0.1
+    requirements: [AVP-RELATIONAL-017]
+    applicability: mandatory
