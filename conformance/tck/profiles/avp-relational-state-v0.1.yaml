@@ -23,4 +23,5 @@ requirements:
     - AVP-RELATIONAL-014
     - AVP-RELATIONAL-015
     - AVP-RELATIONAL-016
+    - AVP-RELATIONAL-017
   conditional: []
