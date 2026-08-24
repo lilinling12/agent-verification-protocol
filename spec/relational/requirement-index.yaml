@@ -1,0 +1,126 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-relational-state-v0.1
+requirements:
+  - id: AVP-RELATIONAL-001
+    level: MUST
+    area: resource-identity
+    statement: Relational resources bind the governed state.relational profile plus exactly one Manifest and one baseline StateImage state-identity Artifact without backend identity substitution or a content-address cycle.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-001
+    schema: schemas/relational-state-manifest.schema.json
+    conformance: [AVP-TCK-RELATIONAL-IDENTITY-001]
+  - id: AVP-RELATIONAL-002
+    level: MUST
+    area: manifest
+    statement: RelationalStateManifest immutably defines the complete portable logical state interpretation surface, row keys, projections, scalar definitions, and canonical representation version.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-002
+    schema: schemas/relational-state-manifest.schema.json
+    conformance: [AVP-TCK-RELATIONAL-IDENTITY-001]
+  - id: AVP-RELATIONAL-003
+    level: MUST
+    area: canonical-values
+    statement: Authoritative values use the closed lossless v0.1 typed scalar model and reject lossy coercion or unsupported selected values.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-003
+    schema: schemas/relational-value.schema.json
+    conformance: [AVP-TCK-RELATIONAL-CANONICAL-001]
+  - id: AVP-RELATIONAL-004
+    level: MUST
+    area: row-identity
+    statement: Every relation has unique non-null logical row identity and canonical ordering independent of backend PK/index/collation/physical order.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-004
+    schema: schemas/relational-state-manifest.schema.json
+    conformance: [AVP-TCK-RELATIONAL-CANONICAL-001, AVP-TCK-RELATIONAL-DIFF-001]
+  - id: AVP-RELATIONAL-005
+    level: MUST
+    area: state-image
+    statement: Full StateImage binds the Manifest and every authoritative row/column in canonical exact bytes whose SHA-256 is the full relational state digest.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-005
+    schema: schemas/relational-state-image.schema.json
+    conformance: [AVP-TCK-RELATIONAL-IDENTITY-001, AVP-TCK-RELATIONAL-CANONICAL-001]
+  - id: AVP-RELATIONAL-006
+    level: MUST
+    area: projection
+    statement: Named evaluator projections are immutable all-row structural relation/column subsets with required logical keys and no portable SQL/query language.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-006
+    schema: schemas/relational-projection.schema.json
+    conformance: [AVP-TCK-RELATIONAL-PROJECTION-001]
+  - id: AVP-RELATIONAL-007
+    level: MUST
+    area: committed-observation
+    statement: Accepted relational observations represent one committed logical view, exclude uncommitted Subject state, and never return torn multi-relation visibility.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-007
+    schema: schemas/relational-projection.schema.json
+    conformance: [AVP-TCK-RELATIONAL-PROJECTION-001]
+  - id: AVP-RELATIONAL-008
+    level: MUST
+    area: quiescing
+    statement: Core QUIESCING closes new Subject relational mutation admission and final verification requires settled accepted work without auto-commit or dirty-read shortcuts.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-008
+    conformance: [AVP-TCK-RELATIONAL-QUIESCING-001]
+  - id: AVP-RELATIONAL-009
+    level: MUST
+    area: logical-drift
+    statement: Selected logical binding drift fails closed while irrelevant backend/catalog changes do not become raw portable identity requirements.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-009
+    conformance: [AVP-TCK-RELATIONAL-DRIFT-001]
+  - id: AVP-RELATIONAL-010
+    level: MUST
+    area: execution-identity
+    statement: Database programs/config outside the Manifest that materially affect Scenario execution bind immutable execution identity and drift invalidates that binding.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-010
+    conformance: [AVP-TCK-RELATIONAL-DRIFT-001]
+  - id: AVP-RELATIONAL-011
+    level: MUST
+    area: snapshot
+    statement: Relational snapshot produces committed canonical StateImage evidence bound to an Environment/resource-owned SnapshotRef rather than backend snapshot tokens.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-011
+    schema: schemas/relational-state-image.schema.json
+    conformance: [AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001]
+  - id: AVP-RELATIONAL-012
+    level: MUST
+    area: reset
+    statement: Reset succeeds only after independent full-state reprojection proves exact baseline StateImage equality under valid bindings.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-012
+    schema: schemas/relational-state-image.schema.json
+    conformance: [AVP-TCK-RELATIONAL-SNAPSHOT-RESET-001]
+  - id: AVP-RELATIONAL-013
+    level: MUST
+    area: restore
+    statement: Successful base relational restore independently re-establishes snapshot StateImage identity and reports exactly STATE_EQUIVALENT; EXACT is forbidden.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-013
+    conformance: [AVP-TCK-RELATIONAL-RESTORE-001]
+  - id: AVP-RELATIONAL-014
+    level: MUST
+    area: diff
+    statement: Relational diff is bound to same-Manifest logical row identity and reports deterministic insert/delete/update/key-change semantics rather than backend operation order.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-014
+    schema: schemas/relational-diff.schema.json
+    conformance: [AVP-TCK-RELATIONAL-DIFF-001]
+  - id: AVP-RELATIONAL-015
+    level: MUST
+    area: security-visibility
+    statement: Evaluator-private relational state may remain authoritative Evidence while Subject-visible relational routes and locators remain actor-authorized and fail closed against disclosure or retrieval.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-015
+    conformance: [AVP-TCK-RELATIONAL-SECURITY-001]
+  - id: AVP-RELATIONAL-016
+    level: MUST
+    area: executed-conformance
+    statement: Relational capability conformance executes backend-neutral observable behavior and rejects metadata-identical torn, false-restore, hidden-leak, and execution-input-drift implementations.
+    spec: spec/relational/relational-state-contract.md
+    anchor: avp-relational-016
+    conformance: [AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001]
