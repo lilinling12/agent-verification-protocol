@@ -67,7 +67,10 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [x] close RS-BR-001..RS-BR-008 Draft → Proposed blockers
 - [x] reconcile AEP-0010 and complete Draft → Proposed readiness audit
 - [x] AEP-0010 status advanced to Proposed for formal protocol review
-- [ ] complete Proposed protocol review and record explicit AEP-0010 Accepted decision
+- [x] complete formal Proposed protocol review
+- [ ] absorb RS-PR-001..RS-PR-003 acceptance-blocker decisions into AEP-0010 and supporting design surfaces
+- [ ] complete acceptance-oriented re-review with no remaining semantic blocker
+- [ ] record explicit protocol-maintainer AEP-0010 Proposed → Accepted decision
 - [ ] relational normative specification and requirement index
 - [ ] `RelationalStateManifest` / `RelationalStateImage` schemas
 - [ ] execution-sensitive `avp-relational-state-v0.1` TCK
@@ -75,7 +78,9 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
-AEP-0010 is **Proposed, not Accepted**. Its current direction is reviewable but non-normative. No relational normative candidate surface or database adapter is authorized until an explicit protocol-maintainer Accepted decision is recorded. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
+AEP-0010 remains **Proposed, not Accepted**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003). The decisions are recorded in `docs/design/alpha3-relational-state-proposed-review-blockers.md` and must be absorbed into AEP-0010 before acceptance-oriented re-review.
+
+No relational normative candidate surface or database adapter is authorized until an explicit protocol-maintainer Accepted decision is recorded. PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
 ### Other resource implementations
 - [ ] Playwright browser runtime
