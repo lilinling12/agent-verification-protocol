@@ -1,0 +1,659 @@
+"""Backend-neutral reference model for the AVP Relational State profile.
+
+This module is downstream of ``spec/relational/relational-state-contract.md``.
+It intentionally models only portable observable semantics. It contains no SQL,
+database-driver, PostgreSQL, MySQL, connection, catalog, or transaction-token
+API and must not be treated as protocol authority.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import re
+from dataclasses import dataclass
+from datetime import date, datetime, time, timezone
+from decimal import Decimal, InvalidOperation
+from enum import Enum
+from typing import Iterable, Mapping, Sequence
+
+from .canonical import canonical_json
+
+
+class RelationalError(RuntimeError):
+    """Base error for fail-closed portable relational operations."""
+
+
+class RelationalCompatibilityError(RelationalError):
+    """The selected logical/execution binding cannot satisfy the profile."""
+
+
+class RelationalReferenceError(RelationalError):
+    """An Environment/resource/Snapshot reference is stale or foreign."""
+
+
+class RelationalVisibilityError(RelationalError):
+    """A Subject-visible operation attempted to disclose private state."""
+
+
+class RelationalLifecycleError(RelationalError):
+    """A relational operation violates the Core lifecycle boundary."""
+
+
+class ValueType(str, Enum):
+    BOOLEAN = "boolean"
+    INTEGER = "integer"
+    DECIMAL = "decimal"
+    TEXT = "text"
+    BINARY = "binary"
+    DATE = "date"
+    TIME_LOCAL = "time-local"
+    TIMESTAMP_LOCAL = "timestamp-local"
+    TIMESTAMP_INSTANT = "timestamp-instant"
+    UUID = "uuid"
+
+
+class RestoreFidelity(str, Enum):
+    STATE_EQUIVALENT = "STATE_EQUIVALENT"
+    NON_EQUIVALENT = "NON_EQUIVALENT"
+
+
+_INTEGER_RE = re.compile(r"^(0|-?[1-9][0-9]{0,64})$")
+_DECIMAL_RE = re.compile(r"^(0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.([0-9]+))?$")
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_TIME_RE = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.([0-9]{1,6}))?$")
+_LOCAL_TS_RE = re.compile(
+    r"^([1-9][0-9]{3}-[0-9]{2}-[0-9]{2})T"
+    r"((?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,6})?)$"
+)
+_INSTANT_TS_RE = re.compile(
+    r"^([1-9][0-9]{3}-[0-9]{2}-[0-9]{2})T"
+    r"((?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,6})?)Z$"
+)
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def _canonical_bytes(value: object) -> bytes:
+    """Return canonical bytes for the profile's restricted JSON value space.
+
+    Relational exact numerics are strings, so the reference implementation's
+    sorted compact JSON serializer has the same byte representation as RFC
+    8785 for the protocol values emitted here. This helper is implementation
+    evidence, not the normative JCS definition.
+    """
+
+    return canonical_json(value).encode("utf-8")
+
+
+@dataclass(frozen=True, slots=True)
+class ColumnType:
+    """Closed portable column type declared by AVP-RELATIONAL-003."""
+
+    kind: ValueType
+    precision: int | None = None
+    scale: int | None = None
+    fractional_precision: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind is ValueType.DECIMAL:
+            if self.precision is None or not 1 <= self.precision <= 65:
+                raise RelationalCompatibilityError("decimal precision must be within 1..65")
+            if self.scale is None or not 0 <= self.scale <= 30 or self.scale > self.precision:
+                raise RelationalCompatibilityError("decimal scale must be within 0..30 and <= precision")
+        elif self.precision is not None or self.scale is not None:
+            raise RelationalCompatibilityError("precision/scale are valid only for decimal")
+
+        temporal = {
+            ValueType.TIME_LOCAL,
+            ValueType.TIMESTAMP_LOCAL,
+            ValueType.TIMESTAMP_INSTANT,
+        }
+        if self.kind in temporal:
+            if self.fractional_precision is None or not 0 <= self.fractional_precision <= 6:
+                raise RelationalCompatibilityError("temporal fractional precision must be within 0..6")
+        elif self.fractional_precision is not None:
+            raise RelationalCompatibilityError("fractional precision is valid only for temporal types")
+
+
+@dataclass(frozen=True, slots=True)
+class ColumnDefinition:
+    column_id: str
+    value_type: ColumnType
+    nullable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalValue:
+    """Canonical typed relational value."""
+
+    kind: ValueType
+    value: bool | str | None
+
+    def as_document(self) -> dict[str, object]:
+        return {"type": self.kind.value, "value": self.value}
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalRow:
+    """One logical row. Values are stored as typed immutable pairs."""
+
+    values: tuple[tuple[str, RelationalValue], ...]
+
+    @classmethod
+    def from_mapping(cls, values: Mapping[str, RelationalValue]) -> "RelationalRow":
+        return cls(tuple(sorted(values.items())))
+
+    def value_map(self) -> dict[str, RelationalValue]:
+        return dict(self.values)
+
+
+@dataclass(frozen=True, slots=True)
+class RelationDefinition:
+    relation_id: str
+    columns: tuple[ColumnDefinition, ...]
+    row_key: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.row_key:
+            raise RelationalCompatibilityError("relation row key must not be empty")
+        ids = [column.column_id for column in self.columns]
+        if len(ids) != len(set(ids)):
+            raise RelationalCompatibilityError("relation column ids must be unique")
+        if any(column_id not in set(ids) for column_id in self.row_key):
+            raise RelationalCompatibilityError("row key must reference declared columns")
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionRelation:
+    relation_id: str
+    columns: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionDefinition:
+    projection_id: str
+    relations: tuple[ProjectionRelation, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalManifest:
+    relations: tuple[RelationDefinition, ...]
+    projections: tuple[ProjectionDefinition, ...] = ()
+
+    def relation(self, relation_id: str) -> RelationDefinition:
+        for relation in self.relations:
+            if relation.relation_id == relation_id:
+                return relation
+        raise RelationalCompatibilityError(f"unknown logical relation: {relation_id}")
+
+    def projection(self, projection_id: str) -> ProjectionDefinition:
+        for projection in self.projections:
+            if projection.projection_id == projection_id:
+                return projection
+        raise RelationalCompatibilityError(f"unknown projection: {projection_id}")
+
+
+@dataclass(frozen=True, slots=True)
+class StateImage:
+    manifest_digest: str
+    relations: tuple[tuple[str, tuple[RelationalRow, ...]], ...]
+
+    def as_document(self) -> dict[str, object]:
+        return {
+            "apiVersion": "avp.relational/v0.1",
+            "kind": "RelationalStateImage",
+            "manifestDigest": self.manifest_digest,
+            "relations": [
+                {
+                    "relationId": relation_id,
+                    "rows": [
+                        {
+                            "key": {},
+                            "values": {
+                                column_id: value.as_document()
+                                for column_id, value in row.values
+                            },
+                        }
+                        for row in rows
+                    ],
+                }
+                for relation_id, rows in self.relations
+            ],
+        }
+
+    @property
+    def digest(self) -> str:
+        return _sha256_bytes(_canonical_bytes(self.as_document()))
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalSnapshot:
+    snapshot_id: str
+    environment_id: str
+    resource_id: str
+    state: StateImage
+
+
+@dataclass(frozen=True, slots=True)
+class DiffChange:
+    relation_id: str
+    change: str
+    key_bytes: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalDiff:
+    changes: tuple[DiffChange, ...]
+
+
+@dataclass(slots=True)
+class _PendingMutation:
+    relation_id: str
+    replacement: tuple[RelationalRow, ...]
+    settled: bool = False
+    committed: bool = False
+
+
+class InMemoryRelationalResource:
+    """Small backend-neutral SUT for the normative relational TCK.
+
+    The implementation is intentionally strict and typed. It demonstrates the
+    portable profile without establishing any database-product mechanics.
+    """
+
+    def __init__(
+        self,
+        *,
+        environment_id: str,
+        resource_id: str,
+        manifest: RelationalManifest,
+        manifest_digest: str,
+        baseline: Mapping[str, Sequence[RelationalRow]],
+        execution_input_identity: str,
+        evaluator_private_columns: Iterable[tuple[str, str]] = (),
+    ) -> None:
+        self.environment_id = environment_id
+        self.resource_id = resource_id
+        self.manifest = manifest
+        self.manifest_digest = manifest_digest
+        self.execution_input_identity = execution_input_identity
+        self._bound_execution_identity = execution_input_identity
+        self._private_columns = frozenset(evaluator_private_columns)
+        self._logical_binding_valid = True
+        self._quiescing = False
+        self._released = False
+        self._pending: list[_PendingMutation] = []
+        self._baseline = self._validate_state(baseline)
+        self._state = {key: tuple(rows) for key, rows in self._baseline.items()}
+        self._snapshot_sequence = 0
+
+    def _ensure_live(self) -> None:
+        if self._released:
+            raise RelationalReferenceError("relational resource reference is released")
+        if not self._logical_binding_valid:
+            raise RelationalCompatibilityError("logical relational binding has drifted")
+        if self.execution_input_identity != self._bound_execution_identity:
+            raise RelationalCompatibilityError("execution-relevant database input identity has drifted")
+
+    def _validate_state(
+        self, state: Mapping[str, Sequence[RelationalRow]]
+    ) -> dict[str, tuple[RelationalRow, ...]]:
+        result: dict[str, tuple[RelationalRow, ...]] = {}
+        expected_relations = {relation.relation_id for relation in self.manifest.relations}
+        if set(state) != expected_relations:
+            raise RelationalCompatibilityError("state does not cover exactly the Manifest relations")
+        for relation in self.manifest.relations:
+            rows = tuple(state[relation.relation_id])
+            validated: list[tuple[bytes, RelationalRow]] = []
+            seen_keys: set[bytes] = set()
+            for row in rows:
+                values = row.value_map()
+                expected_columns = {column.column_id for column in relation.columns}
+                if set(values) != expected_columns:
+                    raise RelationalCompatibilityError("row does not cover exactly the Manifest columns")
+                for column in relation.columns:
+                    self._validate_value(column, values[column.column_id])
+                key_bytes = self._row_key_bytes(relation, row)
+                if key_bytes in seen_keys:
+                    raise RelationalCompatibilityError("duplicate logical row key")
+                seen_keys.add(key_bytes)
+                validated.append((key_bytes, row))
+            validated.sort(key=lambda pair: pair[0])
+            result[relation.relation_id] = tuple(row for _, row in validated)
+        return result
+
+    @staticmethod
+    def _validate_value(column: ColumnDefinition, value: RelationalValue) -> None:
+        if value.kind is not column.value_type.kind:
+            raise RelationalCompatibilityError("typed value does not match Manifest column type")
+        if value.value is None:
+            if not column.nullable:
+                raise RelationalCompatibilityError("null supplied for non-nullable column")
+            return
+
+        raw = value.value
+        kind = value.kind
+        if kind is ValueType.BOOLEAN:
+            if not isinstance(raw, bool):
+                raise RelationalCompatibilityError("boolean value must be JSON boolean")
+            return
+        if not isinstance(raw, str):
+            raise RelationalCompatibilityError("non-boolean relational values must use canonical strings")
+        if kind is ValueType.INTEGER:
+            if not _INTEGER_RE.fullmatch(raw):
+                raise RelationalCompatibilityError("non-canonical integer")
+        elif kind is ValueType.DECIMAL:
+            match = _DECIMAL_RE.fullmatch(raw)
+            if match is None:
+                raise RelationalCompatibilityError("non-canonical decimal")
+            scale = column.value_type.scale or 0
+            fraction = match.group(1) or ""
+            if len(fraction) != scale:
+                raise RelationalCompatibilityError("decimal lexical scale differs from Manifest")
+            try:
+                decimal = Decimal(raw)
+            except InvalidOperation as exc:
+                raise RelationalCompatibilityError("invalid decimal") from exc
+            digits = len(decimal.as_tuple().digits)
+            if digits > (column.value_type.precision or 0):
+                raise RelationalCompatibilityError("decimal exceeds Manifest precision")
+            if decimal.is_zero() and raw.startswith("-"):
+                raise RelationalCompatibilityError("negative decimal zero is non-canonical")
+        elif kind is ValueType.TEXT:
+            try:
+                raw.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise RelationalCompatibilityError("text contains invalid Unicode scalar data") from exc
+        elif kind is ValueType.BINARY:
+            if "=" in raw:
+                raise RelationalCompatibilityError("base64url padding is non-canonical")
+            try:
+                pad = "=" * ((4 - len(raw) % 4) % 4)
+                decoded = base64.urlsafe_b64decode(raw + pad)
+            except Exception as exc:  # pragma: no cover - defensive boundary
+                raise RelationalCompatibilityError("invalid base64url") from exc
+            if base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=") != raw:
+                raise RelationalCompatibilityError("non-canonical base64url")
+        elif kind is ValueType.DATE:
+            try:
+                parsed = date.fromisoformat(raw)
+            except ValueError as exc:
+                raise RelationalCompatibilityError("invalid Gregorian date") from exc
+            if not 1000 <= parsed.year <= 9999 or len(raw) != 10:
+                raise RelationalCompatibilityError("date outside portable range")
+        elif kind is ValueType.TIME_LOCAL:
+            InMemoryRelationalResource._validate_local_time(raw, column.value_type.fractional_precision or 0)
+        elif kind is ValueType.TIMESTAMP_LOCAL:
+            match = _LOCAL_TS_RE.fullmatch(raw)
+            if match is None:
+                raise RelationalCompatibilityError("invalid timestamp-local")
+            InMemoryRelationalResource._validate_date_time_parts(
+                match.group(1), match.group(2), column.value_type.fractional_precision or 0
+            )
+        elif kind is ValueType.TIMESTAMP_INSTANT:
+            match = _INSTANT_TS_RE.fullmatch(raw)
+            if match is None:
+                raise RelationalCompatibilityError("invalid timestamp-instant")
+            InMemoryRelationalResource._validate_date_time_parts(
+                match.group(1), match.group(2), column.value_type.fractional_precision or 0
+            )
+            datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(timezone.utc)
+        elif kind is ValueType.UUID:
+            if not _UUID_RE.fullmatch(raw):
+                raise RelationalCompatibilityError("non-canonical UUID")
+
+    @staticmethod
+    def _validate_local_time(raw: str, precision: int) -> None:
+        match = _TIME_RE.fullmatch(raw)
+        if match is None:
+            raise RelationalCompatibilityError("invalid time-local")
+        fraction = match.group(1) or ""
+        if len(fraction) != precision:
+            raise RelationalCompatibilityError("temporal lexical precision differs from Manifest")
+        time.fromisoformat(raw)
+
+    @staticmethod
+    def _validate_date_time_parts(date_part: str, time_part: str, precision: int) -> None:
+        parsed_date = date.fromisoformat(date_part)
+        if not 1000 <= parsed_date.year <= 9999:
+            raise RelationalCompatibilityError("timestamp outside portable year range")
+        InMemoryRelationalResource._validate_local_time(time_part, precision)
+
+    @staticmethod
+    def _row_key_bytes(relation: RelationDefinition, row: RelationalRow) -> bytes:
+        values = row.value_map()
+        key_document: dict[str, object] = {}
+        for column_id in sorted(relation.row_key):
+            value = values[column_id]
+            if value.value is None:
+                raise RelationalCompatibilityError("logical row key cannot contain null")
+            key_document[column_id] = value.as_document()
+        return _canonical_bytes(key_document)
+
+    def state_image(self) -> StateImage:
+        self._ensure_live()
+        relations = tuple(
+            (relation.relation_id, self._state[relation.relation_id])
+            for relation in sorted(self.manifest.relations, key=lambda item: item.relation_id)
+        )
+        return StateImage(self.manifest_digest, relations)
+
+    def project(self, projection_id: str) -> dict[str, object]:
+        self._ensure_live()
+        projection = self.manifest.projection(projection_id)
+        relations: list[dict[str, object]] = []
+        for selected in sorted(projection.relations, key=lambda item: item.relation_id):
+            relation = self.manifest.relation(selected.relation_id)
+            selected_columns = set(selected.columns)
+            if not set(relation.row_key).issubset(selected_columns):
+                raise RelationalCompatibilityError("projection omits required logical key column")
+            rows = []
+            for row in self._state[relation.relation_id]:
+                values = row.value_map()
+                rows.append(
+                    {
+                        "key": {
+                            key: values[key].as_document() for key in sorted(relation.row_key)
+                        },
+                        "values": {
+                            column: values[column].as_document()
+                            for column in sorted(selected_columns)
+                        },
+                    }
+                )
+            relations.append({"relationId": relation.relation_id, "rows": rows})
+        return {
+            "apiVersion": "avp.relational/v0.1",
+            "kind": "RelationalProjection",
+            "manifestDigest": self.manifest_digest,
+            "projectionId": projection_id,
+            "relations": relations,
+        }
+
+    def begin_subject_mutation(
+        self, relation_id: str, replacement: Sequence[RelationalRow]
+    ) -> _PendingMutation:
+        self._ensure_live()
+        if self._quiescing:
+            raise RelationalLifecycleError("new Subject mutation rejected after QUIESCING")
+        candidate = dict(self._state)
+        candidate[relation_id] = tuple(replacement)
+        validated = self._validate_state(candidate)
+        pending = _PendingMutation(relation_id, validated[relation_id])
+        self._pending.append(pending)
+        return pending
+
+    def settle_subject_mutation(self, pending: _PendingMutation, *, commit: bool) -> None:
+        self._ensure_live()
+        if pending not in self._pending or pending.settled:
+            raise RelationalLifecycleError("mutation is not pending")
+        if commit:
+            self._state[pending.relation_id] = pending.replacement
+            pending.committed = True
+        pending.settled = True
+
+    def enter_quiescing(self) -> None:
+        self._ensure_live()
+        self._quiescing = True
+
+    @property
+    def settlement_complete(self) -> bool:
+        return all(pending.settled for pending in self._pending)
+
+    def final_projection(self, projection_id: str) -> dict[str, object]:
+        self._ensure_live()
+        if not self._quiescing or not self.settlement_complete:
+            raise RelationalLifecycleError("final projection requires settled QUIESCING boundary")
+        return self.project(projection_id)
+
+    def snapshot(self) -> RelationalSnapshot:
+        state = self.state_image()
+        self._snapshot_sequence += 1
+        return RelationalSnapshot(
+            snapshot_id=f"relational-snapshot-{self._snapshot_sequence}",
+            environment_id=self.environment_id,
+            resource_id=self.resource_id,
+            state=state,
+        )
+
+    def reset(self) -> StateImage:
+        self._ensure_live()
+        self._state = {key: tuple(rows) for key, rows in self._baseline.items()}
+        observed = self.state_image()
+        baseline = StateImage(
+            self.manifest_digest,
+            tuple(
+                (relation.relation_id, self._baseline[relation.relation_id])
+                for relation in sorted(self.manifest.relations, key=lambda item: item.relation_id)
+            ),
+        )
+        if observed.digest != baseline.digest:
+            raise RelationalError("reset did not re-establish baseline StateImage identity")
+        return observed
+
+    def restore(self, snapshot: RelationalSnapshot) -> RestoreFidelity:
+        self._ensure_live()
+        self._validate_snapshot_owner(snapshot)
+        self._state = {relation_id: tuple(rows) for relation_id, rows in snapshot.state.relations}
+        observed = self.state_image()
+        if observed.digest != snapshot.state.digest:
+            return RestoreFidelity.NON_EQUIVALENT
+        return RestoreFidelity.STATE_EQUIVALENT
+
+    def _validate_snapshot_owner(self, snapshot: RelationalSnapshot) -> None:
+        if snapshot.environment_id != self.environment_id or snapshot.resource_id != self.resource_id:
+            raise RelationalReferenceError("foreign relational SnapshotRef")
+        if snapshot.state.manifest_digest != self.manifest_digest:
+            raise RelationalReferenceError("snapshot Manifest identity mismatch")
+
+    def set_logical_binding_valid(self, valid: bool) -> None:
+        self._logical_binding_valid = valid
+
+    def set_execution_input_identity(self, identity: str) -> None:
+        self.execution_input_identity = identity
+
+    def subject_view(self, authorized: Iterable[tuple[str, str]]) -> dict[str, tuple[RelationalRow, ...]]:
+        self._ensure_live()
+        allowed = frozenset(authorized)
+        if self._private_columns & allowed:
+            raise RelationalVisibilityError("Subject authorization includes evaluator-private column")
+        result: dict[str, tuple[RelationalRow, ...]] = {}
+        for relation in self.manifest.relations:
+            selected = {
+                column_id
+                for rel_id, column_id in allowed
+                if rel_id == relation.relation_id
+            }
+            if not selected:
+                continue
+            rows: list[RelationalRow] = []
+            for row in self._state[relation.relation_id]:
+                values = row.value_map()
+                rows.append(RelationalRow.from_mapping({key: values[key] for key in selected}))
+            result[relation.relation_id] = tuple(rows)
+        return result
+
+    def diff(self, before: StateImage, after: StateImage) -> RelationalDiff:
+        if before.manifest_digest != self.manifest_digest or after.manifest_digest != self.manifest_digest:
+            raise RelationalCompatibilityError("cross-Manifest comparison is not relational row diff")
+        changes: list[DiffChange] = []
+        before_map = dict(before.relations)
+        after_map = dict(after.relations)
+        for relation in sorted(self.manifest.relations, key=lambda item: item.relation_id):
+            old_rows = {
+                self._row_key_bytes(relation, row): row
+                for row in before_map[relation.relation_id]
+            }
+            new_rows = {
+                self._row_key_bytes(relation, row): row
+                for row in after_map[relation.relation_id]
+            }
+            for key in sorted(old_rows.keys() | new_rows.keys()):
+                if key not in old_rows:
+                    changes.append(DiffChange(relation.relation_id, "INSERT", key))
+                elif key not in new_rows:
+                    changes.append(DiffChange(relation.relation_id, "DELETE", key))
+                elif old_rows[key] != new_rows[key]:
+                    changes.append(DiffChange(relation.relation_id, "UPDATE", key))
+        return RelationalDiff(tuple(changes))
+
+    def release(self) -> None:
+        self._released = True
+
+
+class TornProjectionResource(InMemoryRelationalResource):
+    """Negative SUT: returns a view impossible under one committed boundary."""
+
+    def project(self, projection_id: str) -> dict[str, object]:
+        document = super().project(projection_id)
+        relations = document["relations"]
+        assert isinstance(relations, list)
+        if len(relations) >= 2:
+            first_rows = relations[0]["rows"]
+            second_rows = relations[1]["rows"]
+            assert isinstance(first_rows, list) and isinstance(second_rows, list)
+            if first_rows and second_rows:
+                first_rows[0]["values"]["epoch"] = {"type": "integer", "value": "1"}
+                second_rows[0]["values"]["epoch"] = {"type": "integer", "value": "2"}
+        return document
+
+
+class FalseRestoreResource(InMemoryRelationalResource):
+    """Negative SUT: reports restore success while retaining mutated state."""
+
+    def restore(self, snapshot: RelationalSnapshot) -> RestoreFidelity:
+        self._ensure_live()
+        self._validate_snapshot_owner(snapshot)
+        return RestoreFidelity.STATE_EQUIVALENT
+
+
+class HiddenStateLeakResource(InMemoryRelationalResource):
+    """Negative SUT: bypasses evaluator-private Subject visibility checks."""
+
+    def subject_view(self, authorized: Iterable[tuple[str, str]]) -> dict[str, tuple[RelationalRow, ...]]:
+        self._ensure_live()
+        allowed = set(authorized) | set(self._private_columns)
+        result: dict[str, tuple[RelationalRow, ...]] = {}
+        for relation in self.manifest.relations:
+            selected = {column_id for rel_id, column_id in allowed if rel_id == relation.relation_id}
+            if not selected:
+                continue
+            rows = []
+            for row in self._state[relation.relation_id]:
+                values = row.value_map()
+                rows.append(RelationalRow.from_mapping({key: values[key] for key in selected}))
+            result[relation.relation_id] = tuple(rows)
+        return result
+
+
+class ExecutionInputDriftResource(InMemoryRelationalResource):
+    """Negative SUT: intentionally suppresses execution-input drift failure."""
+
+    def _ensure_live(self) -> None:
+        if self._released:
+            raise RelationalReferenceError("relational resource reference is released")
+        if not self._logical_binding_valid:
+            raise RelationalCompatibilityError("logical relational binding has drifted")
