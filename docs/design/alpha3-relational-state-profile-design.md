@@ -1,6 +1,6 @@
 # Alpha 3 Relational State Profile Design Audit
 
-Status: **DRAFT DESIGN — NOT READY FOR NORMATIVE IMPLEMENTATION**
+Status: **DRAFT DESIGN — NOT READY FOR PROPOSED**
 
 Parent authority: AEP-0009 (Accepted)
 Proposal: AEP-0010 (Draft)
@@ -57,28 +57,34 @@ A conforming claim covers the mandatory relational surface as one reviewed unit.
 
 ### 3.2 Closed logical state surface
 
-A separate `RelationalStateManifest` should describe the authoritative logical state surface. The base `EnvironmentResource` remains unchanged and closed.
+A separate `RelationalStateManifest` describes the authoritative logical state semantics. The base `EnvironmentResource` remains unchanged and closed.
 
-The manifest should bind logical relations, logical columns, portable scalar types, nullability, ordered row keys, named projection definitions, representation version, and baseline state-image identity where applicable.
+The Manifest binds logical relations, logical columns, portable scalar types and parameters, nullability, ordered row keys, named projection definitions, and canonical representation version. It deliberately **does not** reference the baseline StateImage, avoiding a content-addressed identity cycle.
+
+For `state.relational` v0.1, the existing Fabric `EnvironmentResource.identityArtifacts` binds exactly one Manifest ArtifactRef and exactly one baseline StateImage ArtifactRef. Their roles are determined by the profile-defined media types, never by array position. The baseline StateImage contains the Manifest Artifact digest.
 
 Backend DDL, migration files, DSNs, physical table names, driver configuration, and engine-specific catalog details remain implementation evidence/binding information.
+
+The exact identity model is fixed in `docs/design/alpha3-relational-state-canonical-model.md`.
 
 ### 3.3 Closed scalar vocabulary
 
 The initial candidate scalar set is deliberately conservative:
 
-- boolean
-- integer
-- decimal
-- text
-- binary
-- date
-- time-local
-- timestamp-local
-- timestamp-instant
-- uuid
+- boolean;
+- integer — signed exact value up to 65 decimal digits;
+- decimal — precision 1..65, scale 0..30, `scale <= precision`;
+- text — exact Unicode scalar sequence with no implicit normalization;
+- binary — canonical unpadded RFC 4648 base64url;
+- date — portable years 1000..9999;
+- time-local — time of day only, precision 0..6;
+- timestamp-local — local date/time, precision 0..6;
+- timestamp-instant — UTC instant, precision 0..6;
+- uuid — lowercase RFC 9562 hex-and-dash form.
 
 Approximate floating point, JSON, XML, spatial values, arrays, intervals, vendor enum/set values, and opaque extensions are excluded from mandatory v0.1 until lossless canonical semantics are reviewed.
+
+Canonical relational numeric values are strings inside typed value records rather than JSON numbers, preventing IEEE-754 serialization limits from defining database-state identity. Exact lexical rules and canonical JSON identity are fixed in `docs/design/alpha3-relational-state-canonical-model.md`.
 
 This avoids a public `Any`/extension bag that later becomes impossible to normalize consistently across engines and languages.
 
@@ -105,20 +111,22 @@ Server defaults are not evidence. Adapters must explicitly establish the selecte
 
 ## 5. Canonical projection direction
 
-Canonical projection bytes should include/bind:
+Canonical projection bytes include/bind:
 
-- relational manifest identity;
+- relational Manifest Artifact digest;
 - projection identifier;
-- relations ordered by portable relation id;
+- relations in profile-defined canonical order;
 - columns in manifest order;
 - rows ordered by canonical row-key bytes;
 - typed canonical values.
 
-The state digest should be SHA-256 over exact canonical projection bytes.
+The complete structure is serialized with RFC 8785 JCS; the state digest is SHA-256 over those exact canonical bytes.
 
 Backend collation or unspecified SQL row ordering cannot determine identity. SQL `ORDER BY` may optimize extraction, but canonical ordering remains a profile responsibility.
 
-Including manifest identity in the projection preimage prevents equal row bytes under incompatible schema semantics from being mistaken for the same relational state.
+Including Manifest identity in the projection preimage prevents equal row bytes under incompatible schema semantics from being mistaken for the same relational state.
+
+When exact projection bytes are retained as an Artifact, their Artifact digest and relational projection state digest are the same SHA-256 value. Artifact identity is not claimed for bytes that were not retained/published.
 
 ## 6. State-image model
 
@@ -127,12 +135,14 @@ Use one canonical `RelationalStateImage` content model for two roles:
 1. immutable baseline materialization/reset input;
 2. runtime logical snapshot Artifact content.
 
+The StateImage contains the bound Manifest Artifact digest plus the complete canonical authoritative state surface. It does not contain its own digest; SHA-256 over its exact RFC 8785 bytes is both retained Artifact identity and the v0.1 full authoritative relational state digest.
+
 Ownership remains different:
 
-- a baseline Artifact is execution input bound through Scenario/Fabric identity;
-- a runtime SnapshotRef remains owned by the Environment/resource that produced it.
+- the baseline Manifest and baseline StateImage are immutable Fabric resource identity inputs;
+- a runtime snapshot StateImage is generated evidence bound to the Environment/resource-owned SnapshotRef and does not mutate `EnvironmentResource.identityArtifacts`.
 
-The shared content model prevents baseline and snapshot serialization from drifting while preserving Environment stale/foreign snapshot semantics.
+The Manifest never references the baseline image, so Artifact identity remains acyclic.
 
 Cross-Environment snapshot import is explicitly outside v0.1.
 
@@ -140,7 +150,7 @@ Cross-Environment snapshot import is explicitly outside v0.1.
 
 ### Reset
 
-Reset success requires post-reset re-projection of the full authoritative state surface and equality with the bound baseline identity. Backend command success is insufficient.
+Reset success requires post-reset re-projection of the full authoritative state surface and equality with the bound baseline StateImage identity. Backend command success is insufficient.
 
 ### Restore
 
@@ -154,9 +164,9 @@ A future stronger capability must be separately governed.
 
 ## 8. Schema drift
 
-The logical manifest is immutable for one bound Environment instance. Selected schema drift invalidates the current binding.
+The logical Manifest is immutable for one bound Environment instance. Selected schema drift invalidates the current binding.
 
-Adapters must not silently reinterpret changed backend schema under the old manifest.
+Adapters must not silently reinterpret changed backend schema under the old Manifest.
 
 This matters across engines because DDL/transaction visibility differs; for example, MySQL consistent reads can be invalidated by certain `DROP TABLE` / `ALTER TABLE` operations.
 
@@ -242,37 +252,57 @@ A reference-completeness parity fixture should additionally require equivalent l
 
 ## 14. Draft → Proposed blockers
 
-AEP-0010 should remain Draft until all blockers below are explicitly closed.
+AEP-0010 remains Draft until all blockers below are explicitly closed and a separate Proposed-readiness audit confirms the AEP text itself incorporates the decisions.
 
 ### RS-BR-001 — Scalar lexical encoding
 
-Need exact language-neutral lexical rules for integer, decimal, binary, UUID, date/time/timestamp values, including precision and timezone handling.
+Status: **CLOSED FOR DRAFT → PROPOSED READINESS**
+
+Decision evidence: `docs/design/alpha3-relational-state-canonical-model.md`.
+
+Closed with typed value records, RFC 8785 canonical JSON, exact integer/decimal lexical rules, RFC 4648 base64url, RFC 9562 UUID normalization, explicit temporal lexical rules, 0..6 fractional precision, common portability ranges, no Unicode normalization, and fail-closed unsupported/lossy mappings.
 
 ### RS-BR-002 — Manifest versus state-image schema split
 
-Need final field ownership and identity relationships among `EnvironmentResource.identityArtifacts`, `RelationalStateManifest`, `RelationalStateImage`, Environment SnapshotRef, and retained ArtifactRef.
+Status: **CLOSED FOR DRAFT → PROPOSED READINESS**
+
+Decision evidence: `docs/design/alpha3-relational-state-canonical-model.md`.
+
+Closed with distinct Manifest/StateImage Artifact types, acyclic identity, Fabric `identityArtifacts` binding Manifest + baseline by media type, baseline image binding Manifest digest, runtime StateImage binding through Environment/resource-owned SnapshotRef, and reuse of existing Artifact SHA-256 identity rather than a competing content-address scheme.
 
 ### RS-BR-003 — Authoritative surface versus named projections
+
+Status: **OPEN**
 
 Need precise rule for whether named projections are restricted subsets/views of one full authoritative surface and how projection definitions participate in identity.
 
 ### RS-BR-004 — Row-key portability
 
+Status: **OPEN**
+
 Need confirm the v0.1 mandatory row-key rule is sufficient for independent implementations and does not accidentally require backend primary-key syntax.
 
 ### RS-BR-005 — Final observation under unsettled Subject transaction
+
+Status: **OPEN**
 
 Need explicit composition with Core `QUIESCING`: wait, timeout/infrastructure failure, and evidence requirements must be unambiguous without inventing a database lifecycle.
 
 ### RS-BR-006 — Schema drift detection boundary
 
-Need specify what constitutes drift for the portable logical manifest while avoiding raw backend catalog equality as the protocol rule.
+Status: **OPEN**
+
+Need specify what constitutes drift for the portable logical Manifest while avoiding raw backend catalog equality as the protocol rule.
 
 ### RS-BR-007 — Cross-backend canonical parity fixture
+
+Status: **OPEN**
 
 Need a concrete PostgreSQL/MySQL-neutral fixture covering all mandatory scalar types and concurrency behavior.
 
 ### RS-BR-008 — TCK execution interface
+
+Status: **OPEN**
 
 Need define a language-neutral relational TCK operation contract sufficient to execute projection/reset/snapshot/restore/diff without standardizing a general SQL client API.
 
@@ -280,10 +310,14 @@ Need define a language-neutral relational TCK operation contract sufficient to e
 
 **AEP-0010 DRAFT IS JUSTIFIED.**
 
+**RS-BR-001 / RS-BR-002 ARE CLOSED.**
+
+**RS-BR-003 .. RS-BR-008 REMAIN OPEN.**
+
 **NOT READY FOR PROPOSED.**
 
 **NOT READY FOR RELATIONAL NORMATIVE SPECIFICATION.**
 
 **NOT READY FOR POSTGRESQL OR MYSQL ADAPTER IMPLEMENTATION.**
 
-The next governed work is to close RS-BR-001 through RS-BR-008 with explicit portable semantics and then run a Draft → Proposed readiness audit.
+The next governed work is RS-BR-003 / RS-BR-004: authoritative projection structure and portable row identity, followed by the lifecycle/schema/TCK blockers.
