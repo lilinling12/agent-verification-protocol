@@ -10,29 +10,40 @@
     "profile": {"const": "avp-relational-state-v0.1"},
     "revision": {"const": "0.1"},
     "canonicalRepresentation": {"const": "rfc8785-jcs"},
-    "relations": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/relation"}
-    },
-    "projections": {
-      "type": "array",
-      "items": {"$ref": "#/$defs/projectionDefinition"}
-    }
+    "relations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/relation"}},
+    "projections": {"type": "array", "items": {"$ref": "#/$defs/projectionDefinition"}}
   },
   "additionalProperties": false,
   "$defs": {
     "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"},
     "columnType": {
-      "type": "object",
-      "required": ["type"],
-      "properties": {
-        "type": {"enum": ["boolean", "integer", "decimal", "text", "binary", "date", "time-local", "timestamp-local", "timestamp-instant", "uuid"]},
-        "precision": {"type": "integer", "minimum": 1, "maximum": 65},
-        "scale": {"type": "integer", "minimum": 0, "maximum": 30},
-        "fractionalPrecision": {"type": "integer", "minimum": 0, "maximum": 6}
-      },
-      "additionalProperties": false
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {"type": {"enum": ["boolean", "integer", "text", "binary", "date", "uuid"]}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "precision", "scale"],
+          "properties": {
+            "type": {"const": "decimal"},
+            "precision": {"type": "integer", "minimum": 1, "maximum": 65},
+            "scale": {"type": "integer", "minimum": 0, "maximum": 30}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "fractionalPrecision"],
+          "properties": {
+            "type": {"enum": ["time-local", "timestamp-local", "timestamp-instant"]},
+            "fractionalPrecision": {"type": "integer", "minimum": 0, "maximum": 6}
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "column": {
       "type": "object",
