@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-016]
+applicability: mandatory
+type: semantic
+vector:
+  capabilityMetadata:
+    capabilityId: state.relational
+    profile: avp-relational-state-v0.1
+    revision: "0.1"
+  negativeImplementations:
+    - TornProjectionAdapter
+    - FalseRestoreAdapter
+    - HiddenStateLeakAdapter
+    - ExecutionInputDriftAdapter
+expect:
+  sameMetadataForAllControls: true
+  everyNegativeImplementationRejectedByObservedBehavior: true
+  backendNameBranchesForbidden: true

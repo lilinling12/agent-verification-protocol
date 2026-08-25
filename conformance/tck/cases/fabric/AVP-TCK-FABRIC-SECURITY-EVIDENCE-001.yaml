@@ -1,0 +1,26 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-SECURITY-EVIDENCE-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-011]
+applicability: mandatory
+type: semantic
+vector:
+  forbiddenPortableFields:
+    - evaluatorCredential
+    - futureFaultSchedule
+    - isolationLevel
+    - deterministic
+  identityArtifact:
+    digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    size: 16
+    mediaType: application/vnd.avp.fabric-identity+json
+expect:
+  evaluatorSecretsExcluded: true
+  futureFaultScheduleExcluded: true
+  artifactIdentityPreserved: true
+  noIsolationLevel: true
+  noGlobalDeterminismClaim: true
