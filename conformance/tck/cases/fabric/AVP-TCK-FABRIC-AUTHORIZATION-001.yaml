@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-AUTHORIZATION-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-004]
+applicability: mandatory
+type: semantic
+vector:
+  resourceCapability:
+    capabilityId: state.snapshot
+    profile: avp-state-v0.1
+    revision: "0.1"
+    participation: REQUIRED
+  subjectCapabilities:
+    - order.get
+  privilegedOperation: fabric.snapshot
+expect:
+  controlPlaneCanUseResourceCapability: true
+  subjectCannotUsePrivilegedOperation: true
+  resourceCapabilityDoesNotExpandSubjectCapabilities: true

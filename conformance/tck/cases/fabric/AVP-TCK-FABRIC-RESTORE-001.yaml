@@ -1,0 +1,28 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-RESTORE-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-009]
+applicability: mandatory
+type: semantic
+vector:
+  resources:
+    - resourceId: primary-state
+      participation: REQUIRED
+      restoreFidelity: EXACT
+    - resourceId: subject-browser
+      participation: REQUIRED
+      restoreFidelity: STATE_EQUIVALENT
+    - resourceId: network-control
+      participation: OPTIONAL
+      restoreFidelity: NON_EQUIVALENT
+  requiredFailureControl:
+    resourceId: subject-browser
+expect:
+  successfulAggregateFidelity: STATE_EQUIVALENT
+  optionalWeakerFidelityDoesNotInflateOrLowerRequiredAggregate: true
+  requiredFailureAggregatesFailure: true
+  failedAggregateFidelity: NON_EQUIVALENT

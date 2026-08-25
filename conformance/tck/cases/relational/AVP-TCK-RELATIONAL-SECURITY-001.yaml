@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-SECURITY-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-015]
+applicability: mandatory
+type: semantic
+vector:
+  authoritativeState:
+    public_value: visible
+    hidden_evaluator_value: secret
+  subjectAuthorizedFields: [public_value]
+  subjectLocatorGrantsEvaluatorArtifact: false
+  leakageControl:
+    subjectFields: [public_value, hidden_evaluator_value]
+expect:
+  evaluatorStateRemainsComplete: true
+  subjectViewExcludesHiddenState: true
+  artifactDigestDoesNotGrantRetrieval: true
+  leakageControlRejected: true
