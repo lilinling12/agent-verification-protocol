@@ -78,7 +78,7 @@ The three unchecked Foundation items are implemented as a complete **unmerged st
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
-AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a050a75894adb5700318ac709536552384fc` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
+AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
 
 Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review at `4dd656ebaa34b3284c6fff5a6044d3696b164b30` (PR review `5004370426`) found all three blockers closed and no new cross-contract semantic blocker. Final pre-acceptance head `ad79ca158fce56851ce2fd545735bd86794baadb` passed CI #526, Governance #572/#573, and Release Validation #62; review `5004379749` confirmed the semantic re-review-to-final-head delta was ROADMAP-only.
 
