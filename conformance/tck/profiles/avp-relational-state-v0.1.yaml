@@ -1,0 +1,27 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-relational-state-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-RELATIONAL-001
+    - AVP-RELATIONAL-002
+    - AVP-RELATIONAL-003
+    - AVP-RELATIONAL-004
+    - AVP-RELATIONAL-005
+    - AVP-RELATIONAL-006
+    - AVP-RELATIONAL-007
+    - AVP-RELATIONAL-008
+    - AVP-RELATIONAL-009
+    - AVP-RELATIONAL-010
+    - AVP-RELATIONAL-011
+    - AVP-RELATIONAL-012
+    - AVP-RELATIONAL-013
+    - AVP-RELATIONAL-014
+    - AVP-RELATIONAL-015
+    - AVP-RELATIONAL-016
+    - AVP-RELATIONAL-017
+  conditional: []

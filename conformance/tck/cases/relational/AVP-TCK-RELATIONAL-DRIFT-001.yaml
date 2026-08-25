@@ -1,0 +1,24 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-DRIFT-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-009, AVP-RELATIONAL-010]
+applicability: mandatory
+type: semantic
+vector:
+  logicalBindingControls:
+    selectedColumnRemoved: reject
+    unselectedColumnAdded: accept
+    irrelevantIndexChanged: accept
+  executionInput:
+    identity: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    driftedIdentity: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    materiallyRelevant: true
+expect:
+  selectedBindingDriftRejected: true
+  irrelevantCatalogChangeAccepted: true
+  executionInputDriftRejected: true
+  productNameNotIdentity: true

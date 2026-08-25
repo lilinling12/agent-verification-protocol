@@ -19,6 +19,26 @@
         "schemas/fabric-operation-result.schema.json",
         "schemas/resource-capability-declaration.schema.json"
       ]
+    },
+    {
+      "domain": "relational",
+      "lineage": {
+        "type": "accepted-aep",
+        "path": "rfcs/AEP-0010-relational-state-resource-profile.md"
+      },
+      "spec": [
+        "spec/relational/relational-state-contract.md",
+        "spec/relational/manifest-integrity-contract.md"
+      ],
+      "requirement_index": "spec/relational/requirement-index.yaml",
+      "profile": "avp-relational-state-v0.1",
+      "owned_schemas": [
+        "schemas/relational-diff.schema.json",
+        "schemas/relational-projection.schema.json",
+        "schemas/relational-state-image.schema.json",
+        "schemas/relational-state-manifest.schema.json",
+        "schemas/relational-value.schema.json"
+      ]
     }
   ]
 }
