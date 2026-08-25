@@ -1,0 +1,106 @@
+version: "0.1"
+status: draft-normative-candidate
+profile: avp-environment-fabric-v0.1
+requirements:
+  - id: AVP-FABRIC-001
+    level: MUST
+    area: resource-identity
+    statement: Fabric resources bind unique Environment-scoped resource references and reject foreign or stale use without treating resource references as Artifact identity.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-001
+    schema: schemas/environment-fabric-manifest.schema.json
+    conformance: [AVP-TCK-FABRIC-MANIFEST-001, AVP-TCK-FABRIC-CLEANUP-001]
+  - id: AVP-FABRIC-002
+    level: MUST
+    area: resource-classification
+    statement: Resources use the closed portable Resource Kind vocabulary and capability declarations rather than vendor or backend identity as protocol semantics.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-002
+    schema: schemas/environment-resource.schema.json
+    conformance: [AVP-TCK-FABRIC-MANIFEST-001]
+  - id: AVP-FABRIC-003
+    level: MUST
+    area: resource-capability
+    statement: Resource Capability declarations bind governed profile/revision semantics and required incompatible support fails before the requested side effect.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-003
+    schema: schemas/resource-capability-declaration.schema.json
+    conformance: [AVP-TCK-FABRIC-CAPABILITY-001]
+  - id: AVP-FABRIC-004
+    level: MUST
+    area: authorization-boundary
+    statement: Resource Capability support never grants or widens materialized Subject Capability authorization.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-004
+    conformance: [AVP-TCK-FABRIC-AUTHORIZATION-001]
+  - id: AVP-FABRIC-005
+    level: MUST
+    area: manifest
+    statement: EnvironmentFabricManifest immutably binds Environment/Scenario identity, resource membership, capability declarations, participation, and immutable identity references.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-005
+    schema: schemas/environment-fabric-manifest.schema.json
+    conformance: [AVP-TCK-FABRIC-MANIFEST-001]
+  - id: AVP-FABRIC-006
+    level: MUST
+    area: requiredness
+    statement: Required resource/capability participation derives from the materialized execution contract and cannot be downgraded by backend availability.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-006
+    schema: schemas/environment-fabric-manifest.schema.json
+    conformance: [AVP-TCK-FABRIC-CAPABILITY-001]
+  - id: AVP-FABRIC-007
+    level: MUST
+    area: composite-results
+    statement: Multi-resource operations preserve one machine-readable result for every resource in scope, including resource identity, participation, and status.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-007
+    schema: schemas/fabric-operation-result.schema.json
+    conformance: [AVP-TCK-FABRIC-COMPOSITE-001]
+  - id: AVP-FABRIC-008
+    level: MUST
+    area: aggregate-success
+    statement: Aggregate success cannot be reported while a required resource failed to establish the requested operation semantics.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-008
+    schema: schemas/fabric-operation-result.schema.json
+    conformance: [AVP-TCK-FABRIC-COMPOSITE-001]
+  - id: AVP-FABRIC-009
+    level: MUST
+    area: restore-fidelity
+    statement: Aggregate restore fidelity is no stronger than every required restored resource establishes and cannot hide a required restore failure.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-009
+    schema: schemas/fabric-operation-result.schema.json
+    conformance: [AVP-TCK-FABRIC-RESTORE-001]
+  - id: AVP-FABRIC-010
+    level: MUST_NOT
+    area: atomicity
+    statement: Base Fabric success, snapshot, and restore semantics do not imply cross-resource atomicity or a distributed transaction boundary.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-010
+    schema: schemas/fabric-operation-result.schema.json
+    conformance: [AVP-TCK-FABRIC-COMPOSITE-001]
+  - id: AVP-FABRIC-011
+    level: MUST
+    area: evidence-security
+    statement: Fabric resources/results compose with existing Evidence, Artifact, SecurityAssurance, hidden-material, and credential-boundary semantics without inventing replacements.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-011
+    schema: schemas/environment-fabric-manifest.schema.json
+    conformance: [AVP-TCK-FABRIC-SECURITY-EVIDENCE-001]
+  - id: AVP-FABRIC-012
+    level: MUST
+    area: executed-conformance
+    statement: Resource Capability conformance executes observable implementation behavior and cannot pass from equivalent support metadata alone.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-012
+    conformance: [AVP-TCK-FABRIC-EXECUTED-CAPABILITY-001]
+  - id: AVP-FABRIC-013
+    level: MUST
+    area: cleanup
+    statement: Repeated cleanup after successful release is protocol-observably safe and cleanup failure remains infrastructure or validity information rather than Agent Task Verdict failure.
+    spec: spec/fabric/environment-fabric-contract.md
+    anchor: avp-fabric-013
+    schema: schemas/fabric-operation-result.schema.json
+    conformance: [AVP-TCK-FABRIC-CLEANUP-001]

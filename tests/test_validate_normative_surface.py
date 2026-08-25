@@ -4,8 +4,11 @@ import copy
 import json
 import tempfile
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
+
+import yaml
 
 from scripts import validate_normative_surface as validator
 
@@ -153,6 +156,197 @@ class NormativeSurfaceValidationTests(unittest.TestCase):
         matrix = copy.deepcopy(self.matrix)
         matrix["domains"][0]["spec"] = ["../outside.md"]
         self.assert_rejected(matrix)
+
+
+class NormativeCandidateValidationTests(unittest.TestCase):
+    def write_yaml(self, path: Path, value: dict) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+
+    def build_repository(self, root: Path) -> tuple[Path, Path]:
+        spec_root = root / "spec"
+        schema_root = root / "schemas"
+        profile_root = root / "conformance/tck/profiles"
+        matrix_path = root / "docs/reconciliation/v0.1/normative-surface-matrix.json"
+        registry_path = root / "docs/reconciliation/normative-candidates/registry.json"
+
+        (spec_root / "stable").mkdir(parents=True)
+        (spec_root / "candidate").mkdir(parents=True)
+        schema_root.mkdir(parents=True)
+        profile_root.mkdir(parents=True)
+        matrix_path.parent.mkdir(parents=True)
+        registry_path.parent.mkdir(parents=True)
+        (root / "rfcs").mkdir(parents=True)
+
+        (root / "rfcs/AEP-0001-stable.md").write_text("- Status: Final\n", encoding="utf-8")
+        (root / "rfcs/AEP-0099-candidate.md").write_text("- Status: Accepted\n", encoding="utf-8")
+        (spec_root / "stable/contract.md").write_text("# Stable\n", encoding="utf-8")
+        (spec_root / "candidate/contract.md").write_text("# Candidate\n", encoding="utf-8")
+        (schema_root / "stable.schema.json").write_text("{}\n", encoding="utf-8")
+        (schema_root / "candidate.schema.json").write_text("{}\n", encoding="utf-8")
+
+        self.write_yaml(
+            spec_root / "stable/requirement-index.yaml",
+            {
+                "status": "normative",
+                "profile": "avp-stable-v0.1",
+                "requirements": [{"id": "AVP-STABLE-001", "schema": "schemas/stable.schema.json"}],
+            },
+        )
+        self.write_yaml(
+            spec_root / "candidate/requirement-index.yaml",
+            {
+                "status": "draft-normative-candidate",
+                "profile": "avp-candidate-v0.1",
+                "requirements": [{"id": "AVP-CANDIDATE-001", "schema": "schemas/candidate.schema.json"}],
+            },
+        )
+        self.write_yaml(
+            profile_root / "avp-stable-v0.1.yaml",
+            {"metadata": {"name": "avp-stable-v0.1", "status": "active"}},
+        )
+        self.write_yaml(
+            profile_root / "avp-candidate-v0.1.yaml",
+            {"metadata": {"name": "avp-candidate-v0.1", "status": "draft"}},
+        )
+
+        matrix = {
+            "matrix_version": "1.0",
+            "status": "accepted",
+            "authority": "non-normative-acceptance-evidence",
+            "closure_status": "READY",
+            "domains": [
+                {
+                    "domain": "stable",
+                    "lineage": {"type": "final-aep", "path": "rfcs/AEP-0001-stable.md"},
+                    "spec": ["spec/stable/contract.md"],
+                    "requirement_index": "spec/stable/requirement-index.yaml",
+                    "profile": "avp-stable-v0.1",
+                }
+            ],
+            "schemas": [
+                {
+                    "path": "schemas/stable.schema.json",
+                    "classification": "REQUIREMENT_OWNED",
+                    "owner_domains": ["stable"],
+                }
+            ],
+            "blockers": [],
+        }
+        registry = {
+            "registry_version": "1.0",
+            "authority": "non-normative-governance-evidence",
+            "candidates": [
+                {
+                    "domain": "candidate",
+                    "lineage": {"type": "accepted-aep", "path": "rfcs/AEP-0099-candidate.md"},
+                    "spec": ["spec/candidate/contract.md"],
+                    "requirement_index": "spec/candidate/requirement-index.yaml",
+                    "profile": "avp-candidate-v0.1",
+                    "owned_schemas": ["schemas/candidate.schema.json"],
+                }
+            ],
+        }
+        matrix_path.write_text(json.dumps(matrix), encoding="utf-8")
+        registry_path.write_text(json.dumps(registry), encoding="utf-8")
+        return matrix_path, registry_path
+
+    def run_fixture(self, root: Path, *, rejected: bool = False) -> None:
+        matrix_path = root / "docs/reconciliation/v0.1/normative-surface-matrix.json"
+        registry_path = root / "docs/reconciliation/normative-candidates/registry.json"
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(validator, "ROOT", root))
+            stack.enter_context(patch.object(validator, "MATRIX_PATH", matrix_path))
+            stack.enter_context(patch.object(validator, "CANDIDATE_REGISTRY_PATH", registry_path))
+            stack.enter_context(patch.object(validator, "SPEC_ROOT", root / "spec"))
+            stack.enter_context(patch.object(validator, "SCHEMA_ROOT", root / "schemas"))
+            stack.enter_context(patch.object(validator, "PROFILE_ROOT", root / "conformance/tck/profiles"))
+            if rejected:
+                with self.assertRaises(SystemExit):
+                    validator.main()
+            else:
+                validator.main()
+
+    def test_complete_accepted_candidate_is_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            self.run_fixture(root)
+
+    def test_candidate_aep_must_be_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            (root / "rfcs/AEP-0099-candidate.md").write_text("- Status: Proposed\n", encoding="utf-8")
+            self.run_fixture(root, rejected=True)
+
+    def test_final_candidate_requires_explicit_promotion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            (root / "rfcs/AEP-0099-candidate.md").write_text("- Status: Final\n", encoding="utf-8")
+            self.run_fixture(root, rejected=True)
+
+    def test_candidate_requirement_index_must_remain_draft(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            index_path = root / "spec/candidate/requirement-index.yaml"
+            index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+            index["status"] = "normative"
+            self.write_yaml(index_path, index)
+            self.run_fixture(root, rejected=True)
+
+    def test_candidate_tck_profile_must_remain_draft(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            profile_path = root / "conformance/tck/profiles/avp-candidate-v0.1.yaml"
+            profile = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+            profile["metadata"]["status"] = "active"
+            self.write_yaml(profile_path, profile)
+            self.run_fixture(root, rejected=True)
+
+    def test_candidate_owned_schema_requires_requirement_ownership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            index_path = root / "spec/candidate/requirement-index.yaml"
+            index = yaml.safe_load(index_path.read_text(encoding="utf-8"))
+            index["requirements"][0].pop("schema")
+            self.write_yaml(index_path, index)
+            self.run_fixture(root, rejected=True)
+
+    def test_unregistered_candidate_domain_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            registry_path = root / "docs/reconciliation/normative-candidates/registry.json"
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            registry["candidates"] = []
+            registry_path.write_text(json.dumps(registry), encoding="utf-8")
+            self.run_fixture(root, rejected=True)
+
+    def test_candidate_spec_must_stay_inside_canonical_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            registry_path = root / "docs/reconciliation/normative-candidates/registry.json"
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            registry["candidates"][0]["spec"] = ["spec/stable/contract.md"]
+            registry_path.write_text(json.dumps(registry), encoding="utf-8")
+            self.run_fixture(root, rejected=True)
+
+    def test_candidate_cannot_overlap_stable_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.build_repository(root)
+            registry_path = root / "docs/reconciliation/normative-candidates/registry.json"
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            registry["candidates"][0]["domain"] = "stable"
+            registry["candidates"][0]["requirement_index"] = "spec/stable/requirement-index.yaml"
+            registry_path.write_text(json.dumps(registry), encoding="utf-8")
+            self.run_fixture(root, rejected=True)
 
 
 if __name__ == "__main__":

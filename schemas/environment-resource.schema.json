@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:environment-resource:0.1",
+  "title": "AVP Environment Resource",
+  "description": "Portable descriptor for one independently identified member of an Environment Fabric.",
+  "type": "object",
+  "required": ["resourceId", "environmentId", "resourceKind", "participation", "capabilities", "identityArtifacts"],
+  "properties": {
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "environmentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "resourceKind": {
+      "enum": ["state", "browser", "network", "time", "compute"]
+    },
+    "participation": {
+      "enum": ["REQUIRED", "OPTIONAL"]
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "resource-capability-declaration.schema.json"}
+    },
+    "identityArtifacts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "artifact-ref.schema.json"}
+    }
+  },
+  "additionalProperties": false
+}

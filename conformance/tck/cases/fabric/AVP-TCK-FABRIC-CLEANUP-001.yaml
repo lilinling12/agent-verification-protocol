@@ -1,0 +1,25 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-CLEANUP-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-001, AVP-FABRIC-013]
+applicability: mandatory
+type: negative
+vector:
+  lifecycle:
+    - provision
+    - release
+    - release-again
+    - read-through-stale-fabric-reference
+    - operate-through-stale-resource-reference
+  cleanupFailureControl:
+    classification: INFRASTRUCTURE
+expect:
+  retryDoesNotResurrectResource: true
+  retryDoesNotCreateSubjectSideEffect: true
+  staleFabricReferenceRejected: true
+  staleResourceReferenceRejected: true
+  cleanupFailureNotTaskVerdict: true

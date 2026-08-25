@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:relational-state-image:0.1",
+  "title": "AVP Relational State Image",
+  "type": "object",
+  "required": ["apiVersion", "kind", "manifestDigest", "relations"],
+  "properties": {
+    "apiVersion": {"const": "avp.relational/v0.1"},
+    "kind": {"const": "RelationalStateImage"},
+    "manifestDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"},
+    "row": {
+      "type": "object",
+      "required": ["key", "values"],
+      "properties": {
+        "key": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"$ref": "#/$defs/identifier"},
+          "additionalProperties": {"$ref": "relational-value.schema.json"}
+        },
+        "values": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"$ref": "#/$defs/identifier"},
+          "additionalProperties": {"$ref": "relational-value.schema.json"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "required": ["relationId", "rows"],
+      "properties": {
+        "relationId": {"$ref": "#/$defs/identifier"},
+        "rows": {"type": "array", "items": {"$ref": "#/$defs/row"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

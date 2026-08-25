@@ -1,0 +1,23 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-environment-fabric-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-FABRIC-001
+    - AVP-FABRIC-002
+    - AVP-FABRIC-003
+    - AVP-FABRIC-004
+    - AVP-FABRIC-005
+    - AVP-FABRIC-006
+    - AVP-FABRIC-007
+    - AVP-FABRIC-008
+    - AVP-FABRIC-009
+    - AVP-FABRIC-010
+    - AVP-FABRIC-011
+    - AVP-FABRIC-012
+    - AVP-FABRIC-013
+  conditional: []

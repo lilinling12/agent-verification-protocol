@@ -1,0 +1,29 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-FABRIC-MANIFEST-001
+  domain: fabric
+  status: draft
+profile: avp-environment-fabric-v0.1
+requirements: [AVP-FABRIC-001, AVP-FABRIC-002, AVP-FABRIC-005]
+applicability: mandatory
+type: schema-and-semantic
+vector:
+  environmentId: env-fabric-001
+  scenarioInstanceDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  resources:
+    - resourceId: primary-state
+      resourceKind: state
+      participation: REQUIRED
+    - resourceId: subject-browser
+      resourceKind: browser
+      participation: OPTIONAL
+  negativeControls:
+    - duplicate-resource-id
+    - foreign-environment-resource
+expect:
+  manifestBound: true
+  uniqueResourceIds: true
+  ownerBindingEnforced: true
+  portableKindsOnly: true
+  resourceIdIsNotArtifactDigest: true

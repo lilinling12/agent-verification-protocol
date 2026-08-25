@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:resource-capability-declaration:0.1",
+  "title": "AVP Resource Capability Declaration",
+  "description": "Conformance-bearing support declaration for one portable Environment Resource capability under a governed profile/revision.",
+  "type": "object",
+  "required": ["capabilityId", "profile", "revision", "participation"],
+  "properties": {
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "participation": {
+      "enum": ["REQUIRED", "OPTIONAL"]
+    }
+  },
+  "additionalProperties": false
+}

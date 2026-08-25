@@ -1,0 +1,20 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-RELATIONAL-RESTORE-001
+  domain: relational
+  status: draft
+profile: avp-relational-state-v0.1
+requirements: [AVP-RELATIONAL-013]
+applicability: mandatory
+type: semantic
+vector:
+  snapshotRows: [{id: 1, value: snapshot}]
+  mutatedRows: [{id: 1, value: changed}]
+  falseRestoreControl:
+    reportsSuccess: true
+    actuallyRestoresState: false
+expect:
+  successfulFidelity: STATE_EQUIVALENT
+  exactFidelityForbidden: true
+  falseRestoreRejected: true
