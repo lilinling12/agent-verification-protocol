@@ -1,0 +1,209 @@
+"""Backend-neutral execution boundaries for Relational State conformance.
+
+This module is implementation infrastructure, not protocol authority. It keeps
+portable SUT operations separate from privileged fixture controls so a database
+backend can be exercised without exposing SQL, credentials, catalog access, or
+backend transaction handles as AVP capabilities.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable, Mapping, Protocol, Sequence, runtime_checkable
+
+from avp_ref.relational import (
+    ColumnDefinition,
+    RelationalDiff,
+    RelationalManifest,
+    RelationalRow,
+    RelationalSnapshot,
+    RelationalValue,
+    RestoreFidelity,
+    StateImage,
+)
+
+
+class NegativeControl(str, Enum):
+    """Metadata-equivalent broken behavior used only by conformance tests."""
+
+    TORN_PROJECTION = "torn-projection"
+    FALSE_RESTORE = "false-restore"
+    HIDDEN_STATE_LEAK = "hidden-state-leak"
+    EXECUTION_INPUT_DRIFT = "execution-input-drift"
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalResourceSpec:
+    """Deeply immutable materialized inputs for provisioning one relational SUT."""
+
+    environment_id: str
+    resource_id: str
+    resource_instance_id: str
+    manifest: RelationalManifest
+    baseline: tuple[tuple[str, tuple[RelationalRow, ...]], ...]
+    manifest_artifact_digest: str
+    baseline_artifact_digest: str
+    execution_input_identity: str
+    evaluator_private_columns: frozenset[tuple[str, str]] = frozenset()
+
+    def baseline_mapping(self) -> dict[str, tuple[RelationalRow, ...]]:
+        """Return a detached mapping for backend APIs that require mapping access."""
+
+        return dict(self.baseline)
+
+
+@runtime_checkable
+class RelationalSUT(Protocol):
+    """Portable observable operations consumed by relational conformance."""
+
+    environment_id: str
+    resource_id: str
+    resource_instance_id: str
+    manifest: RelationalManifest
+    manifest_digest: str
+    baseline_digest: str
+
+    def state_image(self) -> StateImage: ...
+
+    def project(self, projection_id: str) -> Mapping[str, object]: ...
+
+    def enter_quiescing(self) -> None: ...
+
+    def final_projection(self, projection_id: str) -> Mapping[str, object]: ...
+
+    def snapshot(self) -> RelationalSnapshot: ...
+
+    def reset(self) -> StateImage: ...
+
+    def restore(self, snapshot: RelationalSnapshot) -> RestoreFidelity: ...
+
+    def subject_view(
+        self,
+        authorized: Iterable[tuple[str, str]],
+    ) -> Mapping[str, tuple[RelationalRow, ...]]: ...
+
+    def diff(self, before: StateImage, after: StateImage) -> RelationalDiff: ...
+
+    def release(self) -> None: ...
+
+
+@runtime_checkable
+class RelationalFixtureControl(Protocol):
+    """Privileged logical controls deliberately absent from ``RelationalSUT``.
+
+    A backend implementation may use SQL, DDL, admin credentials, threads, or
+    native transaction handles internally. Those mechanics remain behind this
+    test-only boundary; callers express only logical fixture intent.
+    """
+
+    def replace_relation(
+        self,
+        sut: RelationalSUT,
+        relation_id: str,
+        replacement: Sequence[RelationalRow],
+    ) -> None: ...
+
+    def replace_relations_atomically(
+        self,
+        sut: RelationalSUT,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> None: ...
+
+    def project_during_atomic_commit(
+        self,
+        sut: RelationalSUT,
+        *,
+        projection_id: str,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> Mapping[str, object]: ...
+
+    def begin_held_mutation(
+        self,
+        sut: RelationalSUT,
+        *,
+        label: str,
+        relation_id: str,
+        replacement: Sequence[RelationalRow],
+    ) -> None: ...
+
+    def settle_held_mutation(
+        self,
+        sut: RelationalSUT,
+        *,
+        label: str,
+        commit: bool,
+    ) -> None: ...
+
+    def set_logical_binding_valid(self, sut: RelationalSUT, valid: bool) -> None: ...
+
+    def set_execution_input_identity(self, sut: RelationalSUT, identity: str) -> None: ...
+
+
+@runtime_checkable
+class RelationalBackendHarness(Protocol):
+    """Factory and compatibility contract independently implemented per backend."""
+
+    @property
+    def fixture_control(self) -> RelationalFixtureControl: ...
+
+    def identity_artifacts(
+        self,
+        manifest: RelationalManifest,
+        baseline: Mapping[str, Sequence[RelationalRow]],
+    ) -> tuple[str, str]: ...
+
+    def provision(
+        self,
+        spec: RelationalResourceSpec,
+        *,
+        negative_control: NegativeControl | None = None,
+    ) -> RelationalSUT: ...
+
+    def validate_value(
+        self,
+        column: ColumnDefinition,
+        value: RelationalValue,
+    ) -> None: ...
+
+
+def build_resource_spec(
+    harness: RelationalBackendHarness,
+    *,
+    environment_id: str,
+    resource_id: str,
+    resource_instance_id: str,
+    manifest: RelationalManifest,
+    baseline: Mapping[str, Sequence[RelationalRow]],
+    execution_input_identity: str,
+    evaluator_private_columns: Iterable[tuple[str, str]] = (),
+) -> RelationalResourceSpec:
+    """Bind identity and freeze the same baseline bytes before provisioning.
+
+    Identity is computed before the caller's mutable mapping can be retained by
+    the resource spec. The frozen copy and the identity preimage are therefore
+    guaranteed to describe the same logical baseline.
+    """
+
+    frozen_baseline = tuple(
+        sorted(
+            (relation_id, tuple(rows))
+            for relation_id, rows in baseline.items()
+        )
+    )
+    baseline_for_identity = dict(frozen_baseline)
+    manifest_digest, baseline_digest = harness.identity_artifacts(
+        manifest,
+        baseline_for_identity,
+    )
+    return RelationalResourceSpec(
+        environment_id=environment_id,
+        resource_id=resource_id,
+        resource_instance_id=resource_instance_id,
+        manifest=manifest,
+        baseline=frozen_baseline,
+        manifest_artifact_digest=manifest_digest,
+        baseline_artifact_digest=baseline_digest,
+        execution_input_identity=execution_input_identity,
+        evaluator_private_columns=frozenset(evaluator_private_columns),
+    )
