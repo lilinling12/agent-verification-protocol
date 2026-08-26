@@ -87,6 +87,8 @@ The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision
 
 Backend implementation readiness audit `docs/acceptance/alpha3-relational-backend-implementation-readiness.md` found no remaining protocol-level blocker, but identified implementation blockers RBIR-001..003: the repository still needs a reusable backend-neutral relational conformance harness, one immutable language-neutral parity fixture, and a privileged fixture-control boundary before a PostgreSQL-specific adapter may be introduced. The harness/fixture slice is therefore the next governed implementation unit. It must not introduce backend-name branches into portable TCK semantics or expose SQL/transaction/catalog controls as AVP capabilities.
 
+PR #90 implements the RBIR-001..003 closure candidate without a database-specific adapter. Its semantic implementation head `f2fd00c93338c0e8b9d47841dfc55d97ae56d55d` passed CI #586 and Governance #649, including Python 3.11/3.12/3.13 quality, reproducible packaging, clean-consumer installation, installed-wheel identity, installed-wheel full TCK conformance, and release-evidence verification. `docs/acceptance/alpha3-relational-backend-harness-acceptance.md` records the closure audit. The roadmap prerequisite remains unchecked until #90 is review-closed and adopted by `main`; PostgreSQL/MySQL work remains separate and unauthorized inside #90.
+
 PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
 ### Other resource implementations
