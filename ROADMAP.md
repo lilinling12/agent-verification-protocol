@@ -74,7 +74,7 @@ The Environment Fabric authority slice was adopted into `main` by squash merge o
 - [x] relational normative specification and requirement index
 - [x] `RelationalStateManifest` / `RelationalStateImage` schemas
 - [x] execution-sensitive `avp-relational-state-v0.1` TCK
-- [ ] shared backend-neutral relational conformance harness + immutable parity fixture + privileged fixture-control seam (RBIR-001..003)
+- [x] shared backend-neutral relational conformance harness + immutable parity fixture + privileged fixture-control seam (RBIR-001..003)
 - [ ] PostgreSQL adapter against the portable TCK
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
@@ -85,11 +85,9 @@ Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review a
 
 The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. The Relational State authority slice was developed and formally reviewed through PRs #87 → #86 → #85 → #84 → #83, with each parent receiving a post-child expanded-head review before authorized squash merge. PR #83 then adopted the complete reviewed Alpha 3 stack into `main` at `428635d857c96d9df400ef5a0b16aaba53fb97cf`; exact-main CI #569 passed the installed-wheel full TCK and package/evidence gates. The relational specification/schema/TCK roadmap items are therefore complete on `main`, while AEP-0010 remains Accepted and the candidate registry remains active until a separately governed Final/release promotion.
 
-Backend implementation readiness audit `docs/acceptance/alpha3-relational-backend-implementation-readiness.md` found no remaining protocol-level blocker, but identified implementation blockers RBIR-001..003: the repository still needs a reusable backend-neutral relational conformance harness, one immutable language-neutral parity fixture, and a privileged fixture-control boundary before a PostgreSQL-specific adapter may be introduced. The harness/fixture slice is therefore the next governed implementation unit. It must not introduce backend-name branches into portable TCK semantics or expose SQL/transaction/catalog controls as AVP capabilities.
+Backend implementation readiness audit `docs/acceptance/alpha3-relational-backend-implementation-readiness.md` identified RBIR-001..003 as prerequisites before a database-specific adapter could be introduced. PR #90 implemented and review-closed those prerequisites without adding a database-specific backend, and was explicitly authorized for squash merge into `main` at `06f08f686fa58aff1635ddbd2e9566cab72c390a`. Exact-main CI #590 (`32939199537`) passed Python 3.11/3.12/3.13 quality, reproducible packaging, clean-consumer installation, installed-wheel identity, installed-wheel full TCK conformance, and release-evidence verification. `docs/acceptance/alpha3-relational-backend-harness-main-adoption.md` records the main-adoption evidence. The RBIR prerequisite is therefore complete on `main`.
 
-PR #90 implements the RBIR-001..003 closure candidate without a database-specific adapter. Its semantic implementation head `f2fd00c93338c0e8b9d47841dfc55d97ae56d55d` passed CI #586 and Governance #649, including Python 3.11/3.12/3.13 quality, reproducible packaging, clean-consumer installation, installed-wheel identity, installed-wheel full TCK conformance, and release-evidence verification. `docs/acceptance/alpha3-relational-backend-harness-acceptance.md` records the closure audit. The roadmap prerequisite remains unchecked until #90 is review-closed and adopted by `main`; PostgreSQL/MySQL work remains separate and unauthorized inside #90.
-
-PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
+PostgreSQL and MySQL remain downstream, separately governed implementation evidence; neither backend may define the common API or portable semantics by implementation precedent. PostgreSQL is the next eligible database-specific work unit, but this roadmap state does not itself authorize implementation, merge, release selection, or publication.
 
 ### Other resource implementations
 - [ ] Playwright browser runtime
