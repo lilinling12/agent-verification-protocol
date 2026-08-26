@@ -13,6 +13,7 @@ from .reference_fabric_audit import ReferenceFabricAuditTCKAdapter
 from .reference_mcp import ReferenceMCPTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
 from .reference_relational import ReferenceRelationalTCKAdapter
+from .reference_relational_harness import InMemoryRelationalBackendHarness
 from .reference_relational_manifest import ReferenceRelationalManifestTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
 from .reference_security import ReferenceSecurityTCKAdapter
@@ -45,6 +46,7 @@ class ReferenceConformanceAdapter:
 
     def __init__(self, *, capabilities: Iterable[str] = ()) -> None:
         capability_set = frozenset(capabilities)
+        relational_backend = InMemoryRelationalBackendHarness()
         delegates: list[object] = [
             AlignedReferenceTCKAdapter(capabilities=capability_set),
             ReferenceEvidenceTCKAdapter(),
@@ -52,7 +54,7 @@ class ReferenceConformanceAdapter:
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceFabricAuditTCKAdapter(),
-            ReferenceRelationalTCKAdapter(),
+            ReferenceRelationalTCKAdapter(relational_backend),
             ReferenceRelationalManifestTCKAdapter(),
             ReferenceMCPTCKAdapter(),
             ReferenceSubjectTCKAdapter(),
