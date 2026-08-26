@@ -35,7 +35,7 @@ class NegativeControl(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class RelationalResourceSpec:
-    """Immutable materialized inputs required to provision one relational SUT."""
+    """Materialized inputs required to provision one relational SUT."""
 
     environment_id: str
     resource_id: str
@@ -85,11 +85,11 @@ class RelationalSUT(Protocol):
 
 @runtime_checkable
 class RelationalFixtureControl(Protocol):
-    """Privileged logical controls that are deliberately absent from ``RelationalSUT``.
+    """Privileged logical controls deliberately absent from ``RelationalSUT``.
 
-    A backend implementation may use SQL, DDL, admin credentials, or native
-    transaction handles internally. Those mechanics must remain behind this
-    test-only boundary and must never appear in portable TCK resources.
+    A backend implementation may use SQL, DDL, admin credentials, threads, or
+    native transaction handles internally. Those mechanics remain behind this
+    test-only boundary; callers express only logical fixture intent.
     """
 
     def replace_relation(
@@ -98,6 +98,20 @@ class RelationalFixtureControl(Protocol):
         relation_id: str,
         replacement: Sequence[RelationalRow],
     ) -> None: ...
+
+    def replace_relations_atomically(
+        self,
+        sut: RelationalSUT,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> None: ...
+
+    def project_during_atomic_commit(
+        self,
+        sut: RelationalSUT,
+        *,
+        projection_id: str,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> Mapping[str, object]: ...
 
     def begin_held_mutation(
         self,
