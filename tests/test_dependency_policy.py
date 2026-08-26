@@ -34,6 +34,8 @@ class DependencyPolicyTest(unittest.TestCase):
                     "python -m pip install -c constraints/ci.txt -e '.[dev]'",
                     "python -m pip install -c constraints/ci.txt -e '.[dev]'",
                     ".wheel-venv/bin/python -m pip install dist/*.whl",
+                    ".postgresql-venv/bin/python -m pip install 'dist/example.whl[postgresql]'",
+                    "AVP_POSTGRESQL_DSN=postgresql://fixture.invalid/avp",
                 )
             ),
             encoding="utf-8",

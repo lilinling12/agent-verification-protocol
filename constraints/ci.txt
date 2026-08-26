@@ -11,6 +11,8 @@ opentelemetry-api==1.44.0
 opentelemetry-sdk==1.44.0
 opentelemetry-semantic-conventions==0.65b0
 packaging==26.3
+psycopg==3.3.4
+psycopg-binary==3.3.4
 pyproject-hooks==1.2.0
 PyYAML==6.0.3
 referencing==0.37.0

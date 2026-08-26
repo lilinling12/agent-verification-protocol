@@ -96,14 +96,17 @@ def main() -> None:
             _require_compatibility_window(requirement, f"optional group {group_name}")
 
     pins = _load_constraints()
-    ci_direct_requirements = list(runtime) + list(optional.get("dev", []))
+    ci_optional_groups = ("dev", "postgresql")
+    ci_direct_requirements = list(runtime)
+    for group_name in ci_optional_groups:
+        ci_direct_requirements.extend(optional.get(group_name, []))
     missing = sorted(
         name
         for name in {_requirement_name(item) for item in ci_direct_requirements}
         if name not in pins
     )
     if missing:
-        _fail(f"CI constraints do not pin direct runtime/dev dependencies: {missing}")
+        _fail(f"CI constraints do not pin direct runtime/integration dependencies: {missing}")
     if pins.get(build_backend_name) != build_backend_version:
         _fail("CI constraints must pin the same setuptools version as build-system.requires")
 
@@ -116,6 +119,8 @@ def main() -> None:
         _fail("CI must retain an unconstrained clean-wheel consumer installation")
     if "-c constraints/ci.txt dist/*.whl" in workflow:
         _fail("clean-wheel consumer installation must not use repository constraints")
+    if "[postgresql]" not in workflow or "AVP_POSTGRESQL_DSN" not in workflow:
+        _fail("CI must retain a PostgreSQL optional-wheel integration path")
 
     print(
         "dependency policy OK: "
