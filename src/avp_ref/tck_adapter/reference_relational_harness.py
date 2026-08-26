@@ -187,7 +187,7 @@ class InMemoryRelationalBackendHarness(RelationalBackendHarness):
             resource_instance_id=spec.resource_instance_id,
             manifest=spec.manifest,
             manifest_artifact_digest=spec.manifest_artifact_digest,
-            baseline=spec.baseline,
+            baseline=spec.baseline_mapping(),
             baseline_artifact_digest=spec.baseline_artifact_digest,
             execution_input_identity=spec.execution_input_identity,
             evaluator_private_columns=spec.evaluator_private_columns,
