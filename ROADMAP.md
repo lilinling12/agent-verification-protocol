@@ -55,11 +55,11 @@ Alpha 3 design was explicitly authorized by the protocol maintainer on 2026-08-2
 - [x] authorize Alpha 3 design phase
 - [x] AEP-0009 Environment Fabric composition/capability protocol review and Accepted direction
 - [x] normative gap matrix against Environment v0.1 / Core / Scenario / Security / Evidence
-- [ ] Environment Fabric normative specification and requirement index
-- [ ] Environment Fabric schema(s)
-- [ ] base Environment Fabric TCK, including runtime-execution negative cases
+- [x] Environment Fabric normative specification and requirement index
+- [x] Environment Fabric schema(s)
+- [x] base Environment Fabric TCK, including runtime-execution negative cases
 
-The three unchecked Foundation items are implemented as a complete **unmerged candidate currently carried by PR #83**. Reviewed child PR #85 was squash-merged into #84 as `5612f8063d47236b8b0806f6109c174acccf5963`; after its own expanded-head review, #84 was explicitly squash-merged into #83 as `6d7bc4d2ecc0664ac5f0a71091bd2090d675ad34`. They remain unchecked here because `main` has not adopted PR #83 and no merge of #83 into `main` is authorized.
+The Environment Fabric authority slice was adopted into `main` by squash merge of PR #83 at exact commit `428635d857c96d9df400ef5a0b16aaba53fb97cf`. Exact-main CI #569 (`32852278819`) passed on the merge commit, including Python 3.11/3.12/3.13 quality, reproducible package builds, clean-consumer installation, installed-wheel identity, installed-wheel full TCK conformance, and release-evidence build/verification. AEP-0009 remains **Accepted, not Final**; these checked roadmap items record that the candidate authority surfaces are now present on `main`, not that a stable protocol release has been finalized.
 
 ### Relational State resource profile
 - [x] AEP-0010 Draft problem/scope and standards analysis
@@ -71,9 +71,9 @@ The three unchecked Foundation items are implemented as a complete **unmerged ca
 - [x] absorb RS-PR-001..RS-PR-003 acceptance-blocker decisions into AEP-0010 and record Draft-design supersession
 - [x] complete acceptance-oriented re-review with no remaining semantic blocker
 - [x] record explicit protocol-maintainer AEP-0010 Proposed → Accepted decision
-- [ ] relational normative specification and requirement index
-- [ ] `RelationalStateManifest` / `RelationalStateImage` schemas
-- [ ] execution-sensitive `avp-relational-state-v0.1` TCK
+- [x] relational normative specification and requirement index
+- [x] `RelationalStateManifest` / `RelationalStateImage` schemas
+- [x] execution-sensitive `avp-relational-state-v0.1` TCK
 - [ ] PostgreSQL adapter against the portable TCK
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
@@ -82,9 +82,7 @@ AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a0
 
 Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review at `4dd656ebaa34b3284c6fff5a6044d3696b164b30` (PR review `5004370426`) found all three blockers closed and no new cross-contract semantic blocker. Final pre-acceptance head `ad79ca158fce56851ce2fd545735bd86794baadb` passed CI #526, Governance #572/#573, and Release Validation #62; review `5004379749` confirmed the semantic re-review-to-final-head delta was ROADMAP-only.
 
-The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. Acceptance authorizes the next governed Relational State authority slice: normative specification → requirement index → closed schemas where required → execution-sensitive TCK → reference interface/runtime → PostgreSQL/MySQL adapters. It does not authorize backend-first implementation, PR merge, Final, release selection, `0.3.1` publication, package-index publication, signing, or attestation.
-
-The first Relational State authority slice was developed and formally reviewed in PR #87, then squash-merged into #86 as `9d06427f82820e04cac40829ff6526c962bc2b0f`. Formal review `5006694486` identified five executable authority-chain gaps (RSR-PR-001..RSR-PR-005); acceptance-oriented re-review `5006822376` at semantic head `07aeed2a7b056eb630d2371f8ebdee0ea7e45038` closed all five with no new semantic blocker. #86 then completed its own expanded-head review (`5014126751`) and exact-head gates before being explicitly authorized and squash-merged into PR #85 as `de0a9518dcfbfce93a53c6f76d75907b4c55bb27`. #85 subsequently completed expanded-head review `5015426236` and exact-head gates, then was explicitly squash-merged into parent PR #84 as `5612f8063d47236b8b0806f6109c174acccf5963`. #84 completed expanded-head review `5017088777` and exact-head gates, then was explicitly squash-merged into PR #83 as `6d7bc4d2ecc0664ac5f0a71091bd2090d675ad34`. PR #83 now carries the complete reviewed Alpha 3 candidate stack: AEP-0009 design/acceptance, active normative-candidate governance, Environment Fabric candidate, AEP-0010 acceptance, and Relational State candidate. The three Relational specification/schema/TCK items above remain unchecked because PR #83 has not been adopted by `main`.
+The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. The Relational State authority slice was developed and formally reviewed through PRs #87 → #86 → #85 → #84 → #83, with each parent receiving a post-child expanded-head review before authorized squash merge. PR #83 then adopted the complete reviewed Alpha 3 stack into `main` at `428635d857c96d9df400ef5a0b16aaba53fb97cf`; exact-main CI #569 passed the installed-wheel full TCK and package/evidence gates. The relational specification/schema/TCK roadmap items are therefore complete on `main`, while AEP-0010 remains Accepted and the candidate registry remains active until a separately governed Final/release promotion.
 
 PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
