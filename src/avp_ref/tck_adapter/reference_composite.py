@@ -12,7 +12,6 @@ from .reference_evidence import ReferenceEvidenceTCKAdapter
 from .reference_fabric_audit import ReferenceFabricAuditTCKAdapter
 from .reference_mcp import ReferenceMCPTCKAdapter
 from .reference_oracle import ReferenceOracleTCKAdapter
-from .reference_relational import ReferenceRelationalTCKAdapter
 from .reference_relational_harness import InMemoryRelationalBackendHarness
 from .reference_relational_manifest import ReferenceRelationalManifestTCKAdapter
 from .reference_scenario import ReferenceScenarioTCKAdapter
@@ -21,6 +20,7 @@ from .reference_security_assurance import ReferenceSecurityAssuranceTCKAdapter
 from .reference_security_fault import ReferenceSecurityFaultTCKAdapter
 from .reference_subject import ReferenceSubjectTCKAdapter
 from .reference_trust import ReferenceArtifactTrustTCKAdapter
+from .relational_backend_adapter import RelationalBackendTCKAdapter
 
 
 def _optional_opentelemetry_adapter() -> object | None:
@@ -54,7 +54,7 @@ class ReferenceConformanceAdapter:
             ReferenceScenarioTCKAdapter(),
             ReferenceEnvironmentTCKAdapter(),
             ReferenceFabricAuditTCKAdapter(),
-            ReferenceRelationalTCKAdapter(relational_backend),
+            RelationalBackendTCKAdapter(relational_backend),
             ReferenceRelationalManifestTCKAdapter(),
             ReferenceMCPTCKAdapter(),
             ReferenceSubjectTCKAdapter(),
