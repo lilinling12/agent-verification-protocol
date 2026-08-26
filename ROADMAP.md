@@ -74,6 +74,7 @@ The Environment Fabric authority slice was adopted into `main` by squash merge o
 - [x] relational normative specification and requirement index
 - [x] `RelationalStateManifest` / `RelationalStateImage` schemas
 - [x] execution-sensitive `avp-relational-state-v0.1` TCK
+- [ ] shared backend-neutral relational conformance harness + immutable parity fixture + privileged fixture-control seam (RBIR-001..003)
 - [ ] PostgreSQL adapter against the portable TCK
 - [ ] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
@@ -83,6 +84,8 @@ AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a0
 Those decisions were incorporated into AEP-0010. Acceptance-oriented re-review at `4dd656ebaa34b3284c6fff5a6044d3696b164b30` (PR review `5004370426`) found all three blockers closed and no new cross-contract semantic blocker. Final pre-acceptance head `ad79ca158fce56851ce2fd545735bd86794baadb` passed CI #526, Governance #572/#573, and Release Validation #62; review `5004379749` confirmed the semantic re-review-to-final-head delta was ROADMAP-only.
 
 The protocol maintainer explicitly accepted AEP-0010 on 2026-08-24. The decision is recorded in `docs/acceptance/alpha3-aep-0010-accepted-decision.md`. The Relational State authority slice was developed and formally reviewed through PRs #87 → #86 → #85 → #84 → #83, with each parent receiving a post-child expanded-head review before authorized squash merge. PR #83 then adopted the complete reviewed Alpha 3 stack into `main` at `428635d857c96d9df400ef5a0b16aaba53fb97cf`; exact-main CI #569 passed the installed-wheel full TCK and package/evidence gates. The relational specification/schema/TCK roadmap items are therefore complete on `main`, while AEP-0010 remains Accepted and the candidate registry remains active until a separately governed Final/release promotion.
+
+Backend implementation readiness audit `docs/acceptance/alpha3-relational-backend-implementation-readiness.md` found no remaining protocol-level blocker, but identified implementation blockers RBIR-001..003: the repository still needs a reusable backend-neutral relational conformance harness, one immutable language-neutral parity fixture, and a privileged fixture-control boundary before a PostgreSQL-specific adapter may be introduced. The harness/fixture slice is therefore the next governed implementation unit. It must not introduce backend-name branches into portable TCK semantics or expose SQL/transaction/catalog controls as AVP capabilities.
 
 PostgreSQL and MySQL remain downstream implementation evidence; neither backend may define the common API or portable semantics by implementation precedent.
 
