@@ -202,9 +202,15 @@ Implementation semantic head `f2fd00c93338c0e8b9d47841dfc55d97ae56d55d` passed:
   - release-evidence build and verification — SUCCESS;
 - Governance #649 — SUCCESS.
 
+The first governance-closure head `2aad419319dd8cfe7a6eabaf98100b5c5e3f996b`, which added only this acceptance record and ROADMAP status text after the semantic head, passed:
+
+- CI #588 — SUCCESS, including installed-wheel full TCK conformance;
+- Governance #651 — SUCCESS;
+- Release Validation #87 — SUCCESS.
+
 The earlier strengthened-fixture head also demonstrated that malformed identity data fails closed: CI #582 failed only in the new fixture tests because the lock had an invalid SHA-256 length, while the package job and installed-wheel full TCK remained successful. The exact lock was corrected and the strict rule retained.
 
-Release Validation is not treated as executed evidence for this implementation head unless the workflow is actually triggered for the changed path set. No synthetic or inferred Release Validation result is recorded here.
+No workflow result is inferred. Only runs that actually executed against the named exact head are recorded as evidence.
 
 ## 11. Closure decision
 
