@@ -35,17 +35,22 @@ class NegativeControl(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class RelationalResourceSpec:
-    """Materialized inputs required to provision one relational SUT."""
+    """Deeply immutable materialized inputs for provisioning one relational SUT."""
 
     environment_id: str
     resource_id: str
     resource_instance_id: str
     manifest: RelationalManifest
-    baseline: Mapping[str, Sequence[RelationalRow]]
+    baseline: tuple[tuple[str, tuple[RelationalRow, ...]], ...]
     manifest_artifact_digest: str
     baseline_artifact_digest: str
     execution_input_identity: str
     evaluator_private_columns: frozenset[tuple[str, str]] = frozenset()
+
+    def baseline_mapping(self) -> dict[str, tuple[RelationalRow, ...]]:
+        """Return a detached mapping for backend APIs that require mapping access."""
+
+        return dict(self.baseline)
 
 
 @runtime_checkable
@@ -173,15 +178,30 @@ def build_resource_spec(
     execution_input_identity: str,
     evaluator_private_columns: Iterable[tuple[str, str]] = (),
 ) -> RelationalResourceSpec:
-    """Bind canonical identity before provisioning instead of trusting a backend."""
+    """Bind identity and freeze the same baseline bytes before provisioning.
 
-    manifest_digest, baseline_digest = harness.identity_artifacts(manifest, baseline)
+    Identity is computed before the caller's mutable mapping can be retained by
+    the resource spec. The frozen copy and the identity preimage are therefore
+    guaranteed to describe the same logical baseline.
+    """
+
+    frozen_baseline = tuple(
+        sorted(
+            (relation_id, tuple(rows))
+            for relation_id, rows in baseline.items()
+        )
+    )
+    baseline_for_identity = dict(frozen_baseline)
+    manifest_digest, baseline_digest = harness.identity_artifacts(
+        manifest,
+        baseline_for_identity,
+    )
     return RelationalResourceSpec(
         environment_id=environment_id,
         resource_id=resource_id,
         resource_instance_id=resource_instance_id,
         manifest=manifest,
-        baseline=baseline,
+        baseline=frozen_baseline,
         manifest_artifact_digest=manifest_digest,
         baseline_artifact_digest=baseline_digest,
         execution_input_identity=execution_input_identity,
