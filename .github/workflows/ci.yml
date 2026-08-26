@@ -273,10 +273,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - mysql-version: '8.4.12'
-            mysql-image: mysql:8.4.12
-          - mysql-version: '9.7.3'
-            mysql-image: mysql:9.7.3
+          - mysql-version: '8.4.11'
+            mysql-image: mysql:8.4.11
+          - mysql-version: '9.7.2'
+            mysql-image: mysql:9.7.2
     services:
       mysql:
         image: ${{ matrix.mysql-image }}
