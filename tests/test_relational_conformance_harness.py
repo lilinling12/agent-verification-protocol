@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from avp_ref.canonical import canonical_json, digest
-from avp_ref.relational import RelationalCompatibilityError
+from avp_ref.relational import RelationalCompatibilityError, RelationalRow
 from avp_ref.tck_adapter import TCKRepository, TCKRunner
 from avp_ref.tck_adapter.models import TCKAdapterError, TCKCaseResult
 from avp_ref.tck_adapter.reference_relational import RelationalConformanceTCKAdapter
@@ -19,6 +19,7 @@ from avp_ref.tck_adapter.reference_relational_harness import (
 from avp_ref.tck_adapter.reference_relational_manifest import (
     ReferenceRelationalManifestTCKAdapter,
 )
+from avp_ref.tck_adapter.relational_backend_adapter import RelationalBackendTCKAdapter
 from avp_ref.tck_adapter.relational_fixture import RelationalParityFixtureLoader
 from avp_ref.tck_adapter.relational_harness import (
     RelationalSUT,
@@ -55,7 +56,7 @@ class _RelationalHarnessComposite:
     def __init__(self) -> None:
         backend = InMemoryRelationalBackendHarness()
         self._delegates = (
-            RelationalConformanceTCKAdapter(backend),
+            RelationalBackendTCKAdapter(backend),
             ReferenceRelationalManifestTCKAdapter(),
         )
         self._owners = {
@@ -177,8 +178,14 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
         )
         self.assertEqual(expected.atomic_epoch_mutation_diff_digest, observed_diff.digest)
         self.assertEqual(
-            [(item.relation_id, item.change, dict(item.key)) for item in expected.atomic_epoch_mutation_diff_changes],
-            [(item.relation_id, item.change, dict(item.key)) for item in observed_diff.changes],
+            [
+                (item.relation_id, item.change, dict(item.key))
+                for item in expected.atomic_epoch_mutation_diff_changes
+            ],
+            [
+                (item.relation_id, item.change, dict(item.key))
+                for item in observed_diff.changes
+            ],
         )
 
     def test_atomic_commit_projection_observes_only_allowed_consistency_state(self) -> None:
@@ -191,6 +198,28 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
         )
 
         self.assertIn(self._epochs(observed), self.fixture.allowed_consistency_epochs)
+
+    def test_materialized_baseline_is_detached_from_mutable_caller_input(self) -> None:
+        baseline = self.fixture.baseline_mapping()
+        spec = build_resource_spec(
+            self.backend,
+            environment_id="env-parity",
+            resource_id="state",
+            resource_instance_id="frozen-input",
+            manifest=self.fixture.manifest,
+            baseline=baseline,
+            execution_input_identity="sha256:" + "b" * 64,
+        )
+        expected_digest = spec.baseline_artifact_digest
+
+        baseline["consistency.left"] = tuple[RelationalRow]()
+        sut = self.backend.provision(spec)
+
+        self.assertEqual(expected_digest, sut.baseline_digest)
+        self.assertEqual(
+            self.fixture.expectations.baseline_state_image_digest,
+            sut.state_image().digest,
+        )
 
     def test_fixture_materializes_and_reset_reestablishes_exact_baseline(self) -> None:
         sut = self._provision_parity()
