@@ -36,6 +36,8 @@ class DependencyPolicyTest(unittest.TestCase):
                     ".wheel-venv/bin/python -m pip install dist/*.whl",
                     ".postgresql-venv/bin/python -m pip install 'dist/example.whl[postgresql]'",
                     "AVP_POSTGRESQL_DSN=postgresql://fixture.invalid/avp",
+                    ".mysql-venv/bin/python -m pip install 'dist/example.whl[mysql]'",
+                    "AVP_MYSQL_DSN=mysql://fixture.invalid/avp",
                 )
             ),
             encoding="utf-8",
