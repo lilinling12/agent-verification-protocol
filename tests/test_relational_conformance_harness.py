@@ -5,9 +5,10 @@ import inspect
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
-from avp_ref.canonical import canonical_json
+from avp_ref.canonical import canonical_json, digest
 from avp_ref.relational import RelationalCompatibilityError
 from avp_ref.tck_adapter import TCKRepository, TCKRunner
 from avp_ref.tck_adapter.models import TCKAdapterError, TCKCaseResult
@@ -38,6 +39,13 @@ _FORBIDDEN_PORTABLE_NAMES = {
     "pg_dump_restore",
     "admin_dsn",
     "credentials",
+}
+_FIXTURE_ONLY_NAMES = {
+    "replace_relation",
+    "replace_relations_atomically",
+    "project_during_atomic_commit",
+    "begin_held_mutation",
+    "settle_held_mutation",
 }
 
 
@@ -82,6 +90,13 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
             execution_input_identity="sha256:" + "b" * 64,
         )
         return self.backend.provision(spec)
+
+    @staticmethod
+    def _epochs(projection) -> tuple[str, str]:
+        values: list[str] = []
+        for relation in projection["relations"]:
+            values.append(relation["rows"][0]["values"]["epoch"]["value"])
+        return values[0], values[1]
 
     def test_full_relational_profile_executes_through_shared_harness(self) -> None:
         runner = TCKRunner(
@@ -135,21 +150,56 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
             {item.projection_id for item in self.fixture.manifest.projections},
         )
 
+    def test_fixture_expected_evidence_is_recomputed_from_backend_observation(self) -> None:
+        sut = self._provision_parity("expected-evidence")
+        expected = self.fixture.expectations
+        before = sut.state_image()
+
+        self.assertEqual(expected.manifest_digest, sut.manifest_digest)
+        self.assertEqual(expected.baseline_state_image_digest, before.digest)
+        for projection in self.fixture.manifest.projections:
+            observed = sut.project(projection.projection_id)
+            self.assertEqual(
+                expected.projection_digest(projection.projection_id),
+                digest(observed),
+            )
+
+        self.backend.fixture_control.replace_relations_atomically(
+            sut,
+            self.fixture.epoch_mutation_mapping(),
+        )
+        after = sut.state_image()
+        observed_diff = sut.diff(before, after)
+
+        self.assertEqual(
+            expected.after_atomic_epoch_mutation_state_image_digest,
+            after.digest,
+        )
+        self.assertEqual(expected.atomic_epoch_mutation_diff_digest, observed_diff.digest)
+        self.assertEqual(
+            [(item.relation_id, item.change, dict(item.key)) for item in expected.atomic_epoch_mutation_diff_changes],
+            [(item.relation_id, item.change, dict(item.key)) for item in observed_diff.changes],
+        )
+
+    def test_atomic_commit_projection_observes_only_allowed_consistency_state(self) -> None:
+        sut = self._provision_parity("concurrency-seam")
+
+        observed = self.backend.fixture_control.project_during_atomic_commit(
+            sut,
+            projection_id="consistency.pair",
+            replacements=self.fixture.epoch_mutation_mapping(),
+        )
+
+        self.assertIn(self._epochs(observed), self.fixture.allowed_consistency_epochs)
+
     def test_fixture_materializes_and_reset_reestablishes_exact_baseline(self) -> None:
         sut = self._provision_parity()
         baseline = sut.state_image()
-        mutation = self.fixture.epoch_mutation_mapping()
         control = self.backend.fixture_control
 
-        control.replace_relation(
+        control.replace_relations_atomically(
             sut,
-            "consistency.left",
-            mutation["consistency.left"],
-        )
-        control.replace_relation(
-            sut,
-            "consistency.right",
-            mutation["consistency.right"],
+            self.fixture.epoch_mutation_mapping(),
         )
         self.assertNotEqual(baseline.digest, sut.state_image().digest)
 
@@ -162,14 +212,8 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
         portable_names = set(RelationalSUT.__dict__)
         fixture_names = set(type(self.backend.fixture_control).__dict__)
 
-        self.assertTrue(
-            {"replace_relation", "begin_held_mutation", "settle_held_mutation"}
-            <= fixture_names
-        )
-        self.assertFalse(
-            {"replace_relation", "begin_held_mutation", "settle_held_mutation"}
-            & portable_names
-        )
+        self.assertTrue(_FIXTURE_ONLY_NAMES <= fixture_names)
+        self.assertFalse(_FIXTURE_ONLY_NAMES & portable_names)
         self.assertFalse(_FORBIDDEN_PORTABLE_NAMES & portable_names)
 
     def test_harness_and_fixture_do_not_encode_backend_product_branches(self) -> None:
@@ -210,16 +254,10 @@ class RelationalConformanceHarnessTest(unittest.TestCase):
             baseline=baseline,
             execution_input_identity="sha256:" + "b" * 64,
         )
-        bad_spec = type(spec)(
-            environment_id=spec.environment_id,
-            resource_id=spec.resource_id,
-            resource_instance_id=spec.resource_instance_id,
-            manifest=spec.manifest,
-            baseline=spec.baseline,
-            manifest_artifact_digest=spec.manifest_artifact_digest[:-1] + "0",
-            baseline_artifact_digest=spec.baseline_artifact_digest,
-            execution_input_identity=spec.execution_input_identity,
-            evaluator_private_columns=spec.evaluator_private_columns,
+        replacement = "0" if spec.manifest_artifact_digest[-1] != "0" else "1"
+        bad_spec = replace(
+            spec,
+            manifest_artifact_digest=spec.manifest_artifact_digest[:-1] + replacement,
         )
 
         with self.assertRaises(RelationalCompatibilityError):
