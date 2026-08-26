@@ -12,6 +12,7 @@ from avp_ref.canonical import canonical_json
 from avp_ref.relational import (
     ColumnDefinition,
     ColumnType,
+    InMemoryRelationalResource,
     ProjectionDefinition,
     ProjectionRelation,
     RelationDefinition,
@@ -33,6 +34,31 @@ _PROFILE = "avp-relational-state-v0.1"
 
 
 @dataclass(frozen=True, slots=True)
+class ParityDiffChangeExpectation:
+    relation_id: str
+    change: str
+    key: tuple[tuple[str, RelationalValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RelationalParityExpectations:
+    manifest_digest: str
+    baseline_state_image_digest: str
+    baseline_projection_digests: tuple[tuple[str, str], ...]
+    after_atomic_epoch_mutation_state_image_digest: str
+    atomic_epoch_mutation_diff_digest: str
+    atomic_epoch_mutation_diff_changes: tuple[ParityDiffChangeExpectation, ...]
+
+    def projection_digest(self, projection_id: str) -> str:
+        try:
+            return dict(self.baseline_projection_digests)[projection_id]
+        except KeyError as exc:
+            raise TCKAdapterError(
+                f"fixture has no expected projection digest for {projection_id}"
+            ) from exc
+
+
+@dataclass(frozen=True, slots=True)
 class RelationalParityFixture:
     """Typed immutable view of language-neutral backend parity material."""
 
@@ -41,6 +67,7 @@ class RelationalParityFixture:
     atomic_epoch_mutation: tuple[tuple[str, tuple[RelationalRow, ...]], ...]
     allowed_consistency_epochs: tuple[tuple[str, str], ...]
     drift_controls: tuple[str, ...]
+    expectations: RelationalParityExpectations
     canonical_sha256: str
 
     def baseline_mapping(self) -> dict[str, tuple[RelationalRow, ...]]:
@@ -71,16 +98,12 @@ class RelationalParityFixtureLoader:
             raise TCKAdapterError("relational parity fixture is not valid UTF-8 JSON") from exc
         root = self._mapping(document, "fixture root")
 
-        # Requiring repository bytes to already be canonical prevents a backend
-        # test from silently consuming semantically equal but identity-different
-        # fixture material.
-        canonical_bytes = canonical_json(root).encode("utf-8")
-        if payload != canonical_bytes:
+        # Exact bytes are part of fixture identity. Reformatting a fixture is a
+        # deliberate identity change, not an invisible test-data edit.
+        if payload != canonical_json(root).encode("utf-8"):
             raise TCKAdapterError("relational parity fixture bytes are not canonical JSON")
-
         actual_sha = hashlib.sha256(payload).hexdigest()
-        expected_sha = self._parse_lock(lock_text)
-        if actual_sha != expected_sha:
+        if actual_sha != self._parse_lock(lock_text):
             raise TCKAdapterError("relational parity fixture SHA-256 lock mismatch")
 
         if root.get("formatVersion") != _FORMAT_VERSION:
@@ -102,32 +125,23 @@ class RelationalParityFixtureLoader:
             "atomicEpochMutation.relations",
         )
         epoch_mutation = self._partial_state(manifest, atomic, "atomicEpochMutation")
-
-        allowed_raw = controls.get("allowedConsistencyEpochs")
-        if not isinstance(allowed_raw, list) or not allowed_raw:
-            raise TCKAdapterError("allowedConsistencyEpochs must be a non-empty list")
-        allowed: list[tuple[str, str]] = []
-        for item in allowed_raw:
-            if (
-                not isinstance(item, list)
-                or len(item) != 2
-                or not all(isinstance(value, str) for value in item)
-            ):
-                raise TCKAdapterError("allowedConsistencyEpochs entries must be string pairs")
-            allowed.append((item[0], item[1]))
-        if len(allowed) != len(set(allowed)):
-            raise TCKAdapterError("allowedConsistencyEpochs contains duplicates")
-
+        allowed = self._epoch_pairs(controls.get("allowedConsistencyEpochs"))
         drift = self._string_tuple(controls.get("driftControls"), "driftControls")
         if len(drift) != len(set(drift)):
             raise TCKAdapterError("driftControls contains duplicates")
 
+        expectations = self._expectations(
+            manifest,
+            baseline,
+            self._mapping(root.get("expectations"), "expectations"),
+        )
         return RelationalParityFixture(
             manifest=manifest,
             baseline=tuple(sorted(baseline.items())),
             atomic_epoch_mutation=tuple(sorted(epoch_mutation.items())),
-            allowed_consistency_epochs=tuple(allowed),
+            allowed_consistency_epochs=allowed,
             drift_controls=drift,
+            expectations=expectations,
             canonical_sha256=actual_sha,
         )
 
@@ -140,6 +154,89 @@ class RelationalParityFixtureLoader:
         if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
             raise TCKAdapterError("invalid relational parity fixture SHA-256")
         return digest
+
+    def _expectations(
+        self,
+        manifest: RelationalManifest,
+        baseline: Mapping[str, tuple[RelationalRow, ...]],
+        document: Mapping[str, Any],
+    ) -> RelationalParityExpectations:
+        manifest_digest = self._digest(document.get("manifestDigest"), "manifestDigest")
+        baseline_digest = self._digest(
+            document.get("baselineStateImageDigest"),
+            "baselineStateImageDigest",
+        )
+        computed_manifest, computed_baseline = InMemoryRelationalResource.identity_artifacts(
+            manifest,
+            baseline,
+        )
+        if manifest_digest != computed_manifest or baseline_digest != computed_baseline:
+            raise TCKAdapterError("parity fixture baseline identity expectation is stale")
+
+        projection_raw = self._mapping(
+            document.get("baselineProjectionDigests"),
+            "baselineProjectionDigests",
+        )
+        expected_projection_ids = {
+            projection.projection_id for projection in manifest.projections
+        }
+        if set(projection_raw) != expected_projection_ids:
+            raise TCKAdapterError(
+                "baselineProjectionDigests must cover exactly the Manifest projections"
+            )
+        projection_digests = tuple(
+            sorted(
+                (
+                    projection_id,
+                    self._digest(value, f"projection digest {projection_id}"),
+                )
+                for projection_id, value in projection_raw.items()
+            )
+        )
+
+        diff = self._mapping(
+            document.get("atomicEpochMutationDiff"),
+            "atomicEpochMutationDiff",
+        )
+        changes_raw = diff.get("changes")
+        if not isinstance(changes_raw, list) or not changes_raw:
+            raise TCKAdapterError("atomicEpochMutationDiff.changes must be non-empty")
+        changes: list[ParityDiffChangeExpectation] = []
+        for raw in changes_raw:
+            item = self._mapping(raw, "atomicEpochMutationDiff change")
+            key_raw = self._mapping(item.get("key"), "atomicEpochMutationDiff key")
+            changes.append(
+                ParityDiffChangeExpectation(
+                    relation_id=self._string(item.get("relationId"), "diff relationId"),
+                    change=self._string(item.get("change"), "diff change"),
+                    key=tuple(
+                        sorted(
+                            (
+                                column_id,
+                                self._value(self._mapping(value, "diff key value")),
+                            )
+                            for column_id, value in key_raw.items()
+                        )
+                    ),
+                )
+            )
+        if len(changes) != len({(item.relation_id, item.key) for item in changes}):
+            raise TCKAdapterError("atomicEpochMutationDiff contains duplicate logical keys")
+
+        return RelationalParityExpectations(
+            manifest_digest=manifest_digest,
+            baseline_state_image_digest=baseline_digest,
+            baseline_projection_digests=projection_digests,
+            after_atomic_epoch_mutation_state_image_digest=self._digest(
+                document.get("afterAtomicEpochMutationStateImageDigest"),
+                "afterAtomicEpochMutationStateImageDigest",
+            ),
+            atomic_epoch_mutation_diff_digest=self._digest(
+                diff.get("digest"),
+                "atomicEpochMutationDiff.digest",
+            ),
+            atomic_epoch_mutation_diff_changes=tuple(changes),
+        )
 
     def _manifest(self, document: Mapping[str, Any]) -> RelationalManifest:
         relations_raw = document.get("relations")
@@ -155,14 +252,13 @@ class RelationalParityFixtureLoader:
             columns_raw = item.get("columns")
             if not isinstance(columns_raw, list) or not columns_raw:
                 raise TCKAdapterError("fixture relation columns must be non-empty")
-            columns = tuple(
-                self._column(self._mapping(value, "manifest column"))
-                for value in columns_raw
-            )
             relations.append(
                 RelationDefinition(
                     self._string(item.get("relationId"), "relationId"),
-                    columns,
+                    tuple(
+                        self._column(self._mapping(value, "manifest column"))
+                        for value in columns_raw
+                    ),
                     self._string_tuple(item.get("rowKey"), "rowKey"),
                 )
             )
@@ -178,14 +274,8 @@ class RelationalParityFixtureLoader:
                     self._string(item.get("projectionId"), "projectionId"),
                     tuple(
                         ProjectionRelation(
-                            self._string(
-                                selected.get("relationId"),
-                                "projection relationId",
-                            ),
-                            self._string_tuple(
-                                selected.get("columns"),
-                                "projection columns",
-                            ),
+                            self._string(selected.get("relationId"), "projection relationId"),
+                            self._string_tuple(selected.get("columns"), "projection columns"),
                         )
                         for selected in (
                             self._mapping(value, "projection relation")
@@ -258,38 +348,47 @@ class RelationalParityFixtureLoader:
         result: dict[str, tuple[RelationalRow, ...]] = {}
         for relation_id, rows_raw in document.items():
             try:
-                relation = manifest.relation(relation_id)
+                manifest.relation(relation_id)
             except RelationalCompatibilityError as exc:
                 raise TCKAdapterError(f"{context} references unknown relation") from exc
             if not isinstance(rows_raw, list):
                 raise TCKAdapterError(f"{context}.{relation_id} must be a row list")
-            rows: list[RelationalRow] = []
-            for raw in rows_raw:
-                row = self._mapping(raw, f"{context}.{relation_id} row")
-                values = {
-                    column_id: self._value(self._mapping(value, "typed value"))
-                    for column_id, value in row.items()
-                }
-                rows.append(RelationalRow.from_mapping(values))
-            result[relation_id] = tuple(rows)
+            result[relation_id] = tuple(
+                RelationalRow.from_mapping(
+                    {
+                        column_id: self._value(self._mapping(value, "typed value"))
+                        for column_id, value in self._mapping(
+                            raw,
+                            f"{context}.{relation_id} row",
+                        ).items()
+                    }
+                )
+                for raw in rows_raw
+            )
 
-        # Reuse the reference model only as implementation validation; the
-        # resulting canonical identity is still independently recomputed by the
-        # selected backend harness during provisioning.
+        full = {relation.relation_id: () for relation in manifest.relations}
+        full.update(result)
         try:
-            full = dict(self._empty_state(manifest))
-            full.update(result)
-            from avp_ref.relational import InMemoryRelationalResource
-
             InMemoryRelationalResource._validate_state_for_manifest(manifest, full)
         except RelationalCompatibilityError as exc:
-            if set(result) == {relation.relation_id for relation in manifest.relations}:
-                raise TCKAdapterError(f"invalid {context}: {exc}") from exc
+            raise TCKAdapterError(f"invalid {context}: {exc}") from exc
         return result
 
-    @staticmethod
-    def _empty_state(manifest: RelationalManifest) -> dict[str, tuple[RelationalRow, ...]]:
-        return {relation.relation_id: () for relation in manifest.relations}
+    def _epoch_pairs(self, value: Any) -> tuple[tuple[str, str], ...]:
+        if not isinstance(value, list) or not value:
+            raise TCKAdapterError("allowedConsistencyEpochs must be a non-empty list")
+        pairs: list[tuple[str, str]] = []
+        for item in value:
+            if (
+                not isinstance(item, list)
+                or len(item) != 2
+                or not all(isinstance(part, str) for part in item)
+            ):
+                raise TCKAdapterError("allowedConsistencyEpochs entries must be string pairs")
+            pairs.append((item[0], item[1]))
+        if len(pairs) != len(set(pairs)):
+            raise TCKAdapterError("allowedConsistencyEpochs contains duplicates")
+        return tuple(pairs)
 
     def _value(self, document: Mapping[str, Any]) -> RelationalValue:
         try:
@@ -300,6 +399,17 @@ class RelationalParityFixtureLoader:
         if value is not None and not isinstance(value, (str, bool)):
             raise TCKAdapterError("fixture typed value must be string, boolean, or null")
         return RelationalValue(kind, value)
+
+    @staticmethod
+    def _digest(value: Any, context: str) -> str:
+        if (
+            not isinstance(value, str)
+            or not value.startswith("sha256:")
+            or len(value) != 71
+            or any(char not in "0123456789abcdef" for char in value[7:])
+        ):
+            raise TCKAdapterError(f"relational parity {context} must be a sha256 digest")
+        return value
 
     @staticmethod
     def _mapping(value: Any, context: str) -> Mapping[str, Any]:
