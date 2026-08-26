@@ -34,6 +34,9 @@ conformance = [
   "opentelemetry-api>=1.30,<2",
   "opentelemetry-sdk>=1.30,<2",
 ]
+postgresql = [
+  "psycopg[binary]>=3.3,<4",
+]
 
 [project.urls]
 Homepage = "https://github.com/lilinling12/agent-verification-protocol"
