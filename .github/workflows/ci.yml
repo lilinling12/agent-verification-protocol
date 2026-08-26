@@ -264,3 +264,96 @@ jobs:
         run: >-
           .postgresql-venv/bin/python -m unittest discover
           -s tests -p 'test_postgresql_relational_adapter.py' -v
+
+  mysql-relational:
+    name: MySQL ${{ matrix.mysql-version }} / Relational TCK / Python 3.13
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mysql-version: '8.4.12'
+            mysql-image: mysql:8.4.12
+          - mysql-version: '9.7.3'
+            mysql-image: mysql:9.7.3
+    services:
+      mysql:
+        image: ${{ matrix.mysql-image }}
+        env:
+          MYSQL_ROOT_PASSWORD: avp-ci-${{ github.run_id }}
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pavp-ci-${{ github.run_id }}"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+    env:
+      AVP_MYSQL_DSN: mysql://root:avp-ci-${{ github.run_id }}@127.0.0.1:3306/mysql
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/ci.txt
+      - name: Install constrained build tooling
+        run: python -m pip install -c constraints/ci.txt build==1.5.0
+      - name: Build MySQL-capable wheel
+        run: python -m build --wheel --outdir dist-mysql
+      - name: Install wheel with optional MySQL implementation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(dist-mysql/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one MySQL test wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          python -m venv .mysql-venv
+          .mysql-venv/bin/python -m pip install -c constraints/ci.txt "${wheels[0]}[mysql]"
+          .mysql-venv/bin/python -m pip check
+      - name: Verify MySQL server identity
+        run: |
+          .mysql-venv/bin/python - <<'PY'
+          import os
+          from urllib.parse import unquote, urlsplit
+
+          import mysql.connector
+
+          parsed = urlsplit(os.environ["AVP_MYSQL_DSN"])
+          connection = mysql.connector.connect(
+              host=parsed.hostname,
+              port=parsed.port or 3306,
+              user=unquote(parsed.username or ""),
+              password=unquote(parsed.password or ""),
+              database=parsed.path.lstrip("/") or "mysql",
+          )
+          try:
+              cursor = connection.cursor()
+              try:
+                  cursor.execute("SELECT VERSION()")
+                  reported = cursor.fetchone()[0]
+              finally:
+                  cursor.close()
+          finally:
+              connection.close()
+          expected = "${{ matrix.mysql-version }}"
+          observed = reported.split("-")[0]
+          if observed != expected:
+              raise SystemExit(f"expected MySQL {expected}, observed {reported}")
+          print(f"MySQL integration server identity OK: {reported}")
+          PY
+      - name: Execute real MySQL relational adapter acceptance suite
+        run: >-
+          .mysql-venv/bin/python -m unittest discover
+          -s tests -p 'test_mysql_relational_adapter.py' -v
