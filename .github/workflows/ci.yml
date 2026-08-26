@@ -205,7 +205,7 @@ jobs:
       postgres:
         image: ${{ matrix.postgresql-image }}
         env:
-          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_PASSWORD: avp-ci-${{ github.run_id }}
           POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
         ports:
           - 5432:5432
@@ -215,7 +215,7 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     env:
-      AVP_POSTGRESQL_DSN: postgresql://postgres@127.0.0.1:5432/postgres
+      AVP_POSTGRESQL_DSN: postgresql://postgres:avp-ci-${{ github.run_id }}@127.0.0.1:5432/postgres
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
