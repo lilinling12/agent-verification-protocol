@@ -7,7 +7,7 @@ which storage mechanism backs the SUT.
 
 from __future__ import annotations
 
-from typing import Mapping, Sequence, cast
+from typing import Any, Mapping, Sequence
 
 from avp_ref.relational import (
     ColumnDefinition,
@@ -46,7 +46,7 @@ class InMemoryRelationalFixtureControl(RelationalFixtureControl):
     """Privileged controls for the in-memory conformance backend."""
 
     def __init__(self) -> None:
-        self._held: dict[tuple[int, str], object] = {}
+        self._held: dict[tuple[int, str], Any] = {}
 
     @staticmethod
     def _resource(sut: RelationalSUT) -> InMemoryRelationalResource:
@@ -69,6 +69,49 @@ class InMemoryRelationalFixtureControl(RelationalFixtureControl):
         resource = self._resource(sut)
         pending = resource.begin_subject_mutation(relation_id, replacement)
         resource.settle_subject_mutation(pending, commit=True)
+
+    def replace_relations_atomically(
+        self,
+        sut: RelationalSUT,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> None:
+        resource = self._resource(sut)
+        resource._ensure_live()
+        if resource._quiescing:
+            raise RelationalLifecycleError(
+                "new Subject mutation rejected after QUIESCING"
+            )
+        if not replacements:
+            raise RelationalLifecycleError("atomic fixture mutation must not be empty")
+        unknown = set(replacements) - set(resource._state)
+        if unknown:
+            raise RelationalLifecycleError(
+                f"atomic fixture mutation references unknown relations: {sorted(unknown)}"
+            )
+
+        candidate = dict(resource._state)
+        candidate.update(
+            (relation_id, tuple(rows))
+            for relation_id, rows in replacements.items()
+        )
+        # Direct state replacement is intentionally confined to this privileged
+        # in-memory fixture driver. A real database driver will implement the
+        # same logical operation with its native transaction mechanism.
+        resource._state = resource._validate_state(candidate)
+
+    def project_during_atomic_commit(
+        self,
+        sut: RelationalSUT,
+        *,
+        projection_id: str,
+        replacements: Mapping[str, Sequence[RelationalRow]],
+    ) -> Mapping[str, object]:
+        # The in-memory model has no scheduler/MVCC layer, so choosing the
+        # post-commit side is a valid deterministic implementation of the
+        # portable pre-or-post invariant. Real backends may coordinate threads
+        # and commit at an observation barrier behind this same seam.
+        self.replace_relations_atomically(sut, replacements)
+        return sut.project(projection_id)
 
     def begin_held_mutation(
         self,
@@ -101,7 +144,7 @@ class InMemoryRelationalFixtureControl(RelationalFixtureControl):
             ) from exc
         # The native handle intentionally remains implementation-private. The
         # fixture API exposes only a harness-local label across this boundary.
-        resource.settle_subject_mutation(cast(object, pending), commit=commit)  # type: ignore[arg-type]
+        resource.settle_subject_mutation(pending, commit=commit)
 
     def set_logical_binding_valid(self, sut: RelationalSUT, valid: bool) -> None:
         self._resource(sut).set_logical_binding_valid(valid)
