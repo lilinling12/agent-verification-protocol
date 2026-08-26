@@ -1,8 +1,10 @@
 # Alpha 3 PostgreSQL Relational Adapter Acceptance
 
-Status: **DRAFT — IMPLEMENTATION UNDER REVIEW**
+Status: **SEMANTIC REVIEW CLOSED — FINAL EXACT-HEAD GATES PENDING**
 
-Implementation baseline: `main@ba16ddf4633c9aa178d5088db705fed5bc6918ed`
+Implementation baseline: `main@ba16ddf4633c9aa178d5088db705fed5bc6918ed`  
+Reviewed semantic head: `0954140ec30946787c95dfa04eb980637945ad2f`  
+Formal implementation review: `5028233705`
 
 Governing authority:
 
@@ -26,13 +28,13 @@ This PR is implementation-only with respect to protocol authority. Portable
 Spec, requirement-index, Schema, TCK case semantics, and the canonical shared
 parity fixture are not modified.
 
-## Required acceptance evidence
+## Acceptance criteria
 
-The PostgreSQL adapter is eligible for review closure only when all of the
-following are true on one exact PR head:
+The PostgreSQL adapter is eligible for Ready transition only when all of the
+following are true on one exact final PR head:
 
 1. the adapter implements the existing backend-neutral harness and fixture-control contracts;
-2. the complete mandatory `avp-relational-state-v0.1` profile executes through a real PostgreSQL-backed SUT with **11 PASS / 0 FAIL / 0 SKIP**;
+2. the complete mandatory `avp-relational-state-v0.1` profile executes through the PostgreSQL-backed implementation path with **11 PASS / 0 FAIL / 0 SKIP**;
 3. PostgreSQL 17 and 18 integration lanes use explicit current minor versions rather than a floating `latest` image;
 4. the shared immutable parity fixture independently reproduces its Manifest, baseline StateImage, projection, post-mutation StateImage, and Diff identities from PostgreSQL observations;
 5. a multi-relation mutation is one native PostgreSQL transaction and a projection observed at the commit barrier is either fully pre-commit or fully post-commit, never torn;
@@ -44,44 +46,104 @@ following are true on one exact PR head:
 11. the base `avp-reference` wheel remains installable and its full registered TCK continues to pass without installing a PostgreSQL driver;
 12. Psycopg remains an optional implementation dependency with a compatibility range, while repository PostgreSQL CI resolves it through exact constraints;
 13. PostgreSQL setup and teardown are deterministic, and cleanup failures are treated as implementation/infrastructure failures rather than Agent Task Verdicts;
-14. exact-head CI, Governance, Release Validation, review threads, base drift, and mergeability are independently verified before Ready transition.
+14. exact-head CI, Governance, applicable Release Validation, review threads, base drift, and mergeability are independently verified before Ready transition.
 
-## Implementation boundary
+## Reviewed implementation boundary
 
-The adapter may privately use PostgreSQL schemas, roles, transactions, MVCC,
-DDL, and typed columns. Logical AVP relation and column identifiers are mapped
-to generated physical identifiers and are not interpolated as SQL identifiers.
+The adapter privately uses PostgreSQL schemas, roles, transactions, MVCC, DDL,
+and typed columns. Logical AVP relation and column identifiers are mapped to
+generated physical identifiers and are not interpolated as SQL identifiers.
 
 The database representation is deliberately non-normative. In particular:
 
-- portable `integer` uses an exact PostgreSQL numeric representation rather than narrowing to `bigint`;
+- portable `integer` uses exact PostgreSQL `numeric(65,0)` rather than narrowing to `bigint`;
 - portable decimal precision/scale maps to exact PostgreSQL `numeric(p,s)`;
-- local and instant timestamps retain their existing distinct AVP lexical semantics;
+- local and instant timestamps retain their existing distinct AVP lexical semantics with the already-governed 0..6 fractional-precision domain;
 - row ordering is recomputed from canonical logical keys rather than physical/index/collation order;
 - a PostgreSQL transaction/snapshot token never becomes AVP state identity;
 - physical restore fidelity never inflates Relational v0.1 above `STATE_EQUIVALENT`.
 
-## Dependency and CI boundary
+The implementation consumes the adopted `RelationalSUT` surface rather than
+adding SQL/query/transaction/catalog APIs to it. Native mutation and commit
+coordination remain behind `RelationalFixtureControl`.
+
+## Database authority and visibility boundary
+
+The harness creates generated implementation-private PostgreSQL roles and
+physical schema/table/column identifiers. Evaluator-complete reads and
+Subject-visible reads execute under distinct NOLOGIN roles while provisioning,
+fixture mutation, drift controls, and cleanup retain privileged harness authority.
+
+The CI PostgreSQL service uses authenticated test-only access. Its credential is
+derived from the GitHub Actions run id; it is neither a repository secret nor
+part of any AVP fixture, Artifact, Evidence, Manifest, report, or protocol identity.
+
+## Package and dependency boundary
 
 The base package has no mandatory PostgreSQL dependency. The implementation is
-installed through the optional `postgresql` extra. Repository CI constrains the
-integration resolution exactly, while the public optional dependency remains a
-bounded compatibility range under `docs/DEPENDENCIES.md`.
+installed through the optional `postgresql` extra with bounded public compatibility
+`psycopg[binary]>=3.3,<4`. Repository integration resolution is pinned to
+Psycopg / psycopg-binary `3.3.4` through `constraints/ci.txt`.
 
 The PostgreSQL integration job builds the repository wheel first, installs that
-wheel with the optional PostgreSQL extra in a fresh environment, then executes
+wheel with the optional PostgreSQL extra in a fresh environment, and then executes
 the database-backed acceptance tests. The existing package job independently
-continues to install the base wheel without PostgreSQL and run the full registered
+installs the base wheel without PostgreSQL and executes the full registered
 reference TCK.
 
-## Current disposition
+## Semantic-head execution evidence
 
-**DRAFT — NOT READY.**
+Reviewed semantic head:
 
-The implementation and real-database gates must run before this audit can record
-an exact-head acceptance result. The ROADMAP PostgreSQL item remains unchecked
-until a separately review-closed implementation is actually adopted into
-`main`.
+`0954140ec30946787c95dfa04eb980637945ad2f`
+
+Exact-head CI #596 completed successfully and included:
+
+- Quality / Python 3.11 — SUCCESS;
+- Quality / Python 3.12 — SUCCESS;
+- Quality / Python 3.13 — SUCCESS;
+- Package / Python 3.13 — SUCCESS;
+- reproducible source/wheel distribution bytes — SUCCESS;
+- unconstrained clean base-wheel installation — SUCCESS;
+- installed-wheel identity and reference smoke — SUCCESS;
+- installed-wheel full registered TCK conformance — SUCCESS;
+- release-evidence build and verification — SUCCESS;
+- PostgreSQL 17.11 / Relational TCK / Python 3.13 — SUCCESS;
+- PostgreSQL 18.6 / Relational TCK / Python 3.13 — SUCCESS.
+
+Each PostgreSQL lane executes the integration suite from the built wheel. Its
+full-profile test requires the resulting `ConformanceReport` summary to be
+exactly:
+
+```text
+11 PASS / 0 FAIL / 0 SKIP
+```
+
+The same suite independently recomputes the canonical shared parity fixture
+Manifest/StateImage/projection/post-mutation/Diff identities from PostgreSQL
+observations and exercises atomic-commit visibility and the database-backed
+security case.
+
+Governance #661 also passed on the semantic head. Formal exact-head implementation
+review `5028233705` found no blocker requiring portable Spec/Schema/TCK changes and
+closed the semantic implementation review.
+
+At semantic review time the PR was ahead-only from its exact main baseline with
+`behind_by=0` and had no unresolved inline review threads.
+
+## Final governance gate
+
+The remaining changes after the reviewed semantic head are limited to acceptance
+and roadmap synchronization. Those governance-only changes must independently
+pass final exact-head CI, Governance, and the Release Validation workflow that is
+made applicable by the ROADMAP update. Base drift, mergeability, and review-thread
+state must then be rechecked before the PR may leave Draft.
+
+The ROADMAP PostgreSQL checkbox remains intentionally **unchecked** until the
+reviewed implementation is actually squash-merged into `main` under a separate
+explicit maintainer authorization. PR readiness is not main adoption.
+
+## Non-authorizations
 
 This work does not authorize:
 
