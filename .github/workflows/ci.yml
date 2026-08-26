@@ -253,11 +253,12 @@ jobs:
           import psycopg
 
           with psycopg.connect(os.environ["AVP_POSTGRESQL_DSN"]) as connection:
-              version = connection.execute("SHOW server_version").fetchone()[0]
+              reported = connection.execute("SHOW server_version").fetchone()[0]
           expected = "${{ matrix.postgresql-version }}"
-          if version != expected:
-              raise SystemExit(f"expected PostgreSQL {expected}, observed {version}")
-          print(f"PostgreSQL integration server identity OK: {version}")
+          observed = reported.split()[0]
+          if observed != expected:
+              raise SystemExit(f"expected PostgreSQL {expected}, observed {reported}")
+          print(f"PostgreSQL integration server identity OK: {reported}")
           PY
       - name: Execute real PostgreSQL relational adapter acceptance suite
         run: >-
