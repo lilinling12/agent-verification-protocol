@@ -1,22 +1,20 @@
-"""Execution-sensitive TCK adapter for the AVP Relational State candidate.
+"""Execution-sensitive, backend-neutral Relational State TCK evaluator.
 
-The adapter exercises the backend-neutral reference model defined downstream of
-``spec/relational/relational-state-contract.md``. Backend-specific SQL and
-product identity are deliberately absent from this conformance surface.
+The evaluator owns portable assertions only. Resource provisioning and all
+privileged test controls are supplied by ``RelationalBackendHarness`` so SQL,
+backend identity, credentials, and native transaction handles cannot become TCK
+semantics by implementation convenience.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from typing import Any
 
 from avp_ref.relational import (
     ColumnDefinition,
     ColumnType,
-    ExecutionInputDriftResource,
-    FalseRestoreResource,
-    HiddenStateLeakResource,
-    InMemoryRelationalResource,
     ProjectionDefinition,
     ProjectionRelation,
     RelationDefinition,
@@ -29,15 +27,22 @@ from avp_ref.relational import (
     RelationalValue,
     RelationalVisibilityError,
     RestoreFidelity,
-    TornProjectionResource,
+    StateImage,
     ValueType,
 )
 
 from .models import TCKAdapterError, TCKCaseResult, TCKStatus
+from .relational_harness import (
+    NegativeControl,
+    RelationalBackendHarness,
+    RelationalResourceSpec,
+    RelationalSUT,
+    build_resource_spec,
+)
 
 
-class ReferenceRelationalTCKAdapter:
-    """Execute all mandatory ``avp-relational-state-v0.1`` case families."""
+class RelationalConformanceTCKAdapter:
+    """Execute mandatory relational cases against one backend harness."""
 
     _IDENTITY = "AVP-TCK-RELATIONAL-IDENTITY-001"
     _CANONICAL = "AVP-TCK-RELATIONAL-CANONICAL-001"
@@ -50,7 +55,9 @@ class ReferenceRelationalTCKAdapter:
     _SECURITY = "AVP-TCK-RELATIONAL-SECURITY-001"
     _EXECUTED = "AVP-TCK-RELATIONAL-EXECUTED-CAPABILITY-001"
 
-    def __init__(self) -> None:
+    def __init__(self, backend: RelationalBackendHarness) -> None:
+        self._backend = backend
+        self._fixture = backend.fixture_control
         self._evaluators: dict[str, Callable[[Mapping[str, Any]], tuple[bool, str]]] = {
             self._IDENTITY: self._identity,
             self._CANONICAL: self._canonical,
@@ -95,42 +102,37 @@ class ReferenceRelationalTCKAdapter:
         )
         manifest = self._simple_manifest()
         baseline = {"records": (self._simple_row("1", "baseline"),)}
-        manifest_digest, baseline_digest = InMemoryRelationalResource.identity_artifacts(
-            manifest,
-            baseline,
-        )
-        resource = self._resource(
+        spec = self._spec(
             manifest=manifest,
             baseline=baseline,
             instance_id="identity-good",
         )
+        resource = self._backend.provision(spec)
 
         rejected: set[str] = set()
         if "manifest-artifact-digest" in tamper_controls:
             try:
-                InMemoryRelationalResource(
-                    environment_id="env-identity-tamper",
-                    resource_id="state",
-                    resource_instance_id="identity-bad-manifest",
-                    manifest=manifest,
-                    manifest_artifact_digest=self._different_digest(manifest_digest),
-                    baseline=baseline,
-                    baseline_artifact_digest=baseline_digest,
-                    execution_input_identity=self._digest("b"),
+                self._backend.provision(
+                    replace(
+                        spec,
+                        resource_instance_id="identity-bad-manifest",
+                        manifest_artifact_digest=self._different_digest(
+                            spec.manifest_artifact_digest
+                        ),
+                    )
                 )
             except RelationalCompatibilityError:
                 rejected.add("manifest-artifact-digest")
         if "baseline-artifact-digest" in tamper_controls:
             try:
-                InMemoryRelationalResource(
-                    environment_id="env-identity-tamper",
-                    resource_id="state",
-                    resource_instance_id="identity-bad-baseline",
-                    manifest=manifest,
-                    manifest_artifact_digest=manifest_digest,
-                    baseline=baseline,
-                    baseline_artifact_digest=self._different_digest(baseline_digest),
-                    execution_input_identity=self._digest("b"),
+                self._backend.provision(
+                    replace(
+                        spec,
+                        resource_instance_id="identity-bad-baseline",
+                        baseline_artifact_digest=self._different_digest(
+                            spec.baseline_artifact_digest
+                        ),
+                    )
                 )
             except RelationalCompatibilityError:
                 rejected.add("baseline-artifact-digest")
@@ -148,8 +150,8 @@ class ReferenceRelationalTCKAdapter:
             )
             and vector.get("manifestContainsBaselineReference") is False
             and manifest_doc.get("kind") == "RelationalStateManifest"
-            and resource.manifest_digest == manifest_digest
-            and resource.baseline_digest == baseline_digest
+            and resource.manifest_digest == spec.manifest_artifact_digest
+            and resource.baseline_digest == spec.baseline_artifact_digest
             and rejected == tamper_controls
         )
         return passed, (
@@ -191,7 +193,7 @@ class ReferenceRelationalTCKAdapter:
         for item in valid_controls:
             control = self._mapping(item, "canonical valid control")
             column, value = self._scalar_control(control)
-            InMemoryRelationalResource._validate_value(column, value)
+            self._backend.validate_value(column, value)
             accepted += 1
 
         rejected = 0
@@ -199,7 +201,7 @@ class ReferenceRelationalTCKAdapter:
             control = self._mapping(item, "canonical invalid control")
             try:
                 column, value = self._scalar_control(control)
-                InMemoryRelationalResource._validate_value(column, value)
+                self._backend.validate_value(column, value)
             except (RelationalCompatibilityError, ValueError):
                 rejected += 1
 
@@ -229,12 +231,15 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _projection(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._consistency_resource(InMemoryRelationalResource, "projection-good")
-        projection = resource.project("consistency.pair")
-        observed = self._epochs(projection)
+        del vector
+        resource = self._consistency_resource("projection-good")
+        observed = self._epochs(resource.project("consistency.pair"))
         allowed = {(1, 1), (2, 2)}
 
-        torn = self._consistency_resource(TornProjectionResource, "projection-torn")
+        torn = self._consistency_resource(
+            "projection-torn",
+            negative_control=NegativeControl.TORN_PROJECTION,
+        )
         torn_observed = self._epochs(torn.project("consistency.pair"))
         passed = observed in allowed and torn_observed not in allowed
         return passed, (
@@ -244,12 +249,23 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _quiescing(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         commit_resource = self._simple_resource(instance_id="quiescing-commit")
         replacement = (self._simple_row("1", "committed"),)
-        pending = commit_resource.begin_subject_mutation("records", replacement)
+        self._fixture.begin_held_mutation(
+            commit_resource,
+            label="accepted-before-quiescing",
+            relation_id="records",
+            replacement=replacement,
+        )
         commit_resource.enter_quiescing()
         try:
-            commit_resource.begin_subject_mutation("records", replacement)
+            self._fixture.begin_held_mutation(
+                commit_resource,
+                label="rejected-after-quiescing",
+                relation_id="records",
+                replacement=replacement,
+            )
             rejected_new = False
         except RelationalLifecycleError:
             rejected_new = True
@@ -258,21 +274,31 @@ class ReferenceRelationalTCKAdapter:
             unresolved_blocked = False
         except RelationalLifecycleError:
             unresolved_blocked = True
-        commit_resource.settle_subject_mutation(pending, commit=True)
-        final = commit_resource.final_projection("records.all")
-        committed_observed = self._projection_text(final) == "committed"
+        self._fixture.settle_held_mutation(
+            commit_resource,
+            label="accepted-before-quiescing",
+            commit=True,
+        )
+        committed_observed = (
+            self._projection_text(commit_resource.final_projection("records.all"))
+            == "committed"
+        )
 
         rollback_resource = self._simple_resource(instance_id="quiescing-rollback")
-        rollback = rollback_resource.begin_subject_mutation(
-            "records",
-            (self._simple_row("1", "rolled"),),
+        self._fixture.begin_held_mutation(
+            rollback_resource,
+            label="rollback",
+            relation_id="records",
+            replacement=(self._simple_row("1", "rolled"),),
         )
         rollback_resource.enter_quiescing()
-        rollback_resource.settle_subject_mutation(rollback, commit=False)
+        self._fixture.settle_held_mutation(
+            rollback_resource,
+            label="rollback",
+            commit=False,
+        )
         rolled_back_hidden = (
-            self._projection_text(
-                rollback_resource.final_projection("records.all")
-            )
+            self._projection_text(rollback_resource.final_projection("records.all"))
             == "baseline"
         )
 
@@ -289,8 +315,9 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _drift(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         logical = self._simple_resource(instance_id="drift-logical")
-        logical.set_logical_binding_valid(False)
+        self._fixture.set_logical_binding_valid(logical, False)
         try:
             logical.state_image()
             logical_rejected = False
@@ -301,7 +328,7 @@ class ReferenceRelationalTCKAdapter:
         irrelevant_ok = bool(irrelevant.state_image().digest)
 
         execution = self._simple_resource(instance_id="drift-execution")
-        execution.set_execution_input_identity(self._digest("f"))
+        self._fixture.set_execution_input_identity(execution, self._digest("f"))
         try:
             execution.state_image()
             execution_rejected = False
@@ -309,10 +336,10 @@ class ReferenceRelationalTCKAdapter:
             execution_rejected = True
 
         negative = self._simple_resource(
-            resource_type=ExecutionInputDriftResource,
             instance_id="drift-negative",
+            negative_control=NegativeControl.EXECUTION_INPUT_DRIFT,
         )
-        negative.set_execution_input_identity(self._digest("f"))
+        self._fixture.set_execution_input_identity(negative, self._digest("f"))
         negative_wrongly_accepts = bool(negative.state_image().digest)
 
         passed = (
@@ -328,13 +355,14 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _snapshot_reset(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         resource = self._simple_resource(instance_id="snapshot-owner")
         snapshot = resource.snapshot()
-        mutation = resource.begin_subject_mutation(
+        self._fixture.replace_relation(
+            resource,
             "records",
             (self._simple_row("1", "changed"),),
         )
-        resource.settle_subject_mutation(mutation, commit=True)
         changed = resource.state_image().digest != snapshot.state.digest
         reset = resource.reset()
         reset_equal = reset.digest == resource.baseline_digest
@@ -368,26 +396,27 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _restore(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         resource = self._simple_resource(instance_id="restore-good")
         snapshot = resource.snapshot()
-        mutation = resource.begin_subject_mutation(
+        self._fixture.replace_relation(
+            resource,
             "records",
             (self._simple_row("1", "changed"),),
         )
-        resource.settle_subject_mutation(mutation, commit=True)
         fidelity = resource.restore(snapshot)
         restored = resource.state_image().digest == snapshot.state.digest
 
         false_resource = self._simple_resource(
-            resource_type=FalseRestoreResource,
             instance_id="restore-false",
+            negative_control=NegativeControl.FALSE_RESTORE,
         )
         false_snapshot = false_resource.snapshot()
-        false_mutation = false_resource.begin_subject_mutation(
+        self._fixture.replace_relation(
+            false_resource,
             "records",
             (self._simple_row("1", "changed"),),
         )
-        false_resource.settle_subject_mutation(false_mutation, commit=True)
         false_claim = false_resource.restore(false_snapshot)
         false_detected = (
             false_claim is RestoreFidelity.STATE_EQUIVALENT
@@ -405,6 +434,7 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _diff(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
+        del vector
         resource = self._diff_resource()
         before = resource.state_image()
         replacement = (
@@ -412,8 +442,7 @@ class ReferenceRelationalTCKAdapter:
             self._simple_row("3", "c"),
             self._simple_row("5", "key-before"),
         )
-        pending = resource.begin_subject_mutation("records", replacement)
-        resource.settle_subject_mutation(pending, commit=True)
+        self._fixture.replace_relation(resource, "records", replacement)
         after = resource.state_image()
         diff = resource.diff(before, after)
         document = diff.as_document()
@@ -465,10 +494,8 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _security(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        resource = self._security_resource(
-            InMemoryRelationalResource,
-            "security-good",
-        )
+        del vector
+        resource = self._security_resource("security-good")
         complete = resource.state_image()
         subject = resource.subject_view(
             {("records", "id"), ("records", "public_value")}
@@ -479,7 +506,10 @@ class ReferenceRelationalTCKAdapter:
         )
         hidden_excluded = "hidden_evaluator_value" not in subject_values
 
-        leakage = self._security_resource(HiddenStateLeakResource, "security-leak")
+        leakage = self._security_resource(
+            "security-leak",
+            negative_control=NegativeControl.HIDDEN_STATE_LEAK,
+        )
         leaked = leakage.subject_view(
             {("records", "id"), ("records", "public_value")}
         )
@@ -506,39 +536,46 @@ class ReferenceRelationalTCKAdapter:
         )
 
     def _executed_capability(self, vector: Mapping[str, Any]) -> tuple[bool, str]:
-        torn = self._consistency_resource(TornProjectionResource, "executed-torn")
+        del vector
+        torn = self._consistency_resource(
+            "executed-torn",
+            negative_control=NegativeControl.TORN_PROJECTION,
+        )
         torn_failed = self._epochs(torn.project("consistency.pair")) not in {
             (1, 1),
             (2, 2),
         }
 
         false_restore = self._simple_resource(
-            resource_type=FalseRestoreResource,
             instance_id="executed-false-restore",
+            negative_control=NegativeControl.FALSE_RESTORE,
         )
         snapshot = false_restore.snapshot()
-        mutation = false_restore.begin_subject_mutation(
+        self._fixture.replace_relation(
+            false_restore,
             "records",
             (self._simple_row("1", "changed"),),
         )
-        false_restore.settle_subject_mutation(mutation, commit=True)
         claim = false_restore.restore(snapshot)
         false_restore_failed = (
             claim is RestoreFidelity.STATE_EQUIVALENT
             and false_restore.state_image().digest != snapshot.state.digest
         )
 
-        leak = self._security_resource(HiddenStateLeakResource, "executed-leak")
+        leak = self._security_resource(
+            "executed-leak",
+            negative_control=NegativeControl.HIDDEN_STATE_LEAK,
+        )
         leaked = leak.subject_view(
             {("records", "id"), ("records", "public_value")}
         )
         leak_failed = "hidden_evaluator_value" in leaked["records"][0].value_map()
 
         drift = self._simple_resource(
-            resource_type=ExecutionInputDriftResource,
             instance_id="executed-drift",
+            negative_control=NegativeControl.EXECUTION_INPUT_DRIFT,
         )
-        drift.set_execution_input_identity(self._digest("f"))
+        self._fixture.set_execution_input_identity(drift, self._digest("f"))
         drift_failed = bool(drift.state_image().digest)
 
         passed = torn_failed and false_restore_failed and leak_failed and drift_failed
@@ -606,21 +643,21 @@ class ReferenceRelationalTCKAdapter:
     def _simple_resource(
         self,
         *,
-        resource_type: type[InMemoryRelationalResource] = InMemoryRelationalResource,
         instance_id: str,
-    ) -> InMemoryRelationalResource:
+        negative_control: NegativeControl | None = None,
+    ) -> RelationalSUT:
         manifest = self._simple_manifest()
         baseline = {"records": (self._simple_row("1", "baseline"),)}
         return self._resource(
-            resource_type=resource_type,
             environment_id="env-relational",
             resource_id="primary-state",
             instance_id=instance_id,
             manifest=manifest,
             baseline=baseline,
+            negative_control=negative_control,
         )
 
-    def _diff_resource(self) -> InMemoryRelationalResource:
+    def _diff_resource(self) -> RelationalSUT:
         manifest = self._simple_manifest()
         baseline = {
             "records": (
@@ -661,9 +698,10 @@ class ReferenceRelationalTCKAdapter:
 
     def _consistency_resource(
         self,
-        resource_type: type[InMemoryRelationalResource],
         instance_id: str,
-    ) -> InMemoryRelationalResource:
+        *,
+        negative_control: NegativeControl | None = None,
+    ) -> RelationalSUT:
         row = RelationalRow.from_mapping(
             {
                 "id": RelationalValue(ValueType.INTEGER, "1"),
@@ -676,19 +714,20 @@ class ReferenceRelationalTCKAdapter:
             "consistency.right": (row,),
         }
         return self._resource(
-            resource_type=resource_type,
             environment_id="env-consistency",
             resource_id="state",
             instance_id=instance_id,
             manifest=manifest,
             baseline=baseline,
+            negative_control=negative_control,
         )
 
     def _security_resource(
         self,
-        resource_type: type[InMemoryRelationalResource],
         instance_id: str,
-    ) -> InMemoryRelationalResource:
+        *,
+        negative_control: NegativeControl | None = None,
+    ) -> RelationalSUT:
         relation = RelationDefinition(
             "records",
             (
@@ -710,13 +749,35 @@ class ReferenceRelationalTCKAdapter:
             }
         )
         return self._resource(
-            resource_type=resource_type,
             environment_id="env-security",
             resource_id="state",
             instance_id=instance_id,
             manifest=manifest,
             baseline={"records": (row,)},
             evaluator_private_columns={("records", "hidden_evaluator_value")},
+            negative_control=negative_control,
+        )
+
+    def _spec(
+        self,
+        *,
+        manifest: RelationalManifest,
+        baseline: Mapping[str, tuple[RelationalRow, ...]],
+        instance_id: str,
+        environment_id: str = "env-relational",
+        resource_id: str = "state",
+        execution_input_identity: str | None = None,
+        evaluator_private_columns: set[tuple[str, str]] | None = None,
+    ) -> RelationalResourceSpec:
+        return build_resource_spec(
+            self._backend,
+            environment_id=environment_id,
+            resource_id=resource_id,
+            resource_instance_id=instance_id,
+            manifest=manifest,
+            baseline=baseline,
+            execution_input_identity=execution_input_identity or self._digest("b"),
+            evaluator_private_columns=evaluator_private_columns or (),
         )
 
     def _resource(
@@ -729,22 +790,19 @@ class ReferenceRelationalTCKAdapter:
         resource_id: str = "state",
         execution_input_identity: str | None = None,
         evaluator_private_columns: set[tuple[str, str]] | None = None,
-        resource_type: type[InMemoryRelationalResource] = InMemoryRelationalResource,
-    ) -> InMemoryRelationalResource:
-        manifest_digest, baseline_digest = InMemoryRelationalResource.identity_artifacts(
-            manifest,
-            baseline,
-        )
-        return resource_type(
-            environment_id=environment_id,
-            resource_id=resource_id,
-            resource_instance_id=instance_id,
-            manifest=manifest,
-            manifest_artifact_digest=manifest_digest,
-            baseline=baseline,
-            baseline_artifact_digest=baseline_digest,
-            execution_input_identity=execution_input_identity or self._digest("b"),
-            evaluator_private_columns=evaluator_private_columns or (),
+        negative_control: NegativeControl | None = None,
+    ) -> RelationalSUT:
+        return self._backend.provision(
+            self._spec(
+                manifest=manifest,
+                baseline=baseline,
+                instance_id=instance_id,
+                environment_id=environment_id,
+                resource_id=resource_id,
+                execution_input_identity=execution_input_identity,
+                evaluator_private_columns=evaluator_private_columns,
+            ),
+            negative_control=negative_control,
         )
 
     def _scalar_control(
@@ -869,3 +927,8 @@ class ReferenceRelationalTCKAdapter:
     def _different_digest(digest: str) -> str:
         replacement = "0" if digest[-1] != "0" else "1"
         return digest[:-1] + replacement
+
+
+# Kept as the reference-domain name used by the composite runner; the behavior
+# itself is backend-neutral and receives its backend explicitly.
+ReferenceRelationalTCKAdapter = RelationalConformanceTCKAdapter
