@@ -16,6 +16,7 @@ from avp_ref.relational import (
     InMemoryRelationalResource,
     RelationDefinition,
     RelationalCompatibilityError,
+    RelationalDiff,
     RelationalError,
     RelationalLifecycleError,
     RelationalReferenceError,
@@ -113,11 +114,13 @@ class PostgreSQLRelationalResource(RelationalSUT):
         """Materialize schema, grants, and baseline, then verify evaluator state."""
 
         psycopg, sql = load_driver()
+        schema_created = False
         try:
             with psycopg.connect(self._dsn, autocommit=True) as connection:
                 connection.execute(
                     sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(self._schema))
                 )
+                schema_created = True
                 connection.execute(
                     sql.SQL("GRANT USAGE ON SCHEMA {} TO {}").format(
                         sql.Identifier(self._schema),
@@ -137,14 +140,26 @@ class PostgreSQLRelationalResource(RelationalSUT):
                 raise RelationalCompatibilityError(
                     "PostgreSQL baseline materialization changed canonical StateImage identity"
                 )
-        except BaseException:
-            # PostgreSQL DDL is transactional only within an explicit transaction;
-            # autocommit provisioning can therefore fail after creating the schema.
-            # Always remove the generated namespace before propagating the failure.
-            self._drop_schema()
+        except BaseException as error:
+            # Autocommit DDL may fail after the generated schema exists. Clean up
+            # only materialized state, and preserve the provisioning exception as
+            # the primary failure even if best-effort cleanup also encounters one.
+            if schema_created:
+                try:
+                    self._drop_schema()
+                except BaseException as cleanup_error:
+                    error.add_note(
+                        "PostgreSQL provisioning cleanup also failed: "
+                        f"{cleanup_error!r}"
+                    )
             raise
 
-    def _create_relation(self, connection: Any, relation: RelationDefinition, sql: Any) -> None:
+    def _create_relation(
+        self,
+        connection: Any,
+        relation: RelationDefinition,
+        sql: Any,
+    ) -> None:
         physical_columns = self._columns[relation.relation_id]
         column_sql: list[Any] = []
         for column in relation.columns:
@@ -456,7 +471,7 @@ class PostgreSQLRelationalResource(RelationalSUT):
                     )
         return result
 
-    def diff(self, before: StateImage, after: StateImage):
+    def diff(self, before: StateImage, after: StateImage) -> RelationalDiff:
         self._ensure_live()
         return relational_diff(
             manifest=self.manifest,
