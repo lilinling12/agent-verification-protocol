@@ -13,6 +13,10 @@ CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 _REQUIREMENT_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
 _EXACT_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
+_INTEGRATION_EXTRAS = {
+    "postgresql": "AVP_POSTGRESQL_DSN",
+    "mysql": "AVP_MYSQL_DSN",
+}
 
 
 def _fail(message: str) -> None:
@@ -43,7 +47,10 @@ def _require_compatibility_window(requirement: str, context: str) -> None:
     if "<" not in requirement:
         _fail(f"{context} dependency needs an explicit breaking-version upper bound: {requirement}")
     if "==" in requirement:
-        _fail(f"{context} dependency must expose a compatibility range, not an exact pin: {requirement}")
+        _fail(
+            f"{context} dependency must expose a compatibility range, not an exact pin: "
+            f"{requirement}"
+        )
 
 
 def _load_constraints() -> dict[str, str]:
@@ -51,7 +58,10 @@ def _load_constraints() -> dict[str, str]:
         _fail("constraints/ci.txt is required")
     pins: dict[str, str] = {}
     previous: str | None = None
-    for line_number, raw in enumerate(CONSTRAINTS.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, raw in enumerate(
+        CONSTRAINTS.read_text(encoding="utf-8").splitlines(),
+        start=1,
+    ):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -68,6 +78,15 @@ def _load_constraints() -> dict[str, str]:
     if not pins:
         _fail("constraints/ci.txt must contain at least one exact pin")
     return pins
+
+
+def _require_integration_paths(workflow: str) -> None:
+    for extra, dsn_variable in _INTEGRATION_EXTRAS.items():
+        if f"[{extra}]" not in workflow or dsn_variable not in workflow:
+            _fail(
+                f"CI must retain a {extra} optional-wheel integration path "
+                f"with {dsn_variable}"
+            )
 
 
 def main() -> None:
@@ -96,7 +115,7 @@ def main() -> None:
             _require_compatibility_window(requirement, f"optional group {group_name}")
 
     pins = _load_constraints()
-    ci_optional_groups = ("dev", "postgresql")
+    ci_optional_groups = ("dev", *_INTEGRATION_EXTRAS)
     ci_direct_requirements = list(runtime)
     for group_name in ci_optional_groups:
         ci_direct_requirements.extend(optional.get(group_name, []))
@@ -106,7 +125,10 @@ def main() -> None:
         if name not in pins
     )
     if missing:
-        _fail(f"CI constraints do not pin direct runtime/integration dependencies: {missing}")
+        _fail(
+            "CI constraints do not pin direct runtime/integration dependencies: "
+            f"{missing}"
+        )
     if pins.get(build_backend_name) != build_backend_version:
         _fail("CI constraints must pin the same setuptools version as build-system.requires")
 
@@ -119,8 +141,7 @@ def main() -> None:
         _fail("CI must retain an unconstrained clean-wheel consumer installation")
     if "-c constraints/ci.txt dist/*.whl" in workflow:
         _fail("clean-wheel consumer installation must not use repository constraints")
-    if "[postgresql]" not in workflow or "AVP_POSTGRESQL_DSN" not in workflow:
-        _fail("CI must retain a PostgreSQL optional-wheel integration path")
+    _require_integration_paths(workflow)
 
     print(
         "dependency policy OK: "

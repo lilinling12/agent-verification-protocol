@@ -37,6 +37,9 @@ conformance = [
 postgresql = [
   "psycopg[binary]>=3.3,<4",
 ]
+mysql = [
+  "mysql-connector-python>=26.7,<27",
+]
 
 [project.urls]
 Homepage = "https://github.com/lilinling12/agent-verification-protocol"
