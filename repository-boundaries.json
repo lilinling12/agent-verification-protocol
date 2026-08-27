@@ -1,7 +1,21 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "repository_phase": "alpha-monorepo",
   "authority_order": ["spec", "schemas", "conformance", "reference-implementation"],
+  "policy_documents": {
+    "governance": "GOVERNANCE.md",
+    "architecture_boundaries": "docs/ARCHITECTURE_BOUNDARIES.md",
+    "open_source_engineering": "docs/OPEN_SOURCE_ENGINEERING_STANDARD.md",
+    "security": "SECURITY.md",
+    "repository_settings": "docs/REPOSITORY_SETTINGS.md",
+    "release_process": "docs/RELEASE_PROCESS.md"
+  },
+  "open_source_invariants": {
+    "independent_conformance_requires_public_semantics": true,
+    "private_platform_must_not_define_conformance": true,
+    "private_data_must_not_be_required_for_portable_tck": true,
+    "reference_implementation_is_non_normative": true
+  },
   "surfaces": {
     "spec": {"path": "spec", "role": "normative-protocol", "normative": true, "future_repository": "avp-spec"},
     "schemas": {"path": "schemas", "role": "machine-readable-protocol-contracts", "normative": true, "future_repository": "avp-schema"},
@@ -12,6 +26,8 @@
     "tests": {"path": "tests", "role": "reference-implementation-tests", "normative": false}
   },
   "excluded_surfaces": {
-    "commercial_platform": {"role": "commercial-control-plane", "expected_repository": "private", "normative": false}
+    "commercial_platform": {"role": "commercial-control-plane", "expected_repository": "private", "normative": false},
+    "production_sensitive_material": {"role": "credentials-customer-data-private-topology-and-embargoed-security-material", "expected_repository": "not-public-protocol-repository", "normative": false},
+    "private_evaluation_assets": {"role": "proprietary-or-nonredistributable-prompts-corpora-and-benchmark-data", "expected_repository": "private-or-separately-licensed", "normative": false}
   }
 }

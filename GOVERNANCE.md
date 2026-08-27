@@ -11,7 +11,42 @@ AVP governance is guided by:
 - **upstream ownership** — AVP does not redefine concerns already owned by standards such as MCP, A2A, OpenTelemetry, JSON Schema, or OCI without a documented interoperability gap;
 - **evidence before preference** — normative changes require motivating cases, tradeoffs, and conformance evidence;
 - **secure evaluator boundaries** — changes must preserve separation among Subject, Environment, Evaluator, and privileged verification capabilities;
-- **reviewable evolution** — protocol changes are versioned, documented, tested, and attributable to a proposal or pull request.
+- **reviewable evolution** — protocol changes are versioned, documented, tested, and attributable to a proposal or pull request;
+- **security-safe openness** — all semantics required for independent interoperability and conformance are publicly reviewable, while secrets, private vulnerability details, production/customer data, and private platform implementation details remain outside the public protocol authority.
+
+## Repository policy authority
+
+AVP separates protocol authority from repository engineering policy so implementation convenience, project layout, or private platform behavior cannot silently become protocol semantics.
+
+The repository policy documents have the following responsibilities:
+
+| Policy surface | Responsibility | Protocol authority? |
+|---|---|---|
+| `GOVERNANCE.md` | decision rights, proposal/lifecycle rules, policy authority | project governance, not protocol semantics by itself |
+| `docs/ARCHITECTURE_BOUNDARIES.md` | repository/product/open-source boundaries and future repository topology | no |
+| `repository-boundaries.json` | machine-readable mirror of repository authority and boundary invariants | no |
+| `docs/OPEN_SOURCE_ENGINEERING_STANDARD.md` | implementation structure, dependency, test, maintainability, and engineering-quality rules | no |
+| `SECURITY.md` | vulnerability reporting and coordinated disclosure | no |
+| `docs/REPOSITORY_SETTINGS.md` | target platform/repository enforcement controls | no |
+| `docs/RELEASE_PROCESS.md` | release eligibility, evidence, provenance, and publication process | release governance only |
+
+The normative protocol authority order remains:
+
+```text
+Normative specification -> schema -> TCK/conformance -> reference implementation
+```
+
+Repository engineering policy MUST NOT reverse this direction. In particular, the reference implementation, test layout, repository topology, commercial platform, or a third-party backend cannot define portable AVP semantics by precedent.
+
+When repository policy documents overlap:
+
+1. `GOVERNANCE.md` defines decision rights and which policy surface owns the concern;
+2. normative AVP semantics remain governed by the accepted/final specification and schemas, with TCK/conformance derived from them;
+3. `SECURITY.md` may temporarily restrict disclosure of embargoed vulnerability details, but it cannot create a hidden released interoperability or conformance requirement;
+4. `docs/ARCHITECTURE_BOUNDARIES.md` and `repository-boundaries.json` define what belongs to this public protocol-development repository versus separate/private product surfaces;
+5. `docs/OPEN_SOURCE_ENGINEERING_STANDARD.md` governs implementation quality where the protocol does not prescribe implementation structure.
+
+Changes that alter these ownership relationships are governance changes and require a focused governance PR with explicit rationale and corresponding machine-readable enforcement where practical.
 
 ## Roles
 
