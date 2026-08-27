@@ -95,8 +95,23 @@ PR #96 added the separate cross-backend canonical parity acceptance layer withou
 
 PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain implementation/conformance evidence rather than protocol authority. Completion of these implementation milestones does not authorize AEP Final transition, release selection, publication, signing, or attestation.
 
+### Browser resource profile
+- [ ] AEP-0011 Draft problem/scope and standards analysis
+- [ ] browser portability and Proposed-readiness audit
+- [ ] close BR-BR-001..BR-BR-010 Draft → Proposed blockers
+- [ ] reconcile AEP-0011 and complete Draft → Proposed readiness audit
+- [ ] AEP-0011 status advanced to Proposed for formal protocol review
+- [ ] complete formal Proposed protocol review
+- [ ] resolve acceptance blockers and record explicit AEP-0011 Proposed → Accepted decision
+- [ ] browser normative specification and requirement index
+- [ ] browser schema(s) for serialized state/projection resources where required
+- [ ] execution-sensitive browser resource TCK
+- [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by readiness audit
+- [ ] Playwright browser runtime against the portable TCK
+
+The Browser Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: browser` is only coarse Fabric classification; it does not define browser state, isolation, snapshot/restore, execution identity, or Subject automation semantics. The AEP-0011 Draft and its roadmap item remain incomplete until the reviewed Draft slice is adopted into `main`; Draft text on a feature branch is not protocol adoption. Playwright remains downstream implementation evidence and must not define portable browser semantics by precedent.
+
 ### Other resource implementations
-- [ ] Playwright browser runtime
 - [ ] network fault proxy
 - [ ] virtual clock service
 - [ ] container runtime
