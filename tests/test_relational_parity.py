@@ -57,12 +57,24 @@ class RelationalParityVerifierTest(unittest.TestCase):
         for _, epochs in evidence.atomic_observations:
             self.assertIn(epochs, fixture.allowed_consistency_epochs)
 
-    def test_requires_distinct_backend_slots(self) -> None:
+    def test_requires_at_least_two_backend_slots(self) -> None:
         fixture = RelationalParityFixtureLoader(ROOT).load()
         with self.assertRaisesRegex(ValueError, "at least two backends"):
             RelationalParityVerifier(
                 fixture,
                 {"reference": InMemoryRelationalBackendHarness()},
+            )
+
+    def test_rejects_same_harness_under_multiple_labels(self) -> None:
+        fixture = RelationalParityFixtureLoader(ROOT).load()
+        backend = InMemoryRelationalBackendHarness()
+        with self.assertRaisesRegex(ValueError, "distinct backend harness instances"):
+            RelationalParityVerifier(
+                fixture,
+                {
+                    "reference-a": backend,
+                    "reference-b": backend,
+                },
             )
 
 
