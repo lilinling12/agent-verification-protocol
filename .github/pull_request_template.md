@@ -4,7 +4,7 @@
 
 ## Motivation
 
-<!-- What concrete problem, ambiguity, interoperability need, or maintenance risk does this solve? -->
+<!-- What concrete problem, ambiguity, interoperability need, maintenance risk, or governance risk does this solve? -->
 
 ## Protocol / conformance impact
 
@@ -15,9 +15,17 @@
 
 Describe observable semantic changes, if any:
 
+## Architecture / repository-boundary impact
+
+<!-- Does this change authority direction, public/private boundaries, package ownership, optional dependencies, implementation layering, or future repository placement? State "none" with rationale when appropriate. -->
+
+- [ ] Protocol authority still flows `spec -> schema -> conformance -> reference implementation`
+- [ ] No private platform behavior/data becomes a hidden requirement for public conformance
+- [ ] Reference/backend-specific mechanics remain non-normative
+
 ## Security / trust-boundary impact
 
-<!-- Subject, Environment, Evaluator, Oracle, MCP, telemetry, secrets, authority, sandboxing, artifact integrity, etc. State "none" with rationale when appropriate. -->
+<!-- Subject, Environment, Evaluator, Oracle, MCP, telemetry, secrets, authority, sandboxing, artifact integrity, etc. State "none" with rationale when appropriate. Do not paste sensitive vulnerability details, real secrets, production/customer data, or private infrastructure information into a public PR. -->
 
 ## Compatibility / versioning
 
@@ -45,6 +53,6 @@ Dependent PRs: <!-- none or #N, #N -->
 - [ ] Public API/protocol models are typed and documented
 - [ ] Failure semantics distinguish Agent failure from infrastructure/evaluation invalidity
 - [ ] No evaluator secret/authority boundary is weakened unintentionally
-- [ ] No compatibility shim is added without an explicit protocol reason
+- [ ] No compatibility shim is added without an explicit released/protocol reason
 - [ ] Documentation and migration notes are updated where required
 - [ ] No unrelated formatting/refactoring is bundled
