@@ -28,6 +28,9 @@ REQUIRED_FILES = (
     "CONTRIBUTING.md",
     "GOVERNANCE.md",
     "SECURITY.md",
+    "repository-boundaries.json",
+    "docs/ARCHITECTURE_BOUNDARIES.md",
+    "docs/OPEN_SOURCE_ENGINEERING_STANDARD.md",
     "docs/BRANCHING.md",
     "docs/RELEASE_PROCESS.md",
     "docs/REPOSITORY_SETTINGS.md",
@@ -36,6 +39,19 @@ REQUIRED_FILES = (
     ".github/ISSUE_TEMPLATE/bug.yml",
     ".github/ISSUE_TEMPLATE/protocol-change.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
+)
+
+CODEOWNER_PROTECTED_PATHS = (
+    "/.github/",
+    "/GOVERNANCE.md",
+    "/SECURITY.md",
+    "/repository-boundaries.json",
+    "/docs/ARCHITECTURE_BOUNDARIES.md",
+    "/docs/OPEN_SOURCE_ENGINEERING_STANDARD.md",
+    "/rfcs/",
+    "/spec/",
+    "/schemas/",
+    "/conformance/",
 )
 
 
@@ -102,10 +118,10 @@ def validate_issue_forms() -> None:
 
 def validate_codeowners() -> None:
     text = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
-    if not re.search(r"^/\.github/\s+@\S+", text, re.MULTILINE):
-        _fail("CODEOWNERS must explicitly protect /.github/")
-    if not re.search(r"^/rfcs/\s+@\S+", text, re.MULTILINE):
-        _fail("CODEOWNERS must explicitly own /rfcs/")
+    for protected_path in CODEOWNER_PROTECTED_PATHS:
+        pattern = rf"^{re.escape(protected_path)}\s+@\S+"
+        if not re.search(pattern, text, re.MULTILINE):
+            _fail(f"CODEOWNERS must explicitly protect {protected_path}")
 
 
 def validate_workflows() -> None:
