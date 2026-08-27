@@ -69,8 +69,11 @@ class RelationalParityVerifier:
             raise ValueError("canonical parity requires at least two backends")
         if any(not label for label in backends):
             raise ValueError("parity backend labels must not be empty")
+        if len({id(backend) for backend in backends.values()}) != len(backends):
+            raise ValueError("canonical parity requires distinct backend harness instances")
         self._fixture = fixture
         self._backends = tuple(sorted(backends.items()))
+        self._backend_by_label = dict(self._backends)
 
     def verify(self) -> RelationalParityEvidence:
         """Execute the fixture lifecycle and return portable acceptance evidence."""
@@ -139,7 +142,11 @@ class RelationalParityVerifier:
         observed = {label: resource.state_image() for label, resource in resources.items()}
         expected_digest = self._fixture.expectations.baseline_state_image_digest
         for label, state in observed.items():
-            self._require_equal(f"{label} baseline StateImage digest", state.digest, expected_digest)
+            self._require_equal(
+                f"{label} baseline StateImage digest",
+                state.digest,
+                expected_digest,
+            )
         return self._require_canonical_state_parity("baseline StateImage", observed)
 
     def _verify_baseline_projections(
@@ -175,9 +182,18 @@ class RelationalParityVerifier:
         resources: Mapping[str, RelationalSUT],
         baseline: StateImage,
     ) -> None:
-        snapshots = {label: resource.snapshot() for label, resource in resources.items()}
-        observed = {label: snapshot.state for label, snapshot in snapshots.items()}
-        canonical = self._require_canonical_state_parity("snapshot StateImage", observed)
+        snapshots = {
+            label: resource.snapshot()
+            for label, resource in resources.items()
+        }
+        observed = {
+            label: snapshot.state
+            for label, snapshot in snapshots.items()
+        }
+        canonical = self._require_canonical_state_parity(
+            "snapshot StateImage",
+            observed,
+        )
         self._require_equal("snapshot baseline identity", canonical.digest, baseline.digest)
 
     def _verify_atomic_mutation(
@@ -195,7 +211,7 @@ class RelationalParityVerifier:
         diffs: dict[str, RelationalDiff] = {}
 
         for label, resource in resources.items():
-            backend = dict(self._backends)[label]
+            backend = self._backend_by_label[label]
             document = backend.fixture_control.project_during_atomic_commit(
                 resource,
                 projection_id="consistency.pair",
@@ -209,8 +225,14 @@ class RelationalParityVerifier:
             observations.append((label, epochs))
 
             after = resource.state_image()
-            expected_after = self._fixture.expectations.after_atomic_epoch_mutation_state_image_digest
-            self._require_equal(f"{label} post-commit StateImage digest", after.digest, expected_after)
+            expected_after = (
+                self._fixture.expectations.after_atomic_epoch_mutation_state_image_digest
+            )
+            self._require_equal(
+                f"{label} post-commit StateImage digest",
+                after.digest,
+                expected_after,
+            )
             after_states[label] = after
 
             observed_diff = resource.diff(baseline, after)
@@ -221,7 +243,10 @@ class RelationalParityVerifier:
             )
             diffs[label] = observed_diff
 
-        after = self._require_canonical_state_parity("post-commit StateImage", after_states)
+        after = self._require_canonical_state_parity(
+            "post-commit StateImage",
+            after_states,
+        )
         diff = self._require_canonical_diff_parity("atomic mutation diff", diffs)
         return tuple(sorted(observations)), after, diff
 
@@ -234,7 +259,7 @@ class RelationalParityVerifier:
         expected_baseline = self._fixture.expectations.baseline_state_image_digest
 
         for label, resource in resources.items():
-            backend = dict(self._backends)[label]
+            backend = self._backend_by_label[label]
             resource.reset()
             snapshot = resource.snapshot()
             backend.fixture_control.replace_relations_atomically(
@@ -244,15 +269,22 @@ class RelationalParityVerifier:
             fidelity = resource.restore(snapshot)
             if fidelity is not RestoreFidelity.STATE_EQUIVALENT:
                 raise RelationalParityError(
-                    f"{label} restore fidelity is {fidelity.value}, expected STATE_EQUIVALENT"
+                    f"{label} restore fidelity is {fidelity.value}, "
+                    "expected STATE_EQUIVALENT"
                 )
             state = resource.state_image()
-            self._require_equal(f"{label} restored StateImage digest", state.digest, expected_baseline)
+            self._require_equal(
+                f"{label} restored StateImage digest",
+                state.digest,
+                expected_baseline,
+            )
             fidelities[label] = fidelity
             restored[label] = state
 
         if len(set(fidelities.values())) != 1:
-            raise RelationalParityError("paired backends reported different restore fidelity")
+            raise RelationalParityError(
+                "paired backends reported different restore fidelity"
+            )
         return (
             next(iter(fidelities.values())),
             self._require_canonical_state_parity("restored StateImage", restored),
@@ -265,13 +297,17 @@ class RelationalParityVerifier:
         observed: dict[str, StateImage] = {}
         expected = self._fixture.expectations.baseline_state_image_digest
         for label, resource in resources.items():
-            backend = dict(self._backends)[label]
+            backend = self._backend_by_label[label]
             backend.fixture_control.replace_relations_atomically(
                 resource,
                 self._fixture.epoch_mutation_mapping(),
             )
             state = resource.reset()
-            self._require_equal(f"{label} reset StateImage digest", state.digest, expected)
+            self._require_equal(
+                f"{label} reset StateImage digest",
+                state.digest,
+                expected,
+            )
             observed[label] = state
         return self._require_canonical_state_parity("reset StateImage", observed)
 
@@ -279,20 +315,34 @@ class RelationalParityVerifier:
     def _epochs(document: Mapping[str, object]) -> tuple[str, str]:
         relations = document.get("relations")
         if not isinstance(relations, list) or len(relations) != 2:
-            raise RelationalParityError("consistency projection must contain exactly two relations")
+            raise RelationalParityError(
+                "consistency projection must contain exactly two relations"
+            )
         values: list[str] = []
         for relation in relations:
             if not isinstance(relation, dict):
-                raise RelationalParityError("consistency projection relation is malformed")
+                raise RelationalParityError(
+                    "consistency projection relation is malformed"
+                )
             rows = relation.get("rows")
-            if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
-                raise RelationalParityError("consistency projection must contain one row per relation")
+            if (
+                not isinstance(rows, list)
+                or len(rows) != 1
+                or not isinstance(rows[0], dict)
+            ):
+                raise RelationalParityError(
+                    "consistency projection must contain one row per relation"
+                )
             row_values = rows[0].get("values")
             if not isinstance(row_values, dict):
-                raise RelationalParityError("consistency projection values are malformed")
+                raise RelationalParityError(
+                    "consistency projection values are malformed"
+                )
             epoch = row_values.get("epoch")
             if not isinstance(epoch, dict) or not isinstance(epoch.get("value"), str):
-                raise RelationalParityError("consistency projection epoch is malformed")
+                raise RelationalParityError(
+                    "consistency projection epoch is malformed"
+                )
             values.append(epoch["value"])
         return values[0], values[1]
 
@@ -301,7 +351,10 @@ class RelationalParityVerifier:
         context: str,
         observed: Mapping[str, StateImage],
     ) -> StateImage:
-        documents = {label: state.as_document() for label, state in observed.items()}
+        documents = {
+            label: state.as_document()
+            for label, state in observed.items()
+        }
         self._require_canonical_document_parity(context, documents)
         return next(iter(observed.values()))
 
@@ -310,7 +363,10 @@ class RelationalParityVerifier:
         context: str,
         observed: Mapping[str, RelationalDiff],
     ) -> RelationalDiff:
-        documents = {label: value.as_document() for label, value in observed.items()}
+        documents = {
+            label: value.as_document()
+            for label, value in observed.items()
+        }
         self._require_canonical_document_parity(context, documents)
         return next(iter(observed.values()))
 
@@ -325,7 +381,10 @@ class RelationalParityVerifier:
         }
         values = tuple(encoded.values())
         if not values or any(value != values[0] for value in values[1:]):
-            summaries = {label: digest(document) for label, document in observed.items()}
+            summaries = {
+                label: digest(document)
+                for label, document in observed.items()
+            }
             raise RelationalParityError(
                 f"{context} canonical bytes differ across backends: {summaries}"
             )
