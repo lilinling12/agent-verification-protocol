@@ -76,7 +76,7 @@ The Environment Fabric authority slice was adopted into `main` by squash merge o
 - [x] execution-sensitive `avp-relational-state-v0.1` TCK
 - [x] shared backend-neutral relational conformance harness + immutable parity fixture + privileged fixture-control seam (RBIR-001..003)
 - [x] PostgreSQL adapter against the portable TCK
-- [ ] MySQL/InnoDB adapter against the same portable TCK
+- [x] MySQL/InnoDB adapter against the same portable TCK
 - [ ] PostgreSQL/MySQL canonical parity acceptance evidence
 
 AEP-0010 is **Accepted, not Final**. Formal Proposed review at baseline `29586a050a758a7058e1489df8c0b75e1d7088ca` found three acceptance blockers: visibility-scoped handling of evaluator-private relational state (RS-PR-001), explicit identity binding for execution-relevant database program/configuration inputs outside the logical state Manifest (RS-PR-002), and exact `STATE_EQUIVALENT` fidelity for a successful v0.1 relational restore (RS-PR-003).
@@ -89,7 +89,9 @@ Backend implementation readiness audit `docs/acceptance/alpha3-relational-backen
 
 PR #92 implemented the first database-specific adapter against that adopted backend-neutral harness. Its semantic implementation head `0954140ec30946787c95dfa04eb980637945ad2f` passed CI #596 and Governance #661, and formal implementation review `5028233705` found no blocker requiring portable Spec/Schema/TCK changes. Final PR head `ac8b32346450e9dc3345a289da3e5ea8a5638c93` passed CI #598, Governance #663, Release Validation #90, and Ready-state Governance #664. The protocol maintainer then explicitly authorized squash merge on 2026-08-26. PR #92 was adopted into `main` at exact commit `70b1a6c9ce0d45c596e489533cc9600151dae2b8`, and exact-main CI #599 (`32948033723`) passed Python 3.11/3.12/3.13 quality, reproducible packaging, clean base-wheel installation, installed-wheel full registered TCK conformance, release-evidence verification, and real PostgreSQL 17.11 / 18.6 database lanes. `docs/acceptance/alpha3-postgresql-main-adoption.md` records the adoption evidence. The PostgreSQL adapter roadmap item is therefore complete on `main`.
 
-PostgreSQL remains implementation evidence rather than protocol authority. MySQL/InnoDB and PostgreSQL/MySQL canonical parity remain separate downstream work units; the PostgreSQL adoption does not authorize AEP Final transition, release selection, publication, signing, or attestation.
+PR #94 implemented the second database-specific adapter against the same adopted backend-neutral harness. Final implementation head `4a492d307c60f9fe2b0a7dfb26970616f1681b1c` passed CI #604 and Governance #669, and formal implementation review `5028744001` found no blocker requiring portable Spec/Schema/TCK changes. Ready-state Governance #670 also passed on the unchanged exact head. The protocol maintainer explicitly authorized squash merge on 2026-08-27. PR #94 was adopted into `main` at exact commit `c081b714b832b4fd0201ea01dc35fba023d06826`, and exact-main CI #605 (`33035553945`) passed Python 3.11/3.12/3.13 quality, reproducible packaging, clean base-wheel installation, installed-wheel full registered TCK conformance, release-evidence verification, real PostgreSQL 17.11 / 18.6 regression lanes, and real MySQL 8.4.11 / 9.7.2 database lanes. `docs/acceptance/alpha3-mysql-main-adoption.md` records the adoption evidence. The MySQL/InnoDB adapter roadmap item is therefore complete on `main`.
+
+PostgreSQL and MySQL/InnoDB remain implementation evidence rather than protocol authority. PostgreSQL/MySQL canonical parity remains a separate downstream work unit; independent backend success does not itself establish cross-backend parity. These backend adoptions do not authorize AEP Final transition, release selection, publication, signing, or attestation.
 
 ### Other resource implementations
 - [ ] Playwright browser runtime
