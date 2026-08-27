@@ -1,8 +1,13 @@
 # Alpha 3 PostgreSQL/MySQL Canonical Parity Acceptance
 
-Status: **IMPLEMENTATION REVIEW CANDIDATE — MAIN ADOPTION PENDING**
+Status: **ADOPTED ON MAIN — CANONICAL PARITY ACCEPTANCE CLOSED**
 
-Candidate implementation evidence head: `f551fd510997b1e94a1ea56887b824c01e4b6caf`
+Source pull request: PR #96  
+Final reviewed PR head: `ae5e31c8a080239b81c1204cf141f6ca688302a0`  
+Adopted main commit: `0bc12cdecd7d35292d2720adb0963e66ebeb509d`  
+Merge method: squash  
+Exact-main CI: #612 (`33048968550`)  
+Exact-main Relational Parity: #5 (`33048968491`)
 
 Governing authority:
 
@@ -34,7 +39,7 @@ This work asks the stronger question:
 > observations wherever the profile defines canonical equality, without making
 > either database product the oracle?
 
-The answer for the candidate head is **yes**.
+The adopted implementation evidence answers **yes**.
 
 ## 2. Parity rule
 
@@ -188,7 +193,7 @@ run.
 both optional relational dependencies into a clean virtual environment, verifies
 both live server identities, and then executes the paired acceptance test.
 
-The candidate matrix is deliberately composed of two real product pairs:
+The accepted matrix is deliberately composed of two real product pairs:
 
 - PostgreSQL 17.11 + MySQL 8.4.11;
 - PostgreSQL 18.6 + MySQL 9.7.2.
@@ -196,69 +201,100 @@ The candidate matrix is deliberately composed of two real product pairs:
 The existing independent PostgreSQL and MySQL full-TCK lanes remain in the normal
 CI workflow and are not replaced by this parity gate.
 
-## 6. Candidate exact-head execution evidence
+## 6. Exact-head implementation acceptance
 
-Candidate head:
+An earlier implementation evidence head,
+`f551fd510997b1e94a1ea56887b824c01e4b6caf`, established the initial real-database
+candidate evidence in CI #610, Governance #675, and Relational Parity #3. The
+acceptance-document commit changed the PR head after that execution, so those
+runs were correctly treated as preliminary rather than reused as final-head
+acceptance.
 
-`f551fd510997b1e94a1ea56887b824c01e4b6caf`
+The final reviewed PR #96 head was:
 
-Successful runs on that exact head:
+`ae5e31c8a080239b81c1204cf141f6ca688302a0`
 
-- CI #610 — run `33048079457` — **SUCCESS**;
-- Governance #675 — run `33048079438` — **SUCCESS**;
-- Relational Parity #3 — run `33048079433` — **SUCCESS**.
+Exact-head acceptance evidence on that final head:
 
-Relational Parity #3 completed both matrix jobs successfully:
+- CI #611 (`33048226831`) — **SUCCESS**;
+- Governance #676 (`33048226885`) — **SUCCESS**;
+- Relational Parity #4 (`33048226830`) — **SUCCESS**;
+- formal exact-head review `5038102614` — **READY ELIGIBLE**;
+- Ready-state Governance #677 (`33048372618`) — **SUCCESS**.
 
-- PostgreSQL 17.11 / MySQL 8.4.11 / Canonical Parity / Python 3.13 — **SUCCESS**;
-- PostgreSQL 18.6 / MySQL 9.7.2 / Canonical Parity / Python 3.13 — **SUCCESS**.
+CI #611 preserved the full repository acceptance surface: Quality on Python
+3.11/3.12/3.13, reproducible Package construction, clean base-wheel consumer
+installation, installed-wheel identity/smoke/full registered TCK conformance,
+release-evidence build/verification, PostgreSQL 17.11/18.6 Relational TCK lanes,
+and MySQL 8.4.11/9.7.2 Relational TCK lanes.
 
-Each matrix job completed, in order, live container initialization, built-wheel
-construction, installation with both optional database dependencies, paired
-server identity verification, real canonical parity acceptance, and deterministic
-container teardown.
+Relational Parity #4 completed both real paired-database jobs successfully:
 
-CI #610 separately preserves the existing package/full installed-wheel TCK gates
-and independent PostgreSQL/MySQL Relational TCK regression lanes.
+- PostgreSQL 17.11 + MySQL 8.4.11 / Canonical Parity / Python 3.13;
+- PostgreSQL 18.6 + MySQL 9.7.2 / Canonical Parity / Python 3.13.
 
-## 7. Change boundary
+Each job built the parity-capable wheel, installed both optional backend
+dependencies, verified the paired server identities, and executed the real
+PostgreSQL/MySQL canonical parity acceptance path.
 
-The candidate does not modify:
+The formal review found no blocker and authorized the Ready transition only; it
+did not authorize its own merge or any protocol/release lifecycle transition.
 
-- AEP-0009 or AEP-0010 lifecycle state;
-- normative Relational State specification;
-- Manifest integrity specification;
+## 7. Main adoption evidence
+
+The protocol maintainer explicitly authorized squash merge of PR #96 on
+2026-08-27. GitHub adopted the reviewed implementation/evidence as exact main
+commit:
+
+`0bc12cdecd7d35292d2720adb0963e66ebeb509d`
+
+Exact-main validation then completed successfully:
+
+- CI #612 (`33048968550`) — **SUCCESS** on exact
+  `0bc12cdecd7d35292d2720adb0963e66ebeb509d`;
+- Relational Parity #5 (`33048968491`) — **SUCCESS** on the same exact main
+  commit.
+
+Relational Parity #5 executed both supported real paired-database matrices from a
+built wheel. Independent PostgreSQL/MySQL TCK lanes and the installed-wheel full
+registered TCK remained green in CI #612.
+
+The canonical parity implementation/evidence was therefore adopted and verified
+on `main`. Later main changes have continued to exercise this gate; for example,
+Relational Parity #11 (`33053079311`) completed successfully on
+`main@a77e3bc9039e81d5443125c5ce4229236c258f65` for both supported product pairs.
+This later regression evidence supplements, but does not replace, the exact
+main-adoption evidence tied to PR #96.
+
+## 8. Adoption conclusion and ROADMAP reconciliation
+
+**ADOPTED ON MAIN — CANONICAL PARITY ACCEPTANCE CLOSED.**
+
+The real PostgreSQL and MySQL/InnoDB implementations have direct paired evidence
+that they reproduce the same portable canonical Relational State observations
+under the immutable shared fixture while preserving legitimate backend scheduling
+freedom at the concurrent commit boundary.
+
+The corresponding `ROADMAP.md` item may therefore be marked complete as an
+implementation-evidence milestone. That checkbox does not make either database
+implementation normative and does not change the authority chain.
+
+## 9. Scope boundary and non-authorizations
+
+This adoption/reconciliation does not modify or authorize:
+
+- AEP-0009 or AEP-0010 lifecycle state, including any `Final` transition;
+- normative Relational State or Manifest-integrity specification;
 - requirement index;
 - Relational State schemas;
 - language-neutral TCK profile/case semantics;
 - shared parity fixture bytes or its lock;
 - PostgreSQL adapter portable behavior;
 - MySQL adapter portable behavior;
-- release-development state;
-- ROADMAP parity completion state.
-
-The ROADMAP item remains open until this evidence is merged, validated on exact
-`main`, and reconciled through the repository's normal adoption governance.
-
-## 8. Candidate conclusion
-
-**IMPLEMENTATION REVIEW CANDIDATE — MAIN ADOPTION PENDING.**
-
-The candidate provides direct paired evidence that the real PostgreSQL and
-MySQL/InnoDB implementations reproduce the same portable canonical Relational
-State observations under the immutable shared fixture while preserving legitimate
-backend scheduling freedom at the concurrent commit boundary.
-
-This document is added after the candidate execution above, so its containing PR
-head is a newer commit. The PR MUST rerun all exact-head CI, Governance, and
-Relational Parity gates after this documentation commit before it may be considered
-review-closed or Ready.
-
-This acceptance record does **not** authorize:
-
-- merge of the candidate PR;
-- checking the ROADMAP parity item before main adoption reconciliation;
-- AEP-0009 or AEP-0010 `Final` transition;
-- release selection, tagging, or publication;
+- release-development state or release selection;
+- release tagging or publication;
 - package-index publication;
-- signing or attestation.
+- signing or attestation publication.
+
+PostgreSQL/MySQL parity remains implementation/conformance evidence under the
+existing portable authority; it is not a new source of protocol semantics.
