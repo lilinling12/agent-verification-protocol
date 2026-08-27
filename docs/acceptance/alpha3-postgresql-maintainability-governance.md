@@ -1,9 +1,14 @@
 # Alpha 3 PostgreSQL Relational Adapter Maintainability Governance
 
-Status: **IMPLEMENTATION REVIEW CANDIDATE — MAIN ADOPTION PENDING**
+Status: **ADOPTED ON MAIN — MAINTAINABILITY GOVERNANCE CLOSED**
 
-Base main: `0bc12cdecd7d35292d2720adb0963e66ebeb509d`  
-Source pull request: PR #97
+Implementation review base: `0bc12cdecd7d35292d2720adb0963e66ebeb509d`  
+Source pull request: PR #97  
+Final reviewed PR head: `d1452df771237de8152a73ea03302b7438df3d9c`  
+Adopted main commit: `43a437915cb078e3adde392d5560e832207ee662`  
+Merge method: squash  
+Exact-main CI: #616 (`33051205901`)  
+Exact-main Relational Parity: #9 (`33051205914`)
 
 ## 1. Purpose
 
@@ -64,7 +69,7 @@ existing backend-neutral harness independently.
 
 ## 4. Preserved semantic invariants
 
-The refactor must preserve all previously adopted PostgreSQL guarantees:
+The adopted refactor preserves the previously governed PostgreSQL guarantees:
 
 - portable Manifest and StateImage identity are computed from the existing
   canonical model, not database-native identity;
@@ -115,29 +120,94 @@ properties:
 The existing real PostgreSQL adapter suite remains the semantic acceptance path;
 these structural tests do not replace database-backed TCK execution.
 
-## 7. Required exact-head acceptance
+## 7. Exact-head implementation acceptance
 
-Before this PR is eligible to leave Draft, the exact final head must pass:
+The final reviewed PR head was:
 
-- Governance;
-- Quality on Python 3.11, 3.12, and 3.13;
-- reproducible package construction;
-- clean base-wheel installation and installed-wheel identity/smoke;
-- installed-wheel full registered TCK conformance;
-- release-evidence build and verification;
-- PostgreSQL 17.11 real Relational TCK;
-- PostgreSQL 18.6 real Relational TCK;
-- MySQL 8.4.11 regression Relational TCK;
-- MySQL 9.7.2 regression Relational TCK;
-- PostgreSQL 17.11 + MySQL 8.4.11 real canonical parity;
-- PostgreSQL 18.6 + MySQL 9.7.2 real canonical parity;
-- formal exact-head implementation review with no unresolved review thread.
+`d1452df771237de8152a73ea03302b7438df3d9c`
 
-A successful earlier head is not reusable after a refactor change.
+It was ahead of base by 12 commits and behind by 0 when reviewed. The base
+remained exact `main@0bc12cdecd7d35292d2720adb0963e66ebeb509d`; no base drift or
+unresolved review thread existed.
 
-## 8. Non-authorizations
+Exact-head acceptance evidence:
 
-This work does not authorize or perform:
+- CI #615 (`33050193398`) — SUCCESS;
+- Governance #680 (`33050193383`) — SUCCESS;
+- Relational Parity #8 (`33050193369`) — SUCCESS;
+- formal exact-head review `5038329220` — `READY ELIGIBLE`;
+- Ready-state Governance #681 (`33050393033`) — SUCCESS.
+
+CI #615 included successful Quality lanes for Python 3.11/3.12/3.13, the package
+lane with reproducible distribution-byte verification, clean base-wheel consumer
+installation, installed-wheel identity/smoke/full registered TCK conformance,
+and release-evidence build/verification. It also included successful real
+PostgreSQL 17.11/18.6 Relational TCK lanes and MySQL 8.4.11/9.7.2 regression
+Relational TCK lanes.
+
+Relational Parity #8 passed both real paired-database matrices from a built wheel:
+
+- PostgreSQL 17.11 + MySQL 8.4.11;
+- PostgreSQL 18.6 + MySQL 9.7.2.
+
+The formal review authorized the Ready transition only and did not authorize its
+own merge.
+
+## 8. Main adoption evidence
+
+The protocol maintainer explicitly authorized **squash merge PR #97** on
+2026-08-27. The merge was executed with the reviewed head SHA as the expected
+head guard, so any last-moment PR-head movement would have rejected the merge.
+
+GitHub created exact main commit:
+
+`43a437915cb078e3adde392d5560e832207ee662`
+
+The post-merge branch state confirmed that `main` remained on that exact commit
+while the main-adoption gates executed.
+
+Exact-main CI #616 (`33051205901`) completed successfully with all expected jobs:
+
+- Quality / Python 3.11 — SUCCESS;
+- Quality / Python 3.12 — SUCCESS;
+- Quality / Python 3.13 — SUCCESS;
+- Package / Python 3.13 — SUCCESS;
+- PostgreSQL 17.11 / Relational TCK / Python 3.13 — SUCCESS;
+- PostgreSQL 18.6 / Relational TCK / Python 3.13 — SUCCESS;
+- MySQL 8.4.11 / Relational TCK / Python 3.13 — SUCCESS;
+- MySQL 9.7.2 / Relational TCK / Python 3.13 — SUCCESS.
+
+The package job again passed reproducible distribution verification, built-wheel
+metadata validation, clean base-wheel consumer installation, installed-wheel
+identity, installed-wheel smoke, installed-wheel full registered TCK conformance,
+and release-evidence build/verification on the exact main commit.
+
+Exact-main Relational Parity #9 (`33051205914`) also completed successfully for
+both supported real paired-database matrices:
+
+- PostgreSQL 17.11 + MySQL 8.4.11 / Canonical Parity / Python 3.13 — SUCCESS;
+- PostgreSQL 18.6 + MySQL 9.7.2 / Canonical Parity / Python 3.13 — SUCCESS.
+
+Both parity jobs built the parity-capable wheel, installed both optional backend
+dependencies, verified the paired database identities, and executed the real
+PostgreSQL/MySQL canonical parity acceptance path.
+
+The reviewed maintainability refactor is therefore adopted and verified on
+`main`. This closes the **PostgreSQL maintainability governance work unit**.
+
+## 9. Scope isolation and remaining governance work
+
+This closure does not reconcile the separately governed canonical-parity roadmap
+state. `ROADMAP.md` and the canonical parity acceptance record remain a distinct
+follow-on documentation/governance work unit and are intentionally not changed by
+this maintainability adoption record.
+
+The repository remains in governed development mode; this work does not alter
+`docs/releases/release-development-state.json` or select a release.
+
+## 10. Non-authorizations
+
+This adoption does not authorize or perform:
 
 - changes to AEP-0009 or AEP-0010 lifecycle state;
 - changes to Relational normative specification, requirement index, schemas, or
@@ -145,8 +215,7 @@ This work does not authorize or perform:
 - changes to the immutable parity fixture or its lock;
 - changes to MySQL portable behavior;
 - PostgreSQL behavior becoming portable precedent;
-- ROADMAP reconciliation for the already-merged canonical parity work unit;
+- canonical-parity ROADMAP reconciliation by implication;
 - release selection or publication;
 - package-index publication;
-- signing or attestation publication;
-- merge of PR #97 without separate explicit protocol-maintainer authorization.
+- signing or attestation publication.
