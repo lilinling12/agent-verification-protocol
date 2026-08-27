@@ -96,7 +96,7 @@ PR #96 added the separate cross-backend canonical parity acceptance layer withou
 PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain implementation/conformance evidence rather than protocol authority. Completion of these implementation milestones does not authorize AEP Final transition, release selection, publication, signing, or attestation.
 
 ### Browser resource profile
-- [ ] AEP-0011 Draft problem/scope and standards analysis
+- [x] AEP-0011 Draft problem/scope and standards analysis
 - [ ] browser portability and Proposed-readiness audit
 - [ ] close BR-BR-001..BR-BR-010 Draft → Proposed blockers
 - [ ] reconcile AEP-0011 and complete Draft → Proposed readiness audit
@@ -109,7 +109,7 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by readiness audit
 - [ ] Playwright browser runtime against the portable TCK
 
-The Browser Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: browser` is only coarse Fabric classification; it does not define browser state, isolation, snapshot/restore, execution identity, or Subject automation semantics. The AEP-0011 Draft and its roadmap item remain incomplete until the reviewed Draft slice is adopted into `main`; Draft text on a feature branch is not protocol adoption. Playwright remains downstream implementation evidence and must not define portable browser semantics by precedent.
+AEP-0011 remains **Draft, not Proposed**. Its problem/scope and standards-analysis baseline was adopted into `main` by authorized squash merge of PR #100 at exact commit `8f0c37e34202066ed79f8aa420a9939dd79cc5d1`. Exact-main CI #622 (`33116957396`) and Relational Parity #15 (`33116957406`) both passed on that merge commit. `docs/acceptance/alpha3-browser-draft-main-adoption.md` records the exact-head review, Ready-state, merge, and post-merge evidence. BR-BR-001..BR-BR-010 remain open and are the subject of the next separately governed Browser Resource portability / Proposed-readiness audit. `resourceKind: browser` remains only coarse Fabric classification; Playwright remains downstream implementation evidence and must not define portable browser semantics by precedent.
 
 ### Other resource implementations
 - [ ] network fault proxy
