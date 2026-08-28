@@ -1,10 +1,11 @@
 # AEP-0011 — Browser Resource Profile v0.1
 
-- Status: Draft
+- Status: Proposed
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-27
 - Portability audit: `docs/design/alpha3-browser-resource-portability-audit.md`
 - Proposed-readiness evidence: `docs/design/alpha3-browser-resource-proposed-readiness-audit.md`
+- Lifecycle decision: `docs/acceptance/alpha3-aep-0011-proposed-decision.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (`Accepted`)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Browser Resource
@@ -27,9 +28,9 @@ profile: avp-browser-state-v0.1
 revision: "0.1"
 ```
 
-The exact spelling remains a candidate until the AEP lifecycle and downstream normative authority chain approve it. The capability is one cohesive portable claim rather than a transitional collection of `supports_*` flags.
+The exact spelling remains a candidate until formal protocol review and downstream normative authority approve it. The capability is one cohesive portable claim rather than a transitional collection of `supports_*` flags.
 
-This AEP remains **Draft**. Reconciliation closes the design blockers required for Proposed-readiness review, but it does not itself perform the separate `Draft -> Proposed` lifecycle transition and does not authorize Browser Spec/Schema/TCK or a Playwright implementation.
+AEP-0011 is **Proposed** for formal protocol review. This lifecycle state means the design is sufficiently complete to receive protocol review; it does not make the Browser profile Accepted, normative, released, or authorized for Browser Spec/Schema/TCK/runtime implementation.
 
 ## Problem
 
@@ -543,11 +544,10 @@ No unresolved Draft-design blocker remains from BR-BR-001 through BR-BR-010. For
 
 ## Governance boundary
 
-AEP-0011 remains **Draft** pending a separate explicit lifecycle decision.
+AEP-0011 is **Proposed** for formal protocol review under the explicit protocol-maintainer lifecycle authorization recorded on 2026-08-29. Proposed status is not Accepted or Final protocol authority and does not authorize downstream Browser implementation by itself.
 
-This reconciliation does not authorize:
+This lifecycle transition does not authorize:
 
-- `Draft -> Proposed` transition by itself;
 - `Proposed -> Accepted` or `Accepted -> Final`;
 - Browser normative specification/requirement-index/schema/TCK adoption;
 - browser backend-neutral harness implementation;
@@ -561,7 +561,7 @@ This reconciliation does not authorize:
 - signing or attestation publication;
 - treating reference implementation behavior as protocol authority.
 
-If the accompanying Proposed-readiness audit is review-closed with no semantic blocker, the next governance act is a separately recorded protocol-maintainer decision on whether to advance AEP-0011 from Draft to Proposed for formal protocol review.
+The next governed Browser work after this lifecycle candidate is adopted into `main` is formal Proposed protocol review. Any semantic blocker discovered there must be resolved before a separate `Proposed -> Accepted` decision can be considered.
 
 ## References
 
