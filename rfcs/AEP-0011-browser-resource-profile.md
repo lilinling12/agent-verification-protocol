@@ -3,740 +3,580 @@
 - Status: Draft
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-27
+- Portability audit: `docs/design/alpha3-browser-resource-portability-audit.md`
+- Proposed-readiness evidence: `docs/design/alpha3-browser-resource-proposed-readiness-audit.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (`Accepted`)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Browser Resource
 
 ## Summary
 
-AEP-0011 starts the portable design for the browser resource domain required by
-AVP Alpha 3 Environment Fabric.
+AEP-0011 defines the review-ready portable direction for the first browser resource profile under AVP Environment Fabric.
 
-The core design constraint is inherited from AEP-0009:
+The core rule is:
 
-> AVP must define browser-resource semantics before a Playwright adapter is
-> treated as an official Alpha 3 implementation, and Playwright behavior must
-> never become protocol authority by implementation precedent.
+> AVP standardizes the observable browser-session state boundary and the identity/evidence required to verify it; browser products, automation libraries, native handles, profile directories, and engine-private mechanics remain implementation details.
 
-The base Environment Fabric contract already recognizes `browser` as a coarse
-Resource Kind. That classification is not a Browser Resource Profile. It does not
-define an isolation unit, authoritative browser-state surface, snapshot/restore
-meaning, browser execution identity, cross-origin storage semantics, evaluator
-projection model, or conformance-bearing browser capability.
+The reconciled v0.1 design is deliberately narrow. One independently isolated browser-session resource owns a closed authoritative logical state surface consisting of selected **unpartitioned HTTP cookies** and selected **origin-scoped `localStorage`**. A successful restore may report exactly `STATE_EQUIVALENT`; `EXACT` is not a valid successful fidelity claim for this base profile.
 
-This Draft therefore does **not** implement Playwright and does not yet create a
-normative specification, schema, capability registration, or TCK profile. Its
-purpose is to establish the problem boundary, standards alignment, candidate
-scope, security constraints, and the design blockers that must be resolved before
-AEP-0011 can advance to `Proposed`.
+A working capability identity for downstream normative review is:
 
-A working capability/profile identity may be discussed during design, but no
-identifier in this Draft is an accepted protocol claim until the AEP lifecycle
-and downstream authority chain approve it.
+```text
+capabilityId: browser.session-state
+profile: avp-browser-state-v0.1
+revision: "0.1"
+```
+
+The exact spelling remains a candidate until the AEP lifecycle and downstream normative authority chain approve it. The capability is one cohesive portable claim rather than a transitional collection of `supports_*` flags.
+
+This AEP remains **Draft**. Reconciliation closes the design blockers required for Proposed-readiness review, but it does not itself perform the separate `Draft -> Proposed` lifecycle transition and does not authorize Browser Spec/Schema/TCK or a Playwright implementation.
 
 ## Problem
 
-A browser is not one serializable state object and an isolated browser automation
-context is not automatically a portable AVP snapshot primitive.
+A browser is not one serializable state object, and an automation context is not automatically a portable AVP snapshot primitive.
 
-Real browser execution combines multiple independently specified and differently
-scoped surfaces, including:
+Real browser execution combines independently scoped surfaces such as cookies, Web Storage, IndexedDB, Cache Storage, Service Workers, browsing-context topology, navigation history, DOM/JavaScript execution, credentials, downloads, rendering state, browser build/configuration, networking, and time.
 
-- HTTP cookies and partitioned cookie state;
-- origin/storage-key scoped local storage;
-- top-level-session scoped session storage;
-- IndexedDB databases and transactions;
-- Cache Storage and other storage buckets;
-- service-worker registrations, lifecycle state, and controlled clients;
-- browsing-context/page/tab/popup topology;
-- navigation and history state;
-- DOM and JavaScript heap state;
-- workers, timers, pending tasks, dialogs, permissions, and device/emulation
-  settings;
-- virtual WebAuthn credentials or other credential material when enabled;
-- downloads and uploaded-file effects;
-- browser engine/build, platform, headless/headful mode, rendering inputs, fonts,
-  locale, timezone, viewport, and other execution-relevant configuration;
-- network, DNS, TLS, external-service, and wall-clock dependencies that may be
-  controlled by other Environment Resource profiles or may remain uncontrolled.
+Different automation mechanisms expose different subsets of those surfaces. Treating Playwright `storageState`, a profile directory, a DevTools session, a WebDriver handle, or a browser-process checkpoint as "the AVP browser state" would create backend-first semantics.
 
-Different automation mechanisms expose different subsets of these surfaces.
-Treating one implementation's `storageState` object, profile directory, DevTools
-session, or browser-process checkpoint as "the AVP browser state" would create
-backend-first semantics and would make cross-implementation conformance
-unreviewable.
+A portable Browser Resource Profile must therefore state exactly:
 
-The Browser Resource Profile must instead specify exactly what portable claim is
-made, which surfaces are authoritative for that claim, which surfaces are only
-Evidence, which surfaces are explicitly out of scope, and how omitted surfaces
-limit restore/replay fidelity.
+- what resource boundary AVP owns;
+- which state is authoritative and restorable;
+- which data is Evidence or runtime observation only;
+- which state is excluded from the base profile;
+- what identity must remain immutable for execution;
+- when projection is trustworthy;
+- what restore fidelity can honestly be claimed;
+- how an implementation proves the behavior without self-certification.
 
 ## Existing AVP authority reused
 
-AEP-0011 specializes existing contracts and must not create competing concepts.
+AEP-0011 specializes existing contracts and does not create competing concepts.
 
-### Environment v0.1
+### Environment
 
 Reused unchanged:
 
-- authoritative Environment ownership and ScenarioInstance binding;
-- actor-scoped Subject observations;
-- evaluator-authoritative projections and projection digests;
+- authoritative Environment/resource ownership and ScenarioInstance binding;
+- evaluator-authoritative projection identity;
 - reset target honesty;
-- Environment-owned SnapshotRef identity and stale/foreign fail-closed behavior;
+- Environment-owned SnapshotRef identity and foreign/stale rejection;
 - restore fidelity vocabulary `EXACT | STATE_EQUIVALENT | NON_EQUIVALENT`;
-- semantic diff binding where a selected profile defines meaningful diff
-  semantics;
-- logical-time and fault semantics without claiming control over clocks or
-  networks that remain outside Environment authority;
-- released-handle failure.
+- released-handle failure;
+- Artifact identity for retained exact bytes.
 
 ### Environment Fabric
 
 Reused unchanged:
 
-- `resourceKind: browser` as coarse resource classification;
+- `resourceKind: browser` as coarse classification only;
 - Resource Capability declaration and semantic-revision binding;
 - REQUIRED/OPTIONAL participation from the materialized execution contract;
-- Resource Capability versus Subject Capability authorization separation;
-- resource identity and profile-required `identityArtifacts`;
-- per-resource/composite operation-result honesty;
+- Resource Capability versus Subject Capability separation;
+- resource identity and profile-required identity Artifacts;
+- fail-closed per-resource/composite result semantics;
 - aggregate restore-fidelity non-inflation;
 - no implicit cross-resource atomicity;
 - Security/Evidence composition;
-- execution-sensitive capability conformance;
+- execution-sensitive conformance;
 - retry-safe cleanup.
 
-The base Fabric capability model is necessary but insufficient: no currently
-registered Fabric requirement defines browser-domain state or behavior.
+`resourceKind: browser` alone does not claim Browser v0.1 semantics.
 
 ### Scenario and Core
 
 Reused unchanged:
 
 - unresolved required execution inputs fail before Episode execution;
-- materialized execution semantics remain immutable for the Episode;
-- Subject capability exposure derives from the materialized actor projection;
+- materialized execution semantics remain immutable during an Episode;
+- Subject capabilities derive from the materialized actor projection;
 - Core lifecycle remains the only Episode lifecycle;
-- `QUIESCING` remains the side-effect acceptance boundary;
-- lifecycle, Validity, infrastructure health, and Task Verdict remain separate.
+- `QUIESCING` closes admission of new Subject side effects;
+- already accepted work may settle;
+- lifecycle, infrastructure condition, Validity, and Task Verdict remain separate.
 
 ### Security and Evidence
 
 Reused unchanged:
 
 - Subject, Evaluator, and privileged Control authority remain separated;
-- evaluator/control credentials never enter Subject execution context;
-- evaluator-private material is protected from Subject visibility;
-- `SecurityAssurance` remains multi-dimensional and must not be inflated because
-  a browser runs in an incognito/private context, container, process sandbox, or
-  other named technology;
-- exact retained bytes use AVP Artifact identity;
-- locators, file paths, browser-context IDs, DevTools IDs, and automation handles
-  are not substitutes for Artifact content identity;
-- Evidence classification governs visibility/handling without changing content
-  identity.
+- evaluator/control credentials and automation handles do not enter Subject context;
+- evaluator-private state is protected from Subject visibility;
+- Artifact digest is identity, not retrieval authority or declassification;
+- Evidence classification governs handling without changing exact-byte identity;
+- technology labels such as `incognito`, `BrowserContext`, `headless`, container, or browser sandbox do not automatically establish `SecurityAssurance`.
 
-## Why the base Fabric contract is not enough
+## Standards and interoperability basis
 
-The base Fabric normative candidate deliberately defines only composition-level
-semantics. Its closed `browser` Resource Kind means "this resource belongs to the
-browser interoperability domain". It does not mean any of the following:
+The profile reuses upstream web-platform concepts where they own semantics and adds only the AVP verification-facing boundary.
 
-- the resource has an isolated session boundary;
-- cookies, local storage, IndexedDB, caches, or service workers can be captured;
-- a browser snapshot can be restored;
-- a page or DOM is authoritative state;
-- a browser build or execution configuration is identity-bound;
-- screenshots or traces are state rather than Evidence;
-- navigation, clicking, locator APIs, or JavaScript evaluation are Subject
-  capabilities;
-- a Playwright `BrowserContext` or WebDriver BiDi user context is the protocol
-  object.
+- WHATWG HTML/Web Storage establishes the distinction between origin-scoped `localStorage` and session/topology-scoped `sessionStorage`.
+- WHATWG URL/HTML define tuple-origin components and origin serialization; AVP reuses those semantics instead of inventing a second URL/origin canonicalizer.
+- WHATWG Storage exposes multiple distinct storage endpoints rather than one universal browser-state map.
+- IndexedDB has database, object-store, index, key, version, transaction, and structured-clone semantics that cannot be reduced to an unspecified JSON object.
+- Service Worker and Cache Storage have independent registration/lifecycle/cache semantics.
+- the HTTP cookie storage model distinguishes cookie name, domain, host-only flag, path, persistence/expiry, Secure, HttpOnly, and SameSite semantics; AVP preserves the portable subset needed by the selected unpartitioned-cookie state claim.
+- WebDriver BiDi demonstrates implementation-neutral concepts such as user contexts, browsing contexts, cookie storage, and storage partition keys without defining AVP Environment identity or snapshot fidelity.
+- Playwright is useful reference-implementation evidence but is not AVP protocol authority.
 
-A browser adapter that claimed portable behavior from `resourceKind: browser`
-alone would therefore violate AEP-0009 capability honesty and backend-first
-implementation rules.
+AVP does not copy an automation-library serialization format into the protocol.
 
-## Standards and interoperability analysis
+## Portable resource boundary
 
-The Browser Resource Profile should reuse web-platform and browser-automation
-standards where they own the underlying concepts. AVP should specify only the
-verification-facing gap: state/evidence identity, Environment ownership,
-reset/snapshot/restore honesty, capability binding, and conformance semantics.
+One Browser v0.1 resource represents one independently owned **isolated browser session resource**.
 
-### HTML browsing and origin model
+The portable resource is not:
 
-The WHATWG HTML Standard defines browsing-context/navigation concepts and the
-origin security model. Origin boundaries are fundamental to browser storage and
-script authority. AVP must not replace same-origin/site rules with an
-implementation-specific URL grouping model.
+- one page/tab;
+- one whole browser process;
+- one browser profile directory;
+- a Playwright `BrowserContext` object;
+- a WebDriver BiDi user-context handle;
+- a CDP target/session identifier.
 
-For Web Storage, the HTML Standard distinguishes `localStorage` and
-`sessionStorage`. Local storage is associated with an origin/storage area, while
-session storage is tied to a browsing session/top-level traversable relationship.
-Those scoping differences matter directly to any AVP snapshot/restore claim.
+A conforming implementation may realize the resource using any mechanism that preserves the observable isolation and state semantics. A process may host multiple independent resources. Backend process IDs, profile paths, and native handles are not portable resource identity.
 
-A portable browser profile must therefore avoid a flat map such as:
+Sibling resources must not silently share selected authoritative state.
+
+## Authoritative v0.1 state surface
+
+The base profile authoritative restorable state is exactly:
+
+1. selected **unpartitioned HTTP cookies**; and
+2. selected **origin-scoped `localStorage` key/value entries**.
+
+This surface is closed. An implementation cannot silently omit selected state it cannot project or restore.
+
+### Mandatory authoritative state
+
+#### Unpartitioned cookies
+
+Each projected cookie is one unpartitioned cookie-store entry. Its portable entry identity is the tuple:
 
 ```text
-storage[key] = value
+(name, domain, hostOnly, path)
 ```
 
-that loses origin/storage-key and session/topology boundaries.
+No two projected cookies in one BrowserStateImage may have the same entry-identity tuple.
 
-### IndexedDB
+The canonical cookie state must preserve at least:
 
-Indexed Database API defines databases under storage keys, object stores, indexes,
-key semantics, transactional behavior, upgrade/version behavior, and structured
-clone value semantics.
+- `name` and `value` as the exact cookie data exposed by the selected browser state boundary;
+- canonical domain/host text and the explicit `hostOnly` boolean;
+- `path`;
+- persistent versus session semantics;
+- expiry instant when persistent;
+- `Secure`;
+- `HttpOnly`;
+- `SameSite` state, including the distinction between an explicitly governed value and the user-agent default state where that distinction affects the stored cookie state.
 
-A portable AVP claim cannot treat an IndexedDB database as merely a JSON object
-without defining how database names, versions, object stores, indexes, keys,
-values, key generators, and ordering are represented. It also cannot assume that
-an automation library's export format is a standards-level serialization format.
+Creation time and last-access time are not part of Browser v0.1 portable state identity. Browser eviction policy, cookie-store capacity, and retrieval ordering are not standardized by this profile.
 
-Whether IndexedDB is mandatory in Browser Profile v0.1, optional under a separate
-capability, or excluded from the first portable state surface remains a Draft
-question. Whatever decision is made must be explicit and TCK-testable.
+An expired cookie is not a valid retained BrowserStateImage entry: the projected authoritative image represents the browser's current selected cookie store after expired entries have been removed according to browser cookie-store semantics. A session cookie records session persistence semantics rather than inventing an expiry instant.
 
-### Service Workers and Cache Storage
+Domain text must represent the canonical host/domain value associated with the stored cookie; AVP does not preserve whether an input `Domain` attribute originally contained presentation-only syntax such as a leading dot. Host-only versus domain-scoped behavior is preserved by `hostOnly`.
 
-Service Workers have an independent lifecycle and can mediate network fetches,
-control browsing contexts, and participate in offline/cache behavior. Cache
-Storage is not interchangeable with cookies, local storage, or IndexedDB.
+Partitioned/CHIPS-style cookie state is excluded from the base profile. A future separately governed capability may add storage-partition semantics once portable identity and executable cross-engine behavior are sufficiently bounded.
 
-A browser profile must not report restored state as equivalent when the selected
-portable state claim requires a service worker/cache effect that was silently
-lost or recreated differently.
+#### Origin-scoped localStorage
 
-Conversely, v0.1 must not make service-worker/cache checkpointing mandatory merely
-because one browser or automation backend can expose part of it. The profile may
-need an explicit exclusion or separately claimable capability.
+`localStorage` is represented per selected **tuple origin**. A flat global key/value map is forbidden.
 
-### WebDriver BiDi
+For Browser v0.1, a selected `localStorage` origin must be a non-opaque tuple origin whose identity is `(scheme, host, port)` under WHATWG origin semantics. Its portable canonical text is the WHATWG serialization of that origin:
 
-The W3C WebDriver BiDi work provides a useful implementation-neutral automation
-reference. It defines, among other concepts:
+```text
+scheme://serialized-host[:non-null-port]
+```
 
-- browser user contexts;
-- browsing contexts and their lifecycle/events;
-- navigation and download events;
-- screenshot capture;
-- network events/interception;
-- script realms;
-- cookie storage commands and storage partition keys;
-- browser/emulation controls.
+The serialization therefore uses the parsed/canonical host form and includes a port only when the origin tuple's port is non-null. URL path, query, fragment, username, and password never participate in `localStorage` origin identity.
 
-These concepts are evidence that browser control can be described independently
-of Playwright. They do not by themselves solve AVP's verification problem:
-WebDriver BiDi does not define an AVP Environment Resource identity, baseline
-state Artifact, reset target, snapshot/restore fidelity, Scenario binding,
-Evaluator/Subject authority model, or ConformanceReport semantics.
+Opaque origins and `file:` origin behavior are outside the base v0.1 portable `localStorage` state claim because they do not provide the stable tuple-origin interoperability boundary this profile requires. A Scenario that materially requires them needs separately governed semantics.
 
-AEP-0011 should align terminology with standards where practical rather than
-inventing Playwright-shaped public names, while keeping AVP-specific lifecycle
-and evidence semantics in AVP.
+Within one selected origin, `localStorage` state is a map from exact string key to exact string value. A key appears at most once. Canonical ordering is by the exact string-key representation defined by the downstream normative canonical JSON model, not browser enumeration order, locale, or insertion order.
 
-### Playwright as reference implementation evidence
+For every selected origin, all selected `localStorage` entries participate in the authoritative state claim. Missing, extra, scope-shifted, or transformed selected entries are non-equivalent.
 
-Playwright `BrowserContext` is a strong candidate implementation boundary because
-it provides isolated non-persistent browser sessions and context-scoped browser
-operations.
+Browser profile paths, vendor storage-key tokens, native partition IDs, automation object IDs, or product-specific handles are not AVP origin/state identity.
 
-Current Playwright documentation also demonstrates why its API must not be copied
-into the protocol:
+## Explicitly excluded base state
 
-- `storageState()` documents cookies and local storage as captured state;
-- IndexedDB capture is an explicit option rather than an inseparable universal
-  property;
-- virtual WebAuthn credential capture is an explicit option and can include
-  credential private-key material;
-- service-worker behavior has engine/backend limitations and interacts with
-  network routing;
-- pages, JavaScript heap, service-worker lifecycle, Cache Storage, downloads, and
-  every other browser effect are not thereby proven to be part of one complete
-  portable snapshot.
+The following do not participate in the base Browser v0.1 state digest or restore-equivalence claim:
 
-The AVP profile must define the claim first. A Playwright adapter may then prove
-that a selected Playwright/engine configuration satisfies it.
+- partitioned cookies/storage-partition state;
+- `sessionStorage`;
+- pages/tabs/popups and browsing topology;
+- navigation history and current live page state;
+- DOM and JavaScript heap;
+- workers, timers, pending tasks, and dialogs;
+- IndexedDB;
+- Cache Storage;
+- Service Worker registrations/lifecycle/runtime state;
+- WebAuthn/passkey private credential state;
+- downloads;
+- screenshots, accessibility trees, traces, console logs, page errors, network events, and rendering output.
 
-## Candidate portable resource boundary
+Some excluded surfaces are candidates for separately governed future capabilities. They are not implicitly optional parts of the base capability.
 
-The preferred design direction is one independently owned **isolated browser
-session resource**, not one global browser process and not one page object.
+If a materialized Scenario depends on an excluded surface for reproducible verification, base Browser v0.1 alone is insufficient for that dependency and the execution must not falsely claim that the omitted state was restored.
 
-The session resource should be capable of containing one or more browsing
-contexts/pages while preserving an isolation boundary from sibling browser
-resources.
+## Evidence and runtime observation boundary
 
-This is a design direction, not yet accepted semantics. The forthcoming
-portability audit must determine whether "browser session" can be specified
-without depending on the lifecycle details of Playwright `BrowserContext`,
-WebDriver BiDi user contexts, or one browser engine.
+Evidence/observation is separate from authoritative state.
 
-### Browser process versus resource identity
+Potential Evidence includes current URL/navigation events, selected DOM or accessibility projections, screenshots, console/page errors, network traces, downloads, and execution diagnostics.
 
-A shared browser process may host multiple independently isolated resources. The
-browser process handle is therefore not necessarily the Environment Resource.
+Capturing an Evidence surface does not make it restorable state. Equal screenshots do not prove equal Browser v0.1 state; unequal screenshots do not by themselves prove the selected cookie/`localStorage` state differs.
 
-Conversely, a persistent browser profile directory may contain more state than a
-single portable resource is allowed to claim. A filesystem directory or process
-PID must not become AVP resource identity.
+Retained Evidence continues to use AVP Artifact identity. Redacted bytes are distinct bytes with distinct identity from an original retained Artifact.
 
-### Page topology
+## Browser state identity direction
 
-Pages/tabs/popups are dynamic children of the browser-session boundary. The Draft
-does not yet decide whether page topology participates in authoritative snapshot
-state, is evaluator-observable runtime state only, or is excluded from v0.1
-restore semantics.
+Downstream normative closure should define two acyclic logical resources analogous to AVP's existing content-addressing discipline:
 
-This decision materially affects `sessionStorage`, navigation history, open
-popups, pending dialogs, and live JavaScript state and therefore cannot be left to
-the adapter.
+```text
+BrowserStateManifest
+  profile/revision
+  selected origin set / selection rules
+  selected cookie scope rules
+  canonical representation revision
 
-## State, Evidence, and execution identity must be separate
+BrowserStateImage
+  manifestDigest
+  cookies[]
+  origins[]
+    origin
+    localStorage[]
+```
 
-AEP-0011 must not create one ambiguous "browser state" digest that conflates
-three different verification concerns.
+The exact field names and schema spelling are downstream work; the semantics above are not.
 
-### 1. Authoritative restorable state
+The Manifest defines the interpretation/selection rules and does not point to the baseline StateImage. The baseline StateImage binds the Manifest digest. Runtime snapshot StateImages are generated Environment/Evidence state bound through SnapshotRef and do not mutate the resource's immutable baseline identity inputs.
 
-This is the surface for which the profile makes reset/snapshot/restore and state
-identity claims. Candidate surfaces include cookies, selected origin-scoped Web
-Storage, and selected IndexedDB state, subject to the unresolved blockers below.
+The downstream normative specification must define one closed selection grammar: it must identify the complete set of unpartitioned cookie entries and tuple origins whose state participates in the resource without relying on a vendor query language or runtime-only callback. Selection identity is immutable for the materialized resource.
 
-Only surfaces explicitly selected by the eventual profile may contribute to a
-`STATE_EQUIVALENT` claim.
+Canonical ordering and exact representation must be protocol-owned before schema/TCK closure. No automation-library export format becomes canonical authority.
 
-### 2. Evidence/observation surfaces
+## Execution-relevant immutable identity
 
-Potential browser Evidence includes:
+Logical browser-state equality is not complete execution identity.
 
-- current URL/navigation information;
-- selected DOM projection;
-- accessibility-oriented projection where a stable contract can be defined;
-- screenshot Artifact;
-- console/page-error events;
-- browser/network event traces;
-- download Artifacts;
-- execution diagnostics.
+When the materialized Scenario relies on them, execution-relevant browser inputs must bind through existing Scenario/Fabric immutable execution-input mechanisms. Relevant inputs may include:
 
-Evidence capture does not make these surfaces automatically restorable state.
-For example, a screenshot can prove what was rendered without proving that the
-browser can restore the underlying DOM/JavaScript heap exactly.
-
-### 3. Execution-relevant immutable identity
-
-Browser behavior can differ even with identical logical storage state. The
-materialized execution may rely on identity/configuration inputs such as:
-
-- browser engine family and exact build/revision;
-- browser executable/package identity;
-- operating-system/platform identity where behavior depends on it;
+- browser engine family;
+- exact browser version/build/revision sufficient to distinguish behavior;
+- executable/package Artifact identity where stronger deployment identity is required;
+- operating system/platform/architecture where behavior depends on it;
 - headless/headful mode;
-- locale, timezone, color scheme, reduced-motion, viewport, device scale factor,
-  touch/mobile settings, JavaScript enablement, permissions, geolocation, or
-  other emulation configuration when relied upon by the Scenario;
-- service-worker policy;
-- proxy/network configuration when not separately owned by a Network Resource;
-- trusted certificates or HTTPS policy;
-- extension/preload-script/configuration identity;
-- font/rendering inputs when visual verification relies upon them.
+- locale and timezone;
+- viewport and device scale factor;
+- touch/mobile/device emulation configuration;
+- JavaScript enablement;
+- permissions and geolocation when relied upon;
+- Service Worker policy;
+- proxy/TLS/HTTPS policy when not owned by another Resource;
+- preload scripts, extensions, or browser configuration when relied upon;
+- font/rendering inputs when visual verification depends on them.
 
-The profile must determine which of these belong in a browser-specific immutable
-identity resource versus existing Scenario/Fabric resolved execution-input
-bindings. Backend labels such as `chromium` or `playwright` alone are not
-sufficient immutable identity.
+Relevance is Scenario-specific. The profile does not require hashes of every backend configuration field merely because a backend exposes them.
 
-## Snapshot and restore honesty
+Labels such as `chromium`, `firefox`, `webkit`, `playwright`, or `selenium` alone are not sufficient immutable execution identity.
 
-The Draft starts from a conservative rule: logical browser storage restoration is
-not automatically `EXACT` browser restoration.
+Missing or drifted required execution identity fails closed even when the logical state Manifest remains structurally satisfiable.
 
-Recreating an isolated browser session and reseeding selected storage may restore
-the selected authoritative logical state while failing to reproduce:
+## Snapshot semantics
 
-- live JS heap and tasks;
-- exact page/tab topology;
-- session storage;
-- navigation history;
-- active workers/service-worker lifecycle;
-- cache state;
-- pending downloads/dialogs;
-- in-flight network operations;
-- rendering/runtime timing state.
+A snapshot captures the complete selected authoritative cookie + `localStorage` state as a canonical BrowserStateImage and binds it to the existing Environment/resource-owned SnapshotRef semantics.
 
-If v0.1 defines a logical state surface that intentionally excludes such
-components, successful restoration of the complete selected surface is a
-candidate for `STATE_EQUIVALENT`, not an excuse to claim process-level `EXACT`.
+Successful snapshot creation requires an evaluator-authoritative projection of the complete selected surface after the profile-relevant settlement boundary. Backend command success or an automation-library export object alone is insufficient.
 
-Whether any conforming v0.1 implementation can legitimately report `EXACT` must
-be resolved before Proposed. If the term would be misleading for the entire
-portable profile, the normative profile may prohibit `EXACT` for v0.1 just as the
-Relational State profile did for its logical restore semantics.
+A foreign, stale, corrupted, incompatible, or wrong-resource SnapshotRef fails closed under existing Environment semantics.
+
+## Restore fidelity
+
+Browser v0.1 successful restore reports exactly:
+
+```text
+STATE_EQUIVALENT
+```
+
+`EXACT` is forbidden as a successful base-profile restore fidelity.
+
+A successful restore requires:
+
+1. any conforming backend restore/reseed mechanism;
+2. independent evaluator reprojection of the complete selected authoritative cookie + `localStorage` surface;
+3. canonical equality with the target snapshot under the same profile/Manifest/resource identity binding;
+4. failure if selected authoritative state is missing, extra, scope-shifted, transformed, or otherwise non-equivalent.
+
+Context recreation, storage import success, navigation success, profile-directory restoration, or backend command success does not establish fidelity by itself.
+
+`EXACT` is excluded because v0.1 does not standardize live JavaScript execution, page topology, `sessionStorage`, navigation history, worker lifecycle, caches, pending operations, browser-process continuation, or rendering/runtime timing state.
 
 ## Reset semantics
 
-Reset must establish a profile-defined target and then independently observe the
-post-reset state. Closing a browser context or calling an automation-library
-clear-storage method is not sufficient by command success alone.
+Reset establishes the immutable bound baseline BrowserStateImage and then independently reprojects the complete authoritative surface.
 
-A likely reference strategy is to dispose the isolated session, create a new
-profile-compatible session, seed the bound baseline state, and independently
-re-project the selected authoritative state. That is implementation strategy, not
-protocol semantics.
+An implementation may recreate an isolated session and reseed state, clear/repopulate state safely, or use another mechanism. The protocol tests the observable result rather than prescribing automation commands.
 
-The profile must define behavior for omitted/unrestorable required state rather
-than allowing an adapter to silently downgrade it.
+Successful reset requires canonical post-reset equality with the bound baseline under the same Manifest/profile identity. An implementation cannot silently downgrade or drop an unsupported selected item.
+
+## Operation settling and observation consistency
+
+The browser profile defines no universal `network idle` condition and no arbitrary sleep-based correctness rule.
+
+An accepted authoritative-state observation is produced only after:
+
+1. Core has entered the side-effect admission boundary that prevents new Subject mutations from being accepted;
+2. browser mutations accepted before that boundary have reached a profile-relevant terminal outcome or settlement fails;
+3. selected cookie/`localStorage` writes relevant to the authoritative state no longer have unresolved accepted mutations;
+4. the Evaluator can project the complete selected authoritative state without mixing known pre/post mutation fragments.
+
+For base v0.1, this settlement rule concerns only the selected authoritative storage claim. It does not imply that all animations, timers, workers, rendering, or network activity are idle.
+
+If trustworthy settlement cannot be established under the bound policy, no accepted final state projection is produced. The condition composes with existing infrastructure/Validity semantics and is not converted automatically into Agent Task Verdict failure.
 
 ## Subject capability boundary
 
-Browser Resource Capability support is **not** authority for the Subject to call
-arbitrary browser automation methods.
+Resource Capability support never grants arbitrary browser automation authority to the Subject.
 
-AEP-0011 must preserve the existing Resource Capability / Subject Capability
-separation:
+The base profile does not define a universal page/locator/click/script API.
 
-- the Resource Capability describes Environment behavior the browser resource can
-  satisfy;
-- the materialized Scenario/Security actor projection determines which browser
-  actions/observations the Subject may invoke;
-- privileged reset/snapshot/restore, credential seeding, browser launch/control,
-  diagnostic capture, and hidden test instrumentation remain Evaluator/Control
-  operations unless separately granted through a governed Subject contract.
+The materialized Scenario/Security actor projection separately governs any Subject browser actions or observations. Privileged browser/session provisioning, baseline seeding, reset, snapshot, restore, credential injection, hidden instrumentation, and evaluator-only diagnostics remain Evaluator/Control operations unless a separately governed Subject contract grants specific authority.
 
-The first Browser Resource Profile should not standardize a universal Playwright-
-style page/locator API merely to make the reference adapter convenient.
+Automation/control handles and credentials must not be exposed merely because the reference implementation can access them.
+
+## Service Worker and Cache policy
+
+Service Worker registrations/lifecycle/runtime state and Cache Storage are excluded from base authoritative state.
+
+A conforming implementation may run with Service Workers enabled or disabled as execution configuration. When that policy materially affects the Scenario, it must be identity-bound. The policy does not prove that Service Worker state itself is restorable.
+
+The base capability must not claim state equivalence for behavior whose correctness materially depends on restoring Service Worker or Cache Storage state.
+
+A future Service Worker/cache capability requires separate semantics and real cross-engine conformance evidence.
+
+## Credential-bearing state
+
+Cookies and `localStorage` remain authoritative even when selected values contain authentication material. Confidentiality changes visibility and handling, not identity.
+
+Rules:
+
+1. evaluator-private selected state remains authoritative;
+2. Subject-visible observations must not disclose evaluator-private values;
+3. retained secret-bearing snapshot bytes require appropriate Evidence classification and access control;
+4. a digest does not grant retrieval authority or make secret bytes safe to publish;
+5. public TCK fixtures use synthetic credentials only;
+6. WebAuthn/passkey private credential export/import is not mandatory base behavior;
+7. private keys/authenticator secrets must not become public TCK prerequisites.
 
 ## Relationship to Network and Time profiles
 
-A browser resource observes network and time, but Browser Profile v0.1 must not
-silently absorb the future Network-Control or Time-Control profiles.
+Browser v0.1 does not imply deterministic networking or time control.
 
-For example:
+Browser proxy/offline/interception options are implementation mechanics unless a governed Network Resource owns the portable claim. Browser clock overrides do not imply host/database/remote-service time virtualization.
 
-- repeating a navigation is not proof of deterministic network behavior;
-- setting browser offline mode is not automatically equivalent to a portable
-  network fault profile;
-- overriding a page clock does not prove host/kernel/database/external-service
-  time virtualization;
-- request interception semantics may differ when service workers are active.
-
-Browser-specific configuration required for a Scenario can be identity-bound,
-but broad fault/time capability claims belong to the corresponding portable
-resource profiles unless a later cross-resource capability explicitly coordinates
-them.
+Browser-local configuration relied upon by a Scenario may be identity-bound without absorbing future Network-Control or Time-Control semantics.
 
 ## Security analysis
 
-A browser resource creates a large attack and data-exposure surface. The profile
-must preserve at least the following constraints.
+A browser resource creates substantial control and data-exposure surface.
 
-### Authentication and storage material
+### Origin and state isolation
 
-Cookies, local storage, IndexedDB, and WebAuthn credential state may contain
-bearer tokens, long-lived secrets, personally identifying information, or private
-keys.
-
-- Subject-visible state projections must not expose evaluator-private credential
-  material.
-- Snapshot Artifacts containing credential material require appropriate Evidence
-  classification and access control.
-- A digest does not make sensitive snapshot bytes safe to publish.
-- Virtual credential export/import must not become mandatory base behavior solely
-  because one automation backend can perform it.
-
-### Origin and storage partition isolation
-
-The profile must preserve web-platform origin/storage-key partitioning and must
-not flatten cross-origin state into a Subject-readable global map.
-
-Evaluator privileges used to capture/restore state must not be confused with the
-Subject's same-origin authority.
+Origin boundaries must be preserved. Cross-origin `localStorage` must not be flattened into a Subject-readable global map. Evaluator authority to project or restore state does not expand Subject same-origin authority.
 
 ### Privileged automation channel
 
-Remote-debugging, automation, browser-launch, extension, preload-script, and
-context-management handles can provide powers far beyond Scenario-granted browser
-actions. These handles and credentials belong to Evaluator/Control authority and
-must not enter the Subject execution context.
+Remote-debugging, browser launch, extension/preload, browser-context management, and hidden fixture-control channels may grant powers beyond Scenario-authorized behavior. They remain privileged Control/Evaluator authority.
 
-### Navigation and network exposure
+### Network exposure
 
-A browser can reach local, private, metadata, or privileged network endpoints if
-network policy permits it. Browser Resource conformance must not imply verified
-network isolation. Any egress restrictions must be represented by actual
-SecurityAssurance evidence and/or a governed Network Resource capability.
+Browser Resource conformance does not imply verified egress isolation. Access to local/private/metadata endpoints is governed by actual SecurityAssurance and/or a Network Resource, not by the browser capability label.
 
 ### Downloads and file interaction
 
-Downloads are untrusted output and may need content-addressed Artifact capture,
-size/resource limits, quarantine, and path isolation. Uploaded file inputs require
-immutable input identity when the Scenario relies on exact bytes.
+Downloads are untrusted output. When retained, exact bytes use Artifact identity and may require limits, quarantine, and path isolation. Browser-supplied paths are never Artifact identity.
 
-A browser-supplied path must never be treated as Artifact identity.
+### Evidence leakage
 
-### Rendering and screenshots
+Screenshots, traces, console output, DOM projections, network events, and state snapshots can contain secrets. Evidence visibility/access classification must be explicit.
 
-Screenshots, traces, console output, DOM projections, and network events can leak
-secrets. Evidence visibility and redaction policy must be explicit; redaction must
-not mutate the identity of retained original evidence while pretending the bytes
-are unchanged.
+### SecurityAssurance non-inflation
 
-### Sandbox/engine labels
-
-`Chromium sandbox`, `incognito`, `BrowserContext`, `headless`, containerization,
-or another technology label must not automatically raise any
-`SecurityAssurance` dimension to `verified`.
+`Chromium sandbox`, private/incognito mode, `BrowserContext`, headless mode, a container, or another technology name does not by itself establish any `SecurityAssurance` dimension as verified.
 
 ## Backward compatibility
 
-A Browser Resource Profile is additive under AEP-0009.
+Browser v0.1 is additive under AEP-0009.
 
-Existing AVP implementations that conform to Environment v0.1 or the base
-`avp-environment-fabric-v0.1` profile are not required to claim browser-domain
-capabilities.
+Existing Environment/Fabric implementations need not claim the Browser capability. Existing Fabric manifests may contain `resourceKind: browser`, but that coarse kind alone must not be interpreted as Browser v0.1 support.
 
-Existing Fabric manifests may contain `resourceKind: browser`, but that Resource
-Kind alone must not be interpreted as a claim of the future AEP-0011 capability.
-A conforming implementation may claim the browser profile only after the
-capability/profile identity, semantics, schemas where required, and TCK obligations
-are governed and supported.
+No Alpha 2 semantics change. No release version is selected. The currently planned `0.3.1` maintenance release is not assigned Browser semantics by this AEP.
 
-No accepted Alpha 2 semantics are changed by this Draft.
+## Conformance strategy
 
-## Conformance strategy direction
+Browser-profile conformance must be language-neutral, backend-name-neutral, and execution-sensitive.
 
-Browser-profile conformance must be language-neutral and execution-sensitive.
+Mandatory behavioral cases execute a real browser runtime through the implementation under test. Metadata declarations, mocks, or self-certification cannot substitute for behavior at the certified boundary.
 
-The eventual TCK must operate through an implementation adapter against a real
-browser runtime. It must be capable of rejecting an adapter that advertises the
-same capability/profile metadata as a conforming adapter but does not establish
-the required runtime behavior.
+Mandatory conformance families should cover at least:
 
-Candidate mandatory conformance families include:
+1. isolated-resource ownership and sibling isolation;
+2. execution-identity binding and incompatible-identity rejection;
+3. baseline materialization and independent reprojection;
+4. exact tuple-origin `localStorage` separation and canonical origin identity;
+5. complete unpartitioned-cookie entry identity and stored attribute semantics;
+6. exact canonical state identity for the selected surface;
+7. SnapshotRef ownership/integrity and stale/foreign rejection;
+8. mutation -> snapshot -> restore -> independent reprojection;
+9. reset -> independent baseline reprojection;
+10. restore fidelity exactly `STATE_EQUIVALENT` and rejection of false `EXACT`;
+11. Resource Capability versus Subject Capability separation;
+12. evaluator-private credential non-disclosure;
+13. operation-settlement enforcement;
+14. released-resource and cleanup behavior;
+15. explicitly excluded required state failing closed;
+16. metadata-identical negative implementations that break real behavior.
 
-1. isolated-resource ownership and sibling-session isolation;
-2. execution-identity binding and incompatible-identity fail-closed behavior;
-3. baseline-state materialization and independent post-provision projection;
-4. origin/storage-key partition preservation;
-5. exact canonical state identity for every surface selected as authoritative by
-   the profile;
-6. snapshot ownership/integrity and foreign/stale rejection;
-7. mutation -> snapshot/restore -> independent reprojection;
-8. reset -> independent reprojection to the bound baseline;
-9. restore-fidelity non-inflation;
-10. Resource Capability versus Subject Capability separation;
-11. credential/evaluator-private non-disclosure;
-12. stale/released resource failure and retry-safe cleanup;
-13. negative implementation controls that preserve metadata while breaking real
-    browser behavior;
-14. explicitly unsupported state surfaces failing closed when the materialized
-    execution contract requires them.
+Negative controls should include at minimum implementations that:
 
-A real-browser CI matrix should eventually cover more than one browser engine
-family where the selected portable requirements claim cross-engine semantics.
-Passing Chromium alone would be Playwright/Chromium implementation evidence, not
-proof that a supposedly engine-neutral semantic boundary is portable.
+- omit selected `localStorage` state;
+- flatten cross-origin state;
+- collapse host-only and domain-scoped cookies with otherwise matching fields;
+- report restore success without independent reprojection;
+- falsely report `EXACT`;
+- expose evaluator-private credential values;
+- admit new Subject mutation after the settlement boundary;
+- self-certify support without real-browser execution.
 
-The TCK must use controlled local test origins/resources for mandatory behavior so
-external Internet availability, third-party service drift, and unrelated DNS/TLS
-conditions do not become accidental conformance dependencies.
+Mandatory TCK fixtures use deterministic controlled local origins/resources. Portable expectations must not branch on Playwright, Chromium, Firefox, WebKit, Selenium, or other product names.
 
-## Reference implementation direction
+### Multi-engine portability evidence
 
-Only after the portable semantics, schema boundary, and executable TCK are
-reviewable may a Playwright adapter be introduced.
+A conforming third-party implementation is not required to implement multiple browser engines merely to claim one implementation of the portable profile.
 
-A Playwright implementation should be an optional backend dependency rather than
-an unconditional dependency of the base AVP package unless packaging governance
-later decides otherwise.
+However, before AVP treats the **reference semantics** as adequately protected against one-engine precedent, the reference acceptance gate should execute the same portable behavioral cases across at least two materially independent browser-engine families. A three-engine matrix is desirable where practical.
 
-The adapter may use Playwright `BrowserContext` and browser-specific APIs behind
-implementation-private seams, but portable code and language-neutral TCK vectors
-must not branch on `playwright`, `chromium`, `firefox`, or `webkit` product names.
+A single Chromium-only run is useful implementation evidence but is insufficient by itself to prove that an unresolved semantic choice is implementation-independent.
 
-An implementation-specific real-browser fixture/control seam may be needed for
-TCK setup, mutations, concurrency/lifecycle forcing, and negative controls. That
-seam must remain privileged and must not become a Subject API or portable protocol
-resource merely because the reference tests use it.
+Engine product names remain test-matrix metadata, not protocol identity.
 
-## Draft design blockers before Proposed
+## Reference implementation gate
 
-This Draft is intentionally **not Proposed-ready**. The next portability audit
-must resolve at least the following blockers with implementation-independent
-semantics and an executable conformance strategy.
+A Playwright adapter may begin only after:
 
-### BR-BR-001 — authoritative v0.1 state surface
+1. AEP-0011 reaches the lifecycle state required by governance for downstream normative closure;
+2. Browser normative semantics are encoded in the public specification;
+3. serialized state/projection resources receive reviewed schemas where required;
+4. the language-neutral execution-sensitive Browser TCK is reviewable;
+5. any backend-neutral conformance harness/fixture-control prerequisites identified by readiness review are closed.
 
-Define the exact closed set of browser state surfaces covered by the base profile
-and distinguish mandatory, optional-capability, Evidence-only, and excluded
-surfaces. Cookies/local storage/IndexedDB/session storage/service workers/cache
-state cannot remain implicit.
+The base AVP distribution must remain usable without a browser provider dependency unless separate packaging governance decides otherwise. Browser provider dependencies should be optional, lazily imported at the implementation boundary, and must not download browser binaries during unrelated base-package import/install.
 
-### BR-BR-002 — origin and storage-partition identity
+Implementation-private packages may use native browser objects internally, but portable public boundaries and TCK semantics must not expose those objects.
 
-Define the portable identity model for origins/storage keys/partitioned cookies
-and cross-origin state so state equality does not depend on one browser's internal
-profile layout or automation export format.
+No generic `BaseBrowserBackend`, plugin framework, or provider abstraction is justified before a stable multi-consumer extension contract exists.
 
-### BR-BR-003 — page topology and session-scoped state
+## Alternatives considered
 
-Decide whether pages/tabs/popups, navigation history, and session storage are part
-of authoritative restorable state, runtime observation, or explicit v0.1
-exclusions. The decision must remain valid across independent browser engines.
+### Implement Playwright first and generalize later
 
-### BR-BR-004 — snapshot/restore fidelity
+Rejected. It reverses the AEP-0009 authority direction and turns implementation limits into protocol semantics.
 
-Define the exact state/evidence required before `STATE_EQUIVALENT` may be reported
-and determine whether `EXACT` is forbidden in Browser Profile v0.1. Command
-success or context recreation alone cannot establish restore fidelity.
+### Define browser state as Playwright `storageState`
 
-### BR-BR-005 — browser execution identity
+Rejected as portable authority. It is an implementation mechanism for selected state surfaces, not a standards-level complete browser checkpoint.
 
-Define which browser build, platform, mode, emulation/configuration, preload/
-extension, and rendering inputs are materially execution-relevant and how they
-bind through existing Scenario/Fabric immutable identity mechanisms without
-turning product labels into protocol identity.
+### Make IndexedDB mandatory in base v0.1
 
-### BR-BR-006 — service-worker/cache semantics
+Rejected for the base profile. IndexedDB semantics are materially richer than the selected cookie/`localStorage` boundary and require separately governed canonical serialization and transaction semantics.
 
-Choose a portable v0.1 policy for service workers and Cache Storage: mandatory
-state, optional capability, blocked/disabled profile mode, or explicit exclusion.
-The choice must address cross-engine support and network-observation interactions.
+### Include `sessionStorage` and page topology
 
-### BR-BR-007 — credential-bearing browser state
+Rejected for base v0.1. Session storage depends on browsing-session/topology identity that the base profile intentionally does not standardize.
 
-Define how authentication material and optional virtual WebAuthn/passkey state
-interact with state identity, snapshot Artifacts, Evidence classification,
-Evaluator confidentiality, and restore semantics without making secret export a
-base conformance requirement.
+### Include Service Worker / Cache Storage state
 
-### BR-BR-008 — canonical projection and evidence boundary
+Rejected for base v0.1. Cross-engine lifecycle/control behavior is not sufficiently bounded for the initial portable state claim.
 
-Define which browser projections, if any, require portable canonical bytes and
-digests. DOM/accessibility/screenshot/trace outputs must not be conflated, and
-rendering artifacts must not be mistaken for authoritative restorable state.
+### Support partitioned cookies in the base profile
 
-### BR-BR-009 — operation settling and observation consistency
+Rejected for v0.1. Storage-partition identity and cross-engine automation support require separate governance rather than a backend-shaped compatibility layer.
 
-Define when a browser state observation is accepted relative to navigation,
-async tasks, storage transactions, workers, and pre-QUIESCING accepted work. The
-profile must reject torn/partially settled state where it claims one logical
-observation without inventing a universal "network idle means deterministic"
-rule.
+### Snapshot the whole browser profile directory
 
-### BR-BR-010 — capability decomposition and real-browser TCK matrix
+Rejected. Profile bytes contain engine/version-private formats, caches, locks, secrets, and unrelated state and cannot be portable equality.
 
-Determine whether v0.1 should expose one cohesive browser-session capability or a
-small set of separately claimable capability revisions, and define the minimum
-real-browser execution matrix needed to demonstrate portable semantics without
-making a specific engine mandatory protocol identity.
+### Make a live page the resource
 
-Until these blockers are review-closed, AEP-0011 must remain Draft and no
-Playwright adapter should be merged as the official Alpha 3 Browser Resource
-implementation.
+Rejected. A page is too narrow to own shared cookie/origin storage and encourages native automation objects to become protocol identity.
 
-## Alternatives considered at Draft stage
+### Make the whole browser process the resource
 
-### Alternative A — implement Playwright first and generalize later
+Rejected. Multiple independently isolated sessions may share one process, and process identity is an implementation concern.
 
-Rejected by AEP-0009.
+### Omit snapshot/restore and standardize browser actions only
 
-This would make Playwright's context/storage/export limitations de facto protocol
-semantics and recreate the backend-first architecture Alpha 3 explicitly
-prohibits.
+Rejected for this resource profile. A universal Subject automation API does not solve Environment state/reset/identity/replay honesty.
 
-### Alternative B — define browser state as Playwright `storageState`
+### Use `network idle` as the settlement definition
 
-Rejected as a portable contract.
+Rejected. Network-idle heuristics are not equivalent to settlement of the selected authoritative storage state and are not portable correctness semantics.
 
-It is a useful implementation mechanism for selected storage surfaces but is not
-a complete standards-level serialization of browser execution state and evolves
-with Playwright capabilities/options.
+## Draft design-blocker disposition
 
-### Alternative C — snapshot the whole browser profile directory
+The portability audit and this reconciliation resolve the original Draft blockers as follows:
 
-Rejected as the base portable identity.
+- **BR-BR-001 — CLOSED:** authoritative base state is selected unpartitioned cookies + origin-scoped `localStorage` only.
+- **BR-BR-002 — CLOSED:** tuple-origin state identity and cookie entry identity are explicitly portable; partitioned-cookie state is excluded from base.
+- **BR-BR-003 — CLOSED:** page topology, history, and `sessionStorage` are excluded from base authoritative state.
+- **BR-BR-004 — CLOSED:** successful base restore is exactly `STATE_EQUIVALENT`; `EXACT` is forbidden.
+- **BR-BR-005 — CLOSED:** logical state is separated from Scenario/Fabric-bound execution identity.
+- **BR-BR-006 — CLOSED:** Service Worker/Cache state is excluded from base and requires future separate capability semantics.
+- **BR-BR-007 — CLOSED:** credential-bearing selected state remains authoritative with Security/Evidence visibility controls; WebAuthn private state is excluded.
+- **BR-BR-008 — CLOSED:** canonical bytes/digests apply to the authoritative logical state surface, not rendering/diagnostic Evidence.
+- **BR-BR-009 — CLOSED:** accepted projection requires profile-relevant settlement; no universal network-idle rule exists.
+- **BR-BR-010 — CLOSED:** one cohesive base capability; real-browser backend-neutral TCK; reference portability evidence across at least two independent engine families before claiming implementation-independent reference semantics.
 
-Profile directories contain browser-specific files, caches, internal databases,
-locks, version-specific implementation details, and potentially unrelated or
-sensitive material. Equal portable state cannot depend on byte-identical profile
-directories across engines.
-
-### Alternative D — make a live page the resource
-
-Rejected as the default resource boundary.
-
-A page is too narrow for shared cookies/origin storage and cannot naturally own
-popups, workers, or session-wide state. It also encourages automation API objects
-to become protocol identity.
-
-### Alternative E — make the whole browser process the resource
-
-Rejected as the default resource boundary.
-
-Multiple isolated verification sessions may share one process, while process
-identity and crash behavior are implementation concerns. Process-level ownership
-would also make independent-session cleanup and isolation unnecessarily
-backend-dependent.
-
-### Alternative F — omit snapshot/restore and standardize browser actions only
-
-Rejected for Alpha 3 Browser Resource scope.
-
-AEP-0009 specifically identifies browser state/isolation as an Environment Fabric
-resource problem. A universal Subject browser-action API is a separate
-interoperability question and does not solve Environment reset, identity,
-state/evidence, or replay honesty.
+No unresolved Draft-design blocker remains from BR-BR-001 through BR-BR-010. Formal protocol review may still challenge these decisions; closure means the decisions are explicit and reviewable rather than predetermined as Accepted.
 
 ## Governance boundary
 
-AEP-0011 is **Draft**.
+AEP-0011 remains **Draft** pending a separate explicit lifecycle decision.
 
-This Draft does not authorize:
+This reconciliation does not authorize:
 
-- `Draft -> Proposed` transition;
-- acceptance of any candidate capability identifier or state surface;
-- normative Browser Resource specification or schema adoption;
-- registration of an `avp-browser-*` TCK profile as accepted authority;
-- Playwright, WebDriver BiDi, Chromium, Firefox, WebKit, or another browser
-  adapter as an official Alpha 3 implementation;
+- `Draft -> Proposed` transition by itself;
+- `Proposed -> Accepted` or `Accepted -> Final`;
+- Browser normative specification/requirement-index/schema/TCK adoption;
+- browser backend-neutral harness implementation;
+- Playwright/Selenium/WebDriver/CDP/BiDi adapter implementation as official AVP behavior;
 - changing AEP-0009 or AEP-0010 lifecycle state;
 - selecting an Alpha 3 public release version;
-- assigning this work to the currently planned `0.3.1` maintenance release;
-- changing `docs/releases/release-development-state.json` from development mode;
-- tagging, GitHub Release creation, package-index publication, signing, or
-  attestation publication;
-- treating any Python/reference implementation behavior as protocol authority.
+- assigning Browser work to `0.3.1`;
+- changing release-development mode;
+- repository merge without separate authorization;
+- tag/GitHub Release/package-index publication;
+- signing or attestation publication;
+- treating reference implementation behavior as protocol authority.
 
-The next governed work unit after this Draft is a **Browser Resource portability
-and Proposed-readiness audit** that resolves or explicitly narrows BR-BR-001
-through BR-BR-010 before any Proposed transition.
+If the accompanying Proposed-readiness audit is review-closed with no semantic blocker, the next governance act is a separately recorded protocol-maintainer decision on whether to advance AEP-0011 from Draft to Proposed for formal protocol review.
 
 ## References
 
-Primary upstream references for portability analysis:
+- AEP-0009 — `rfcs/AEP-0009-environment-fabric.md`
+- Environment Fabric contract — `spec/fabric/environment-fabric-contract.md`
+- Browser portability audit — `docs/design/alpha3-browser-resource-portability-audit.md`
+- WHATWG HTML — <https://html.spec.whatwg.org/>
+- WHATWG URL — <https://url.spec.whatwg.org/>
+- WHATWG Storage — <https://storage.spec.whatwg.org/>
+- HTTP Cookies (RFC 6265bis work) — <https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/>
+- W3C WebDriver BiDi — <https://w3c.github.io/webdriver-bidi/>
+- Indexed Database API 3.0 — <https://w3c.github.io/IndexedDB/>
+- Service Workers — <https://w3c.github.io/ServiceWorker/>
+- Web Authentication Level 3 — <https://www.w3.org/TR/webauthn-3/>
+- Playwright BrowserContext — <https://playwright.dev/docs/api/class-browsercontext>
+- Playwright Service Workers — <https://playwright.dev/docs/service-workers>
 
-- AEP-0009 — Environment Fabric Composition and Capability Contract:
-  `rfcs/AEP-0009-environment-fabric.md`
-- AVP Environment Fabric Contract v0.1:
-  `spec/fabric/environment-fabric-contract.md`
-- WHATWG HTML Standard — browsing/origin and Web Storage:
-  https://html.spec.whatwg.org/
-- W3C WebDriver BiDi Editor's Draft:
-  https://w3c.github.io/webdriver-bidi/
-- W3C Indexed Database API 3.0:
-  https://w3c.github.io/IndexedDB/
-- W3C Service Workers:
-  https://w3c.github.io/ServiceWorker/
-- Web Authentication Level 3:
-  https://www.w3.org/TR/webauthn-3/
-- Playwright BrowserContext documentation:
-  https://playwright.dev/docs/api/class-browsercontext
-- Playwright Service Workers documentation:
-  https://playwright.dev/docs/service-workers
-
-These references constrain mechanism and interoperability analysis. They do not
-become AVP normative semantics merely by citation.
+External standards constrain interoperability analysis and mechanisms; they do not become AVP normative semantics merely by citation.
