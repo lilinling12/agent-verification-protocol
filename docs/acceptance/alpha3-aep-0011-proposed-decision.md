@@ -1,27 +1,28 @@
-# AEP-0011 Draft → Proposed Lifecycle Decision Preparation
+# AEP-0011 Draft → Proposed Lifecycle Decision
 
-Status: **DECISION PENDING — PROPOSED ELIGIBLE, NOT YET AUTHORIZED**
+Status: **AUTHORIZED — PROPOSED CANDIDATE UNDER EXACT-HEAD REVIEW**
 
 Decision target: `rfcs/AEP-0011-browser-resource-profile.md`
 
-Decision-preparation baseline: `main@e2159b1daba4dc214b5dc05c233df28afa328a99`
+Decision baseline: `main@e2159b1daba4dc214b5dc05c233df28afa328a99`
 
 Prepared: 2026-08-29
 
-## Purpose
+Lifecycle authorization: **2026-08-29 — protocol maintainer explicitly authorized `AEP-0011 Draft → Proposed`.**
 
-This record prepares the separately governed protocol-maintainer decision on whether
-AEP-0011 — Browser Resource Profile v0.1 should advance from `Draft` to `Proposed`.
+## Decision
 
-It exists to make the lifecycle decision auditable before any status mutation is
-performed. It does **not** itself change AEP-0011's lifecycle state. Until an
-explicit protocol-maintainer authorization is recorded and the corresponding
-status change is adopted into `main`, AEP-0011 remains **Draft**.
+The protocol maintainer explicitly authorized the following lifecycle proposition:
 
-The decision under consideration is intentionally narrow:
+> **Advance AEP-0011 from `Draft` to `Proposed` for formal protocol review.**
 
-> Advance AEP-0011 from `Draft` to `Proposed` so the reconciled Browser Resource
-> design can enter formal protocol review.
+This authorization permits the focused PR #106 lifecycle mutation only. It does not
+by itself merge the candidate into `main`.
+
+Until PR #106 is separately authorized for squash merge and the resulting exact-main
+commit passes required post-merge validation, `main` continues to carry AEP-0011 as
+`Draft`. The branch candidate may truthfully carry `Status: Proposed` because that
+is the exact lifecycle mutation currently under review.
 
 `Proposed` means only that the design is sufficiently complete for formal protocol
 review. It does not mean the design is Accepted, normative, released, or approved
@@ -47,7 +48,7 @@ AEP lifecycle decision
   -> Reference implementation
 ```
 
-A lifecycle transition must not invert that direction. In particular, Playwright,
+The lifecycle transition does not invert that direction. In particular, Playwright,
 WebDriver BiDi implementations, browser-engine behavior, profile directories,
 automation handles, or reference-runtime code cannot establish portable Browser
 semantics by precedent.
@@ -112,9 +113,6 @@ The readiness audit's conclusion is:
 
 **AEP-0011 IS READY TO MOVE FROM `Draft` TO `Proposed` FOR FORMAL PROTOCOL REVIEW.**
 
-The audit explicitly states that this is eligibility evidence only and that a
-separate lifecycle decision is still required.
-
 ### 4. Main-adoption reconciliation
 
 PR #105 recorded the main-adopted Proposed-readiness baseline and reconciled the
@@ -143,8 +141,25 @@ Exact-main validation:
 - CI #632 / run `33212353304` — **SUCCESS**;
 - Relational Parity #25 / run `33212353330` — **SUCCESS**.
 
-The current `main` baseline therefore contains the complete reviewed readiness
-record while AEP-0011 still remains `Draft`.
+### 5. Decision-preparation exact-head evidence
+
+PR #106 first froze this decision record without mutating AEP-0011 or ROADMAP.
+
+Preparation exact head:
+
+`bdf483b98294cb11f49f7a96bfcbc2f4aaf5684b`
+
+Exact-head evidence before lifecycle authorization:
+
+- CI #633 / run `33213189621` — **SUCCESS**;
+- Governance #701 / run `33213189552` — **SUCCESS**;
+- Relational Parity #26 / run `33213189608` — **SUCCESS**;
+- focused preparation review `5055271284` — decision-preparation content review closed;
+- unresolved inline review threads — none.
+
+This evidence verified the decision-preparation artifact only. Because lifecycle
+authorization causes a new branch head, it cannot substitute for the required
+post-authorization exact-head gates and lifecycle review.
 
 ## Draft → Proposed eligibility assessment
 
@@ -170,9 +185,8 @@ semantics merely to make the AEP reviewable.
 
 ## Semantics carried into formal Proposed review
 
-If the lifecycle transition is later explicitly authorized and adopted, formal
-protocol review should challenge — not silently assume — the following reviewed
-Draft choices:
+Formal protocol review must challenge — not silently assume — the following
+Proposed design choices:
 
 1. one isolated browser-session resource rather than page/process/native-handle
    identity;
@@ -198,9 +212,6 @@ may retain, narrow, amend, or reject them.
 
 ## Open questions for formal Proposed review
 
-The readiness audit intentionally carries the following challenge questions into
-formal review:
-
 1. Should the final capability/profile naming remain
    `browser.session-state` / `avp-browser-state-v0.1`?
 2. Is `(name, domain, hostOnly, path)` the correct portable unpartitioned-cookie
@@ -219,40 +230,30 @@ formal review:
 A question becoming a semantic blocker during Proposed review must be resolved in
 the AEP before any later `Proposed -> Accepted` decision.
 
-## Decision proposition
+## Authorized status-mutation scope
 
-The lifecycle proposition awaiting explicit protocol-maintainer authorization is:
+The protocol-maintainer authorization permits PR #106 to:
 
-> **Advance AEP-0011 from `Draft` to `Proposed` for formal protocol review.**
-
-If explicitly authorized, the status-mutation work must remain limited to:
-
-1. changing AEP-0011 lifecycle metadata and stale Draft-only lifecycle wording to
+1. change AEP-0011 lifecycle metadata and stale Draft-only lifecycle wording to
    `Proposed` without altering the reviewed portable design semantics;
-2. updating `ROADMAP.md` to mark only
+2. update `ROADMAP.md` to mark only
    `AEP-0011 status advanced to Proposed for formal protocol review` complete and
-   to record exact decision evidence;
-3. making this decision record effective, with the exact authorization and
-   reviewed status-mutation head attributable in PR history;
-4. running all applicable exact-head CI/Governance/Release Validation/Relational
+   record the lifecycle decision boundary;
+3. update this decision record with the explicit authorization and exact branch
+   evidence;
+4. run all applicable exact-head CI/Governance/Release Validation/Relational
    Parity gates;
-5. performing a focused exact-head lifecycle review that verifies the delta is
-   lifecycle/evidence-only;
-6. requiring a **separate explicit squash-merge authorization** before the status
-   transition is adopted into `main`;
-7. requiring exact-main post-merge validation before the lifecycle work unit is
-   considered fully closed.
+5. perform a focused exact-head lifecycle review verifying the final delta is
+   lifecycle/evidence-only.
 
-No semantic rewrite should be bundled into the lifecycle status mutation. Any
-semantic change discovered necessary during review belongs to the subsequent
-formal Proposed-review work unit and invalidates assumptions that the transition
-is metadata-only.
+The authorization does **not** authorize merge. PR #106 still requires a separate
+explicit squash-merge authorization after final exact-head gates, review, Ready
+state, and no-drift checks succeed.
 
 ## Non-authorization boundary
 
-This preparation record does **not** authorize or perform:
+This lifecycle authorization does **not** authorize:
 
-- AEP-0011 `Draft -> Proposed`;
 - AEP-0011 `Proposed -> Accepted` or `Accepted -> Final`;
 - Browser normative specification or requirement-index adoption;
 - Browser JSON Schema adoption;
@@ -265,7 +266,7 @@ This preparation record does **not** authorize or perform:
 - release-development state changes;
 - tag, GitHub Release, package-index publication, signing, or attestation;
 - physical repository split or plugin-framework introduction;
-- merge of the current preparation PR.
+- merge of PR #106.
 
 Release provenance remains:
 
@@ -275,13 +276,11 @@ sourceVersion: 0.3.1.dev0
 nextRelease: 0.3.1
 ```
 
-No lifecycle decision may be inferred merely from the existence of this file, a
-successful CI run, GitHub Ready state, or a generic instruction to continue work.
-
 ## Current gate
 
-**DECISION PENDING — EXPLICIT AEP-0011 `Draft -> Proposed` AUTHORIZATION REQUIRED.**
+**AUTHORIZED — STATUS-MUTATION CANDIDATE MUST PASS EXACT-HEAD REVIEW AND GATES.**
 
-The next action after review-closing this preparation artifact is a separate,
-explicit protocol-maintainer authorization of the lifecycle proposition. Only
-then may the branch mutate AEP-0011/ROADMAP to the Proposed candidate state.
+After the final lifecycle-mutation head is review-closed and all applicable gates
+succeed, PR #106 may become Ready. Ready state is not merge authorization. A
+separate explicit squash-merge authorization is required before `main` adopts the
+`Proposed` lifecycle state.
