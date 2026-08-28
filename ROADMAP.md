@@ -97,9 +97,9 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 
 ### Browser resource profile
 - [x] AEP-0011 Draft problem/scope and standards analysis
-- [ ] browser portability and Proposed-readiness audit
-- [ ] close BR-BR-001..BR-BR-010 Draft → Proposed blockers
-- [ ] reconcile AEP-0011 and complete Draft → Proposed readiness audit
+- [x] browser portability and Proposed-readiness audit
+- [x] close BR-BR-001..BR-BR-010 Draft → Proposed blockers
+- [x] reconcile AEP-0011 and complete Draft → Proposed readiness audit
 - [ ] AEP-0011 status advanced to Proposed for formal protocol review
 - [ ] complete formal Proposed protocol review
 - [ ] resolve acceptance blockers and record explicit AEP-0011 Proposed → Accepted decision
@@ -109,7 +109,13 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by readiness audit
 - [ ] Playwright browser runtime against the portable TCK
 
-AEP-0011 remains **Draft, not Proposed**. Its problem/scope and standards-analysis baseline was adopted into `main` by authorized squash merge of PR #100 at exact commit `8f0c37e34202066ed79f8aa420a9939dd79cc5d1`. Exact-main CI #622 (`33116957396`) and Relational Parity #15 (`33116957406`) both passed on that merge commit. `docs/acceptance/alpha3-browser-draft-main-adoption.md` records the exact-head review, Ready-state, merge, and post-merge evidence. BR-BR-001..BR-BR-010 remain open and are the subject of the next separately governed Browser Resource portability / Proposed-readiness audit. `resourceKind: browser` remains only coarse Fabric classification; Playwright remains downstream implementation evidence and must not define portable browser semantics by precedent.
+AEP-0011 remains **Draft, not Proposed**. Its initial problem/scope and standards-analysis baseline was adopted into `main` by authorized squash merge of PR #100 at exact commit `8f0c37e34202066ed79cc5d1`. Exact-main CI #622 (`33116957396`) and Relational Parity #15 (`33116957406`) both passed on that merge commit, and `docs/acceptance/alpha3-browser-draft-main-adoption.md` records that baseline adoption.
+
+The implementation-independent portability audit was then adopted by PR #103 at exact main commit `ee876088bf53c82730b98dc74bfbc2e87f7aebb4`; exact-main CI #628 (`33134651349`) and Relational Parity #21 (`33134651336`) both passed. The audit narrowed base authoritative browser-session state to selected unpartitioned HTTP cookies plus selected tuple-origin `localStorage`, separated state from Evidence and execution identity, established `STATE_EQUIVALENT` as the only successful base restore fidelity, rejected universal network-idle/sleep settling, and required real-browser portability evidence without making multi-engine support a universal third-party conformance requirement.
+
+PR #104 reconciled those decisions into AEP-0011 and added the Draft → Proposed readiness audit. Formal review `5048566230` at exact PR head `ae2cc0dfa42a476b1949611fbd201e9ce36f69a4` concluded `REVIEW-CLOSED — PROPOSED-ELIGIBILITY EVIDENCE IS COHERENT FOR THIS EXACT HEAD`; CI #629 (`33148952559`), Governance #695 (`33148952556`), Relational Parity #22 (`33148952557`), and Ready-state Governance #696 (`33149074249`) succeeded. After explicit squash authorization, PR #104 was adopted into `main` at exact commit `69f3d91a9197f159eb0b5d77418f01b956aa17ff`; exact-main CI #630 (`33149341398`) and Relational Parity #23 (`33149341383`) both passed. `docs/acceptance/alpha3-browser-readiness-main-adoption.md` records the reviewed and main-adopted evidence.
+
+BR-BR-001..BR-BR-010 are therefore closed as **Draft design blockers for Proposed-readiness**, and the reconciled Draft is **Proposed-eligible**. This does not itself advance AEP-0011 to Proposed. The next separately governed Browser milestone is the explicit AEP-0011 `Draft → Proposed` lifecycle decision and formal Proposed protocol review. `resourceKind: browser` remains only coarse Fabric classification; no Browser normative Spec/Schema/TCK, backend-neutral browser harness, Playwright implementation, release selection, publication, signing, or attestation is authorized by these completed readiness milestones.
 
 ### Other resource implementations
 - [ ] network fault proxy
