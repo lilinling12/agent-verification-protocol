@@ -112,9 +112,11 @@ Reused unchanged:
 The profile reuses upstream web-platform concepts where they own semantics and adds only the AVP verification-facing boundary.
 
 - WHATWG HTML/Web Storage establishes the distinction between origin-scoped `localStorage` and session/topology-scoped `sessionStorage`.
+- WHATWG URL/HTML define tuple-origin components and origin serialization; AVP reuses those semantics instead of inventing a second URL/origin canonicalizer.
 - WHATWG Storage exposes multiple distinct storage endpoints rather than one universal browser-state map.
 - IndexedDB has database, object-store, index, key, version, transaction, and structured-clone semantics that cannot be reduced to an unspecified JSON object.
 - Service Worker and Cache Storage have independent registration/lifecycle/cache semantics.
+- the HTTP cookie storage model distinguishes cookie name, domain, host-only flag, path, persistence/expiry, Secure, HttpOnly, and SameSite semantics; AVP preserves the portable subset needed by the selected unpartitioned-cookie state claim.
 - WebDriver BiDi demonstrates implementation-neutral concepts such as user contexts, browsing contexts, cookie storage, and storage partition keys without defining AVP Environment identity or snapshot fidelity.
 - Playwright is useful reference-implementation evidence but is not AVP protocol authority.
 
@@ -150,27 +152,52 @@ This surface is closed. An implementation cannot silently omit selected state it
 
 #### Unpartitioned cookies
 
-Portable cookie state must preserve the semantic fields required to distinguish cookie identity, scope, and behavior, including at minimum:
+Each projected cookie is one unpartitioned cookie-store entry. Its portable entry identity is the tuple:
 
-- name;
-- value;
-- host-only versus domain semantics in the eventual normative representation;
-- domain when domain-scoped;
-- path;
-- expiry versus session semantics;
+```text
+(name, domain, hostOnly, path)
+```
+
+No two projected cookies in one BrowserStateImage may have the same entry-identity tuple.
+
+The canonical cookie state must preserve at least:
+
+- `name` and `value` as the exact cookie data exposed by the selected browser state boundary;
+- canonical domain/host text and the explicit `hostOnly` boolean;
+- `path`;
+- persistent versus session semantics;
+- expiry instant when persistent;
 - `Secure`;
 - `HttpOnly`;
-- `SameSite` where applicable.
+- `SameSite` state, including the distinction between an explicitly governed value and the user-agent default state where that distinction affects the stored cookie state.
+
+Creation time and last-access time are not part of Browser v0.1 portable state identity. Browser eviction policy, cookie-store capacity, and retrieval ordering are not standardized by this profile.
+
+An expired cookie is not a valid retained BrowserStateImage entry: the projected authoritative image represents the browser's current selected cookie store after expired entries have been removed according to browser cookie-store semantics. A session cookie records session persistence semantics rather than inventing an expiry instant.
+
+Domain text must represent the canonical host/domain value associated with the stored cookie; AVP does not preserve whether an input `Domain` attribute originally contained presentation-only syntax such as a leading dot. Host-only versus domain-scoped behavior is preserved by `hostOnly`.
 
 Partitioned/CHIPS-style cookie state is excluded from the base profile. A future separately governed capability may add storage-partition semantics once portable identity and executable cross-engine behavior are sufficiently bounded.
 
 #### Origin-scoped localStorage
 
-`localStorage` is represented per selected origin. A flat global key/value map is forbidden.
+`localStorage` is represented per selected **tuple origin**. A flat global key/value map is forbidden.
 
-The normative layer must define a protocol-owned canonical origin representation based on standards-level origin components. Browser profile paths, vendor storage-key tokens, native partition IDs, automation object IDs, or product-specific handles are not AVP origin/state identity.
+For Browser v0.1, a selected `localStorage` origin must be a non-opaque tuple origin whose identity is `(scheme, host, port)` under WHATWG origin semantics. Its portable canonical text is the WHATWG serialization of that origin:
+
+```text
+scheme://serialized-host[:non-null-port]
+```
+
+The serialization therefore uses the parsed/canonical host form and includes a port only when the origin tuple's port is non-null. URL path, query, fragment, username, and password never participate in `localStorage` origin identity.
+
+Opaque origins and `file:` origin behavior are outside the base v0.1 portable `localStorage` state claim because they do not provide the stable tuple-origin interoperability boundary this profile requires. A Scenario that materially requires them needs separately governed semantics.
+
+Within one selected origin, `localStorage` state is a map from exact string key to exact string value. A key appears at most once. Canonical ordering is by the exact string-key representation defined by the downstream normative canonical JSON model, not browser enumeration order, locale, or insertion order.
 
 For every selected origin, all selected `localStorage` entries participate in the authoritative state claim. Missing, extra, scope-shifted, or transformed selected entries are non-equivalent.
+
+Browser profile paths, vendor storage-key tokens, native partition IDs, automation object IDs, or product-specific handles are not AVP origin/state identity.
 
 ## Explicitly excluded base state
 
@@ -225,6 +252,8 @@ BrowserStateImage
 The exact field names and schema spelling are downstream work; the semantics above are not.
 
 The Manifest defines the interpretation/selection rules and does not point to the baseline StateImage. The baseline StateImage binds the Manifest digest. Runtime snapshot StateImages are generated Environment/Evidence state bound through SnapshotRef and do not mutate the resource's immutable baseline identity inputs.
+
+The downstream normative specification must define one closed selection grammar: it must identify the complete set of unpartitioned cookie entries and tuple origins whose state participates in the resource without relying on a vendor query language or runtime-only callback. Selection identity is immutable for the materialized resource.
 
 Canonical ordering and exact representation must be protocol-owned before schema/TCK closure. No automation-library export format becomes canonical authority.
 
@@ -396,8 +425,8 @@ Mandatory conformance families should cover at least:
 1. isolated-resource ownership and sibling isolation;
 2. execution-identity binding and incompatible-identity rejection;
 3. baseline materialization and independent reprojection;
-4. origin-scoped `localStorage` preservation;
-5. complete unpartitioned-cookie state identity;
+4. exact tuple-origin `localStorage` separation and canonical origin identity;
+5. complete unpartitioned-cookie entry identity and stored attribute semantics;
 6. exact canonical state identity for the selected surface;
 7. SnapshotRef ownership/integrity and stale/foreign rejection;
 8. mutation -> snapshot -> restore -> independent reprojection;
@@ -414,6 +443,7 @@ Negative controls should include at minimum implementations that:
 
 - omit selected `localStorage` state;
 - flatten cross-origin state;
+- collapse host-only and domain-scoped cookies with otherwise matching fields;
 - report restore success without independent reprojection;
 - falsely report `EXACT`;
 - expose evaluator-private credential values;
@@ -499,7 +529,7 @@ Rejected. Network-idle heuristics are not equivalent to settlement of the select
 The portability audit and this reconciliation resolve the original Draft blockers as follows:
 
 - **BR-BR-001 — CLOSED:** authoritative base state is selected unpartitioned cookies + origin-scoped `localStorage` only.
-- **BR-BR-002 — CLOSED:** origin-scoped state identity is protocol-owned; partitioned-cookie state is excluded from base.
+- **BR-BR-002 — CLOSED:** tuple-origin state identity and cookie entry identity are explicitly portable; partitioned-cookie state is excluded from base.
 - **BR-BR-003 — CLOSED:** page topology, history, and `sessionStorage` are excluded from base authoritative state.
 - **BR-BR-004 — CLOSED:** successful base restore is exactly `STATE_EQUIVALENT`; `EXACT` is forbidden.
 - **BR-BR-005 — CLOSED:** logical state is separated from Scenario/Fabric-bound execution identity.
@@ -539,7 +569,9 @@ If the accompanying Proposed-readiness audit is review-closed with no semantic b
 - Environment Fabric contract — `spec/fabric/environment-fabric-contract.md`
 - Browser portability audit — `docs/design/alpha3-browser-resource-portability-audit.md`
 - WHATWG HTML — <https://html.spec.whatwg.org/>
+- WHATWG URL — <https://url.spec.whatwg.org/>
 - WHATWG Storage — <https://storage.spec.whatwg.org/>
+- HTTP Cookies (RFC 6265bis work) — <https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/>
 - W3C WebDriver BiDi — <https://w3c.github.io/webdriver-bidi/>
 - Indexed Database API 3.0 — <https://w3c.github.io/IndexedDB/>
 - Service Workers — <https://w3c.github.io/ServiceWorker/>
