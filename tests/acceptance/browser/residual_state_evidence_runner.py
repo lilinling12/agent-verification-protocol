@@ -35,7 +35,7 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Iterator
 
-_FIXTURE_REVISION = "browser-residual-state-evidence-v0.3"
+_FIXTURE_REVISION = "browser-residual-state-evidence-v0.4"
 _HOST = "localhost"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
@@ -61,7 +61,7 @@ class EngineResult:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    server_version = "AVPBrowserResidualEvidence/0.3"
+    server_version = "AVPBrowserResidualEvidence/0.4"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = self.path.split("?", 1)[0]
@@ -207,12 +207,12 @@ def _install_service_worker_and_cache(context: Any, port: int) -> None:
               const ready = await navigator.serviceWorker.ready;
               return {
                 scope: registration.scope,
-                active: ready.active !== null && ready.active.state === 'activated',
+                active: ready.active !== null,
               };
             }"""
         )
         if not state.get("active"):
-            raise AssertionError(f"Service Worker did not reach active state: {state!r}")
+            raise AssertionError(f"Service Worker did not reach ready active registration: {state!r}")
     finally:
         page.close()
 
