@@ -1,0 +1,190 @@
+name: Browser Shipping Cookie Provenance Evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-shipping-cookie-provenance-evidence.yml'
+      - 'tests/acceptance/browser/shipping_cookie_provenance_evidence_runner.py'
+      - 'tests/acceptance/browser/bind_evidence_source.py'
+      - 'rfcs/AEP-0011-browser-resource-profile.md'
+      - 'docs/design/alpha3-browser-cross-engine-acceptance-evidence.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-shipping-cookie-provenance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVP_EVIDENCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  chrome:
+    name: Shipping Provenance — chrome
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install pinned native WebDriver client
+        run: python -m pip install 'selenium==4.48.0'
+      - name: Record shipping browser and driver identity
+        run: |
+          google-chrome --version
+          chromedriver --version
+      - name: Configure controlled test origins
+        run: |
+          printf '%s\n' '127.0.0.1 a.test sub.a.test' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts a.test sub.a.test
+      - name: Execute provenance-complete cookie evidence
+        run: |
+          xvfb-run -a python tests/acceptance/browser/shipping_cookie_provenance_evidence_runner.py \
+            --engine chrome \
+            --output browser-evidence/browser-shipping-cookie-provenance-chrome.json
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-shipping-cookie-provenance-chrome.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+      - name: Show compact provenance disposition
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('browser-evidence/browser-shipping-cookie-provenance-chrome.json')
+          if p.exists():
+              d = json.loads(p.read_text())
+              print('source=', d.get('repositorySha'), 'binding=', d.get('sourceBinding'))
+              print({c['case_id']: c['status'] for c in d.get('cases', [])})
+          PY
+      - name: Upload exact-head provenance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-shipping-cookie-provenance-chrome-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-shipping-cookie-provenance-chrome.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  firefox:
+    name: Shipping Provenance — firefox
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install pinned native WebDriver client
+        run: python -m pip install 'selenium==4.48.0'
+      - name: Record shipping browser and driver identity
+        run: |
+          firefox --version
+          geckodriver --version
+      - name: Configure controlled test origins
+        run: |
+          printf '%s\n' '127.0.0.1 a.test sub.a.test' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts a.test sub.a.test
+      - name: Execute provenance-complete cookie evidence
+        run: |
+          xvfb-run -a python tests/acceptance/browser/shipping_cookie_provenance_evidence_runner.py \
+            --engine firefox \
+            --output browser-evidence/browser-shipping-cookie-provenance-firefox.json
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-shipping-cookie-provenance-firefox.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+      - name: Show compact provenance disposition
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('browser-evidence/browser-shipping-cookie-provenance-firefox.json')
+          if p.exists():
+              d = json.loads(p.read_text())
+              print('source=', d.get('repositorySha'), 'binding=', d.get('sourceBinding'))
+              print({c['case_id']: c['status'] for c in d.get('cases', [])})
+          PY
+      - name: Upload exact-head provenance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-shipping-cookie-provenance-firefox-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-shipping-cookie-provenance-firefox.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  safari:
+    name: Shipping Provenance — safari
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install pinned native WebDriver client
+        run: python -m pip install 'selenium==4.48.0'
+      - name: Enable and record Safari native WebDriver identity
+        run: |
+          sw_vers
+          defaults read /Applications/Safari.app/Contents/Info CFBundleShortVersionString
+          /usr/bin/safaridriver --version
+          sudo /usr/bin/safaridriver --enable
+      - name: Configure controlled test origins
+        run: |
+          printf '%s\n' '127.0.0.1 a.test sub.a.test' | sudo tee -a /etc/hosts >/dev/null
+          dscacheutil -q host -a name a.test
+          dscacheutil -q host -a name sub.a.test
+      - name: Execute provenance-complete cookie evidence
+        run: |
+          python tests/acceptance/browser/shipping_cookie_provenance_evidence_runner.py \
+            --engine safari \
+            --output browser-evidence/browser-shipping-cookie-provenance-safari.json
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-shipping-cookie-provenance-safari.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+      - name: Show compact provenance disposition
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('browser-evidence/browser-shipping-cookie-provenance-safari.json')
+          if p.exists():
+              d = json.loads(p.read_text())
+              print('source=', d.get('repositorySha'), 'binding=', d.get('sourceBinding'))
+              print({c['case_id']: c['status'] for c in d.get('cases', [])})
+          PY
+      - name: Upload exact-head provenance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-shipping-cookie-provenance-safari-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-shipping-cookie-provenance-safari.json
+          if-no-files-found: warn
+          retention-days: 30
