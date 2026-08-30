@@ -1,21 +1,21 @@
 """Execute non-normative residual-state noninterference evidence for AEP-0011.
 
 BAE-011 proves that equal selected Browser v0.1 state does not imply equal
-behavior when excluded browser state differs. The fixture exercises Service
-Worker/Cache Storage and IndexedDB, then proves one admissible isolation policy:
-destroy the contaminated isolated context, create a fresh context, and
-materialize only the selected base-profile state.
+behavior when excluded browser state differs. The fixture exercises two
+independent excluded-state surfaces: Service Worker/Cache Storage and IndexedDB.
+It then proves one admissible isolation policy: destroy the contaminated isolated
+context, create a fresh context, and materialize only the selected base-profile
+state.
 
 The runner uses ``http://localhost`` because Service Worker registration requires
 a secure context and localhost is the web-platform loopback exception for a
 potentially trustworthy origin.
 
-Service Worker client-controller timing is deliberately *not* an acceptance
-oracle. Engines may expose ``navigator.serviceWorker.controller`` at different
-points around activation/navigation. The evidence instead requires an active
-registration and, separately, observable fetch behavior produced by the Service
-Worker/Cache state. If the worker never materially affects behavior, BAE-011
-still fails.
+Playwright is evidence transport only. In particular, Playwright documents its
+Service Worker support as Chromium-only. A non-Chromium managed build that
+cannot demonstrate the Service Worker fetch-interception subproof is therefore
+recorded as transport-insufficient, not as a protocol failure and never as a
+protocol pass. An independently observed interception still counts as evidence.
 
 This module is acceptance evidence only. It is not Browser runtime, portable
 TCK, or protocol authority.
@@ -35,7 +35,7 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Iterator
 
-_FIXTURE_REVISION = "browser-residual-state-evidence-v0.4"
+_FIXTURE_REVISION = "browser-residual-state-evidence-v0.5"
 _HOST = "localhost"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
@@ -44,6 +44,7 @@ _DB_STORE = "state"
 _DB_KEY = "probe"
 _DB_VALUE = "residual-value"
 _CACHE_NAME = "avp-residual-v1"
+_PLAYWRIGHT_SERVICE_WORKER_DOC = "https://playwright.dev/docs/service-workers"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +62,7 @@ class EngineResult:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    server_version = "AVPBrowserResidualEvidence/0.4"
+    server_version = "AVPBrowserResidualEvidence/0.5"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = self.path.split("?", 1)[0]
@@ -195,7 +196,7 @@ def _assert_service_worker_capability(page: Any) -> None:
 
 
 def _install_service_worker_and_cache(context: Any, port: int) -> None:
-    """Install residue while avoiding engine-specific controller timing as oracle."""
+    """Install residue without making client-controller timing an oracle."""
 
     page = context.new_page()
     try:
@@ -312,6 +313,17 @@ def _read_indexed_db(context: Any, port: int) -> str | None:
         page.close()
 
 
+def _indexed_db_behavior(context: Any, port: int) -> str:
+    """Project an IndexedDB behavior state using a side-effect-free existence probe."""
+
+    value = _read_indexed_db(context, port)
+    if value is None:
+        return "indexeddb-clean"
+    if value == _DB_VALUE:
+        return "indexeddb-residual"
+    raise AssertionError(f"unexpected controlled IndexedDB value: {value!r}")
+
+
 def _read_controlled_resource(context: Any, port: int) -> str:
     page = context.new_page()
     try:
@@ -344,7 +356,15 @@ def _assert_clean_excluded_state(context: Any, port: int) -> None:
         )
 
 
-def _case_bae_011(browser: Any, port: int) -> CaseResult:
+def _playwright_service_worker_support(engine_family: str) -> str:
+    """Classify Playwright transport support, never browser-engine semantics."""
+
+    if engine_family == "chromium":
+        return "documented-supported"
+    return "documented-nonchromium-insufficient"
+
+
+def _case_bae_011(browser: Any, port: int, engine_family: str) -> CaseResult:
     clean = browser.new_context()
     residual = browser.new_context()
     recreated = None
@@ -358,6 +378,14 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
             raise AssertionError("contexts did not begin with identical selected state")
         _assert_clean_excluded_state(clean, port)
 
+        clean_idb_before = _indexed_db_behavior(clean, port)
+        residual_idb_before = _indexed_db_behavior(residual, port)
+        if clean_idb_before != "indexeddb-clean" or residual_idb_before != "indexeddb-clean":
+            raise AssertionError(
+                "contexts did not begin with clean IndexedDB behavior: "
+                f"clean={clean_idb_before!r}, residual={residual_idb_before!r}"
+            )
+
         _install_service_worker_and_cache(residual, port)
         _seed_indexed_db(residual, port)
 
@@ -365,14 +393,16 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
         if residual_selected_after != clean_selected:
             raise AssertionError("excluded-state setup unexpectedly changed selected state")
 
-        clean_resource = _read_controlled_resource(clean, port)
-        residual_resource = _read_controlled_resource(residual, port)
-        if clean_resource != "network-origin":
-            raise AssertionError(f"clean context resource unexpectedly changed: {clean_resource!r}")
-        if residual_resource != "service-worker-cache":
+        clean_idb_after = _indexed_db_behavior(clean, port)
+        residual_idb_after = _indexed_db_behavior(residual, port)
+        if clean_idb_after != "indexeddb-clean":
             raise AssertionError(
-                "Service Worker/Cache residual state did not materially affect behavior: "
-                f"{residual_resource!r}"
+                f"clean context IndexedDB behavior unexpectedly changed: {clean_idb_after!r}"
+            )
+        if residual_idb_after != "indexeddb-residual":
+            raise AssertionError(
+                "controlled IndexedDB residue did not materially change behavior: "
+                f"{residual_idb_after!r}"
             )
 
         registrations = _service_worker_registration_count(residual, port)
@@ -383,9 +413,25 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
             raise AssertionError(
                 f"controlled Cache residue was not observable: {cache_names!r}"
             )
-        indexed_db = _read_indexed_db(residual, port)
-        if indexed_db != _DB_VALUE:
-            raise AssertionError(f"IndexedDB residual state not observed: {indexed_db!r}")
+
+        clean_resource = _read_controlled_resource(clean, port)
+        residual_resource = _read_controlled_resource(residual, port)
+        if clean_resource != "network-origin":
+            raise AssertionError(f"clean context resource unexpectedly changed: {clean_resource!r}")
+
+        transport_support = _playwright_service_worker_support(engine_family)
+        if residual_resource == "service-worker-cache":
+            service_worker_outcome = "pass"
+        elif residual_resource == "network-origin" and transport_support != "documented-supported":
+            # Playwright documents SW support as Chromium-only. This branch is a
+            # transport limitation classification, not a Gecko/WebKit semantic
+            # claim and not a portable-protocol success.
+            service_worker_outcome = "transport-insufficient"
+        else:
+            raise AssertionError(
+                "Service Worker/Cache behavior was inconsistent with the observed transport capability: "
+                f"support={transport_support!r}, response={residual_resource!r}"
+            )
 
         # One admissible noninterference strategy: discard the contaminated
         # isolated session, create a fresh session, then materialize only the
@@ -398,25 +444,51 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
         if recreated_selected != clean_selected:
             raise AssertionError("fresh isolated context changed selected baseline")
         _assert_clean_excluded_state(recreated, port)
+
+        recreated_idb = _indexed_db_behavior(recreated, port)
+        if recreated_idb != "indexeddb-clean":
+            raise AssertionError(
+                f"IndexedDB residue crossed fresh isolation boundary: {recreated_idb!r}"
+            )
         recreated_resource = _read_controlled_resource(recreated, port)
         if recreated_resource != "network-origin":
             raise AssertionError("Service Worker/Cache residue crossed fresh isolation boundary")
 
+        status = "pass" if service_worker_outcome == "pass" else "partial"
+        closure_required = None
+        if status == "partial":
+            closure_required = (
+                "obtain the Service Worker/cache behavior subproof from a shipping/native transport "
+                "for this engine family; this Playwright result makes no engine-semantic conclusion"
+            )
+
         return CaseResult(
             case_id="BAE-011",
-            status="pass",
+            status=status,
             details={
                 "fixture_origin_is_potentially_trustworthy": True,
                 "service_worker_controller_timing_used_as_oracle": False,
                 "selected_state_equal_before_excluded_mutation": True,
                 "selected_state_equal_after_excluded_mutation": True,
+                "indexeddb_behavior_before_clean": clean_idb_before,
+                "indexeddb_behavior_before_residual": residual_idb_before,
+                "indexeddb_behavior_after_clean": clean_idb_after,
+                "indexeddb_behavior_after_residual": residual_idb_after,
+                "indexeddb_behavior_changed": True,
+                "fresh_isolated_context_indexeddb_behavior": recreated_idb,
                 "service_worker_registration_observed": True,
                 "cache_storage_residue_observed": True,
-                "service_worker_cache_changed_behavior": True,
-                "indexeddb_residual_value_observed": True,
+                "service_worker_expected_intercept": "service-worker-cache",
+                "service_worker_observed_response": residual_resource,
+                "service_worker_behavior_outcome": service_worker_outcome,
+                "service_worker_transport_support": transport_support,
+                "service_worker_transport_documentation": _PLAYWRIGHT_SERVICE_WORKER_DOC,
+                "service_worker_transport_authority": "test-transport-only",
                 "selected_state_equality_proved_excluded_equivalence": False,
                 "fresh_isolated_context_removed_service_worker_cache_residue": True,
                 "fresh_isolated_context_removed_indexeddb_residue": True,
+                "full_bae011_engine_family_evidence_proven": status == "pass",
+                "closure_required": closure_required,
                 "noninterference_strategy_proven": (
                     "destroy contaminated isolated context; recreate fresh context; "
                     "materialize selected base state only"
@@ -441,7 +513,7 @@ def _run_engine(browser_type: Any, port: int) -> EngineResult:
     browser = browser_type.launch(headless=True)
     try:
         try:
-            result = _case_bae_011(browser, port)
+            result = _case_bae_011(browser, port, browser_type.name)
         except Exception as exc:
             result = CaseResult(
                 case_id="BAE-011",
