@@ -1,6 +1,6 @@
 # Alpha 3 Browser Resource Proposed Review Blockers
 
-Status: **OPEN — PROTOCOL EDITS REQUIRED BEFORE ACCEPTANCE RE-REVIEW**
+Status: **PROTOCOL DECISIONS INCORPORATED — ACCEPTANCE EVIDENCE OPEN**
 
 Proposal: AEP-0011 — Browser Resource Profile v0.1
 
@@ -8,185 +8,209 @@ Formal review baseline: `main@ccd05b71635b46218dfa14043320a60376339dc2`
 
 Formal review record: `docs/design/alpha3-browser-resource-formal-proposed-review.md`
 
+Protocol-resolution branch baseline: `main@fa62d004a4fb8498219989abcbd0b21caf14177f`
+
 ## Purpose
 
-This record tracks the protocol-semantic blockers identified by the formal Proposed review of AEP-0011.
+This record tracks the protocol-semantic blockers identified by the formal Proposed review of AEP-0011 and distinguishes **protocol decisions incorporated into the Proposed text** from **acceptance evidence still required before lifecycle promotion can be considered**.
 
-Unlike the Relational State blocker record after its edits had already been incorporated, the Browser blockers below are intentionally still **open**. No blocker-resolution edit has yet been made to AEP-0011. Keeping this ledger separate prevents the review record from being mistaken for an Accepted protocol surface and prevents implementation work from outrunning unresolved semantics.
+AEP-0011 remains `Proposed`. Incorporating a blocker decision does not self-approve the AEP, does not substitute for cross-engine evidence, and does not authorize Browser Spec/Schema/TCK/harness/runtime work.
 
-AEP-0011 remains `Proposed`. The next governed protocol step is to resolve these blockers in AEP-0011, then perform an exact-head acceptance-oriented re-review. `Proposed -> Accepted` remains a separate explicit protocol-maintainer decision.
+The blocker-resolution edit is intentionally confined to AEP-0011 plus this ledger. The formal review record remains historical review evidence and is not rewritten to make its earlier findings appear retrospectively closed.
 
 ## BPR-001 — Capability/profile naming closure
 
-### Finding
+### Formal-review finding
 
-Current working identifiers `browser.session-state` / `avp-browser-state-v0.1` can be read more broadly than the actual narrow unpartitioned cookie + `localStorage` state contract.
+The previous working identifiers `browser.session-state` / `avp-browser-state-v0.1` could be read more broadly than the narrow unpartitioned cookie + `localStorage` state contract.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must select stable protocol-facing identifiers that:
+AEP-0011 now fixes:
 
-1. identify a Browser **state** capability rather than a universal Browser Agent action API;
-2. do not imply a complete browser-profile snapshot;
-3. remain extensible to separately governed future partitioned-storage, richer state, action, or observation capabilities;
-4. are fixed by protocol review rather than copied from an implementation package.
+```text
+capabilityId: state.browser
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+revision: "0.1"
+```
 
-Recommended direction is a generic state capability such as `state.browser` plus a narrow versioned profile identifier. Exact spelling remains a protocol decision.
+The capability is explicitly a Browser state capability, not a universal Browser Agent action API or full browser-profile checkpoint. Future partition-aware storage, richer state, action, and observation capabilities remain separately governable.
 
-**BPR-001: OPEN.**
+**BPR-001: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-002 — Explicit unpartitioned `localStorage` boundary
 
-### Finding
+### Formal-review finding
 
 Tuple-origin identity is not a sufficient unqualified description of modern browser storage because deployed engines partition third-party storage by top-level site and related context.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must:
+AEP-0011 now limits v0.1 to **unpartitioned `localStorage`** whose storage identity can be proven to be the tuple origin in the controlled execution context. Partitioned or top-level-site-keyed state cannot be projected as ordinary tuple-origin state. A scenario that materially depends on partitioned state must fail closed under v0.1 unless a future separately governed capability owns it.
 
-1. define the v0.1 authoritative `localStorage` surface as **unpartitioned** state;
-2. state the admitted execution-context assumptions under which tuple `(scheme, host, port)` identity is valid;
-3. forbid projecting partitioned storage into the base profile as ordinary tuple-origin state;
-4. fail closed or require a future separately governed partition-aware capability when a scenario materially depends on partitioned state.
-
-**BPR-002: OPEN.**
+**BPR-002: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-003 — Lossless cookie identity/projection proof
 
-### Finding
+### Formal-review finding
 
-RFC 10025 cookie identity includes the host-only flag, while mainstream automation surfaces do not consistently expose enough information to recover it directly.
+The portable cookie identity requires `hostOnly`, while mainstream automation surfaces may not expose enough information to establish that identity directly.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must:
+AEP-0011 retains:
 
-1. retain `(name, domain, hostOnly, path)` as portable selected-cookie identity;
-2. prohibit weakening the identity because a backend API is lossy;
-3. require an implementation to establish the selected identity/state through independently reviewable projection evidence or fail closed;
-4. require acceptance evidence across Chromium, Gecko, and WebKit families.
+```text
+(name, domain, hostOnly, path)
+```
 
-**BPR-003: OPEN.**
+as selected-cookie identity. Backend API lossiness does not weaken the protocol. Evaluator/control authority must establish all required selected cookie identity/state through an independently reviewable mechanism or fail closed. Convenience serialization, inference from incomplete exports, normalization, and backend command success are insufficient proof.
+
+### Remaining acceptance evidence
+
+Before acceptance-oriented review can close, the identity/projection rule must be demonstrated across Chromium, Gecko, and WebKit families, including host-only versus domain-scoped behavior.
+
+**BPR-003: PROTOCOL DECISION INCORPORATED — ACCEPTANCE EVIDENCE PENDING.**
 
 ## BPR-004 — Cookie temporal semantics and restore fidelity
 
-### Finding
+### Formal-review finding
 
-Stored-cookie creation time can affect observable HTTP behavior, including `SameSite=Default` compatibility behavior and ordering, but Browser v0.1 does not currently preserve arbitrary historical creation time.
+Stored-cookie creation time can affect observable HTTP behavior while mainstream portable automation surfaces do not reliably expose and restore arbitrary historic creation time. Field-equal recreated cookies can therefore be behaviorally different.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must:
+AEP-0011 does not pretend creation time is a portable BrowserStateImage field. Instead it defines **cookie temporal restore eligibility**:
 
-1. preserve `SameSite=Default` as distinct state where the browser model does;
-2. define the cookie classes admitted to a successful `STATE_EQUIVALENT` restore;
-3. fail closed when required temporal behavior cannot be preserved or proven;
-4. prohibit `Default -> Lax` normalization as a restore workaround;
-5. define the exact equivalence claim without pretending that field equality alone proves unbounded behavioral identity.
+1. `SameSite=Default` remains distinct from explicit `Lax`;
+2. `Default -> Lax` normalization is forbidden;
+3. where creation-time-dependent behavior can materially affect the verification claim and cannot be preserved or otherwise proven equivalent, restore fails closed;
+4. image-field equality remains necessary but is not sufficient proof of unbounded HTTP behavioral equivalence;
+5. a backend may not recreate a fresh field-equal cookie and report `STATE_EQUIVALENT` while a material temporal distinction remains unresolved.
 
-**BPR-004: OPEN.**
+### Remaining acceptance evidence
+
+Chromium/Gecko/WebKit evidence must establish the practical boundary of the admitted restore class and demonstrate the fail-closed rule for temporal semantics before acceptance.
+
+**BPR-004: PROTOCOL DECISION INCORPORATED — ACCEPTANCE EVIDENCE PENDING.**
 
 ## BPR-005 — Closed state-selection grammar and equivalence domain
 
-### Finding
+### Formal-review finding
 
-The Proposed text requires a closed grammar but still leaves the grammar itself to downstream work. That leaves protocol semantics underdetermined.
+The previous Proposed text required a closed grammar but deferred the grammar itself to downstream normative work.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must fix a finite vendor-neutral selection grammar. Recommended v0.1 direction:
+AEP-0011 now fixes the v0.1 grammar:
 
-1. exact canonical tuple-origin list for selected unpartitioned `localStorage` origins;
-2. each selected origin contributes its complete admitted `localStorage` map;
-3. exact canonical stored-domain list for selected unpartitioned cookies;
-4. every selected cookie entry for the selected exact stored domains participates in the authoritative set;
-5. no regex, glob, suffix match, vendor callback, backend-native query language, or runtime code;
-6. missing, extra, transformed, or scope-shifted in-scope state is non-equivalent.
+- `localStorage`: finite duplicate-free exact canonical tuple-origin list;
+- every listed origin contributes its complete admitted unpartitioned map, including an empty map;
+- cookies: finite duplicate-free exact canonical stored-domain list;
+- every unpartitioned cookie whose canonical stored domain exactly equals a selected domain participates;
+- no regex, glob, suffix/subdomain matching, vendor callback, backend-native query language, Playwright/CDP filter, partition selector, or runtime code;
+- selection is immutable for the materialized resource;
+- missing, extra, transformed, scope-shifted, or differently keyed in-scope state is non-equivalent.
 
-**BPR-005: OPEN.**
+The exact downstream schema field spelling remains open to the normative Spec/Schema phase; the selection semantics do not.
+
+**BPR-005: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-006 — Portable settlement witness
 
-### Finding
+### Formal-review finding
 
-There is no portable universal browser-idle condition. Sleep windows, `networkidle`, or vendor queue inspection are insufficient protocol evidence.
+There is no portable universal browser-idle condition. Sleep windows, `networkidle`, or vendor queue inspection are not sufficient protocol evidence.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must define a positive profile/scenario-bound settlement witness in which:
+AEP-0011 now requires a positive profile-relevant settlement witness established by evaluator/control authority:
 
 1. Core has closed admission of new Subject side effects;
-2. all accepted pre-boundary mutations relevant to the selected authoritative state have reached a terminal outcome known to evaluator/control authority;
+2. every accepted pre-boundary mutation capable of affecting selected authoritative state has a known terminal outcome;
 3. no accepted profile-relevant mutation remains unresolved;
-4. authoritative projection is accepted only after that witness;
-5. inability to establish the witness fails closed as unsettled rather than guessing with timeouts.
+4. authoritative projection begins only after those conditions hold and does not knowingly mix pre/post mutation fragments.
 
-The witness applies to selected state and does not imply global animation/network/worker inactivity.
+A timeout can terminate waiting but cannot prove settlement. Sleep, network-idle, quiet-window heuristics, vendor event queues, and backend command completion are insufficient by themselves. Failure to establish the witness fails closed as `unsettled` and produces no accepted final projection.
 
-**BPR-006: OPEN.**
+**BPR-006: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-007 — Lossless Web IDL `DOMString` canonical semantics
 
-### Finding
+### Formal-review finding
 
-Web Storage keys/values use Web IDL `DOMString`; exact UTF-16 code-unit sequences can include unmatched surrogates that common canonical JSON schemes reject or transform.
+Web Storage keys/values are Web IDL `DOMString` values and may contain unmatched UTF-16 surrogates, while generic canonical-JSON schemes can reject or transform such values.
 
-### Required closure
+### Incorporated protocol decision
 
-AEP-0011 must choose a language-neutral rule that is either:
+AEP-0011 now defines protocol-owned lossless representation:
 
-1. a lossless representation of the exact admitted `DOMString` code-unit sequence; or
-2. an explicit fail-closed unsupported rule for selected state outside the chosen canonical character domain.
+1. preserve the exact ordered sequence of unsigned 16-bit UTF-16 code units;
+2. encode each code unit as two network-byte-order bytes;
+3. concatenate in code-unit order;
+4. serialize those bytes as unpadded base64url;
+5. define equality on decoded code-unit sequences;
+6. define canonical ordering lexicographically by unsigned UTF-16 code units, with shorter-prefix-first ordering.
 
-Ordering/equality must be defined over the selected protocol representation and must not vary by JavaScript/Python/Java JSON-library behavior.
+Canonical JSON carries only the ASCII-safe encoded representation. Host-language Unicode normalization, surrogate repair, locale collation, browser enumeration order, and JSON-library string behavior cannot alter Browser v0.1 identity.
 
-**BPR-007: OPEN.**
+The representation revision is bound by BrowserStateManifest.
+
+**BPR-007: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-008 — Excluded-state residual noninterference
 
-### Finding
+### Formal-review finding
 
-Excluded state such as Service Workers, Cache Storage, IndexedDB, permissions, extensions, preload scripts, profile residue, network policy, and credential state can still affect scenario behavior.
+Excluded surfaces can still materially affect scenario behavior even though they are not part of BrowserStateImage.
 
-### Required closure
+### Incorporated protocol decision
 
-For every materially relevant excluded surface, AEP-0011 must require at least one of:
+For each materially relevant excluded surface, AEP-0011 now requires at least one of:
 
-1. isolation/configuration proving noninterference with the verification claim;
-2. immutable execution-identity/policy binding through existing Scenario/Fabric mechanisms; or
-3. fail-closed declaration that Browser v0.1 is insufficient for that scenario dependency.
+1. isolation/configuration establishing noninterference;
+2. immutable execution-identity/policy binding sufficient to make the relied-upon condition explicit and drift-detectable; or
+3. fail-closed declaration that Browser v0.1 is insufficient for the dependency.
 
-The base image must remain narrow, but narrowness cannot become a false reproducibility claim.
+The rule explicitly covers Service Worker state, Cache Storage, IndexedDB, permissions, extensions, preload scripts, profile residue, network policy, credential state, and analogous excluded state.
 
-**BPR-008: OPEN.**
+A successful BrowserStateImage restore never claims reproduction of excluded state merely because selected state is equal.
+
+**BPR-008: PROTOCOL DECISION INCORPORATED.**
 
 ## BPR-009 — Chromium/Gecko/WebKit acceptance evidence matrix
 
-### Finding
+### Formal-review finding
 
-Browser portability claims require stronger cross-engine evidence before acceptance than was necessary for Draft-to-Proposed readiness.
+Browser portability claims require stronger cross-engine evidence before acceptance than Draft-to-Proposed readiness required.
 
-### Required closure
+### Incorporated protocol gate
 
-Before acceptance-oriented re-review closes, evidence must cover Chromium, Gecko, and WebKit engine families for the selected semantics, including at minimum:
+AEP-0011 now makes Chromium + Gecko + WebKit evidence a mandatory **AEP acceptance-evidence gate**, not a desirable optional matrix.
 
-1. unpartitioned cookie identity and projection;
+The matrix must cover at least:
+
+1. selected unpartitioned cookie identity/projection;
 2. host-only versus domain-scoped cookie behavior;
-3. `SameSite=Default` treatment and any restore restriction arising from temporal semantics;
+3. `SameSite=Default` and temporal restore restrictions;
 4. admitted unpartitioned `localStorage` tuple-origin behavior;
 5. rejection/non-admission of partitioned state into the base profile;
-6. independent post-restore/reset projection;
-7. settlement fail-closed behavior;
-8. residual-state isolation assumptions used by the fixture.
+6. lossless Web Storage string behavior where the engine boundary permits the selected value;
+7. independent post-restore/reset reprojection;
+8. settlement fail-closed behavior;
+9. residual-state isolation assumptions relied upon by the fixture.
 
-This is an **AEP acceptance-evidence gate**, not a universal requirement that every future third-party conforming implementation support all three engine families.
+This requirement does not force every future third-party conforming implementation to support all three engine families. Engine names remain evidence metadata, not protocol identity.
 
-**BPR-009: OPEN.**
+### Remaining acceptance evidence
+
+The required three-engine evidence has **not** been produced by this protocol-edit PR and cannot be closed by documentation assertion.
+
+**BPR-009: OPEN — ACCEPTANCE EVIDENCE REQUIRED.**
 
 ## Historical design-document disposition
 
-Draft-era portability/readiness documents remain useful provenance:
+Draft-era portability/readiness documents remain provenance:
 
 - `docs/design/alpha3-browser-resource-portability-audit.md`;
 - `docs/design/alpha3-browser-resource-proposed-readiness-audit.md`;
@@ -194,17 +218,24 @@ Draft-era portability/readiness documents remain useful provenance:
 - `docs/acceptance/alpha3-browser-readiness-main-adoption.md`;
 - `docs/acceptance/alpha3-aep-0011-proposed-decision.md`.
 
-They document why the AEP became Proposed. They do not override later Formal Proposed Review decisions. When BPR edits are eventually incorporated into AEP-0011, any conflicting Draft-era wording must be explicitly treated as superseded provenance and must not be used to reintroduce rejected semantics into the future Spec/Schema/TCK.
+They explain why AEP-0011 became Proposed but do not override the Formal Proposed Review or the incorporated blocker-resolution decisions.
+
+The following earlier design assumptions are explicitly superseded where present:
+
+- tuple-origin `localStorage` described without an explicit unpartitioned boundary;
+- selection grammar deferred entirely to downstream normative work;
+- exact Web Storage string representation deferred to generic canonical JSON;
+- two materially independent browser-engine families treated as sufficient acceptance protection while a third engine was merely desirable.
 
 ## Acceptance gate
 
-AEP-0011 is acceptance-ready only if all of the following are true:
+AEP-0011 is acceptance-ready only when all of the following are true:
 
-1. BPR-001..BPR-009 decisions are incorporated into the AEP-0011 Proposed text — **NOT STARTED**;
-2. ROADMAP and review/adoption metadata accurately reflect the Proposed/formal-review state — **PENDING**;
-3. superseded Draft-era semantics are explicitly identified where necessary — **PENDING BLOCKER EDITS**;
-4. required three-engine-family semantic evidence is reviewable — **PENDING**;
-5. exact-head CI, Governance, Release Validation, and applicable portability/conformance gates are green — **PENDING FUTURE BLOCKER-RESOLUTION HEAD**;
+1. BPR-001..BPR-008 protocol decisions are incorporated into the AEP-0011 Proposed text — **SATISFIED ON BLOCKER-RESOLUTION BRANCH**;
+2. BPR-003/BPR-004 implementation-boundary claims receive required cross-engine evidence — **PENDING**;
+3. BPR-009 Chromium/Gecko/WebKit evidence matrix is complete and reviewable — **PENDING**;
+4. ROADMAP and adoption metadata accurately reflect the actual Proposed/blocker/evidence state — **PENDING MAIN ADOPTION / LATER EVIDENCE SYNC**;
+5. exact-head CI, Governance, Release Validation, and applicable portability/conformance gates are green for the blocker-resolution PR — **PENDING PR HEAD**;
 6. an acceptance-oriented exact-head protocol re-review finds no remaining semantic blocker — **PENDING**;
 7. the protocol maintainer separately and explicitly authorizes `Proposed -> Accepted` — **NOT AUTHORIZED**.
 
@@ -214,12 +245,15 @@ Generic continuation does not satisfy item 7.
 
 ```text
 AEP-0011 lifecycle: Proposed
-Formal Proposed review: completed as review evidence
-BPR-001..BPR-009: OPEN
-Blocker-resolution protocol edits: NOT STARTED
+Formal Proposed review: completed
+BPR-001/002/005/006/007/008: protocol decisions incorporated
+BPR-003/004: protocol decisions incorporated; acceptance evidence pending
+BPR-009: OPEN acceptance-evidence gate
 Acceptance-oriented re-review: NOT READY
 Accepted: NOT AUTHORIZED
 Browser normative Spec/Schema/TCK: NOT AUTHORIZED
 Browser conformance harness: NOT AUTHORIZED
 Playwright/reference runtime: NOT AUTHORIZED
 ```
+
+The next governed work after adoption of the blocker-resolution protocol edits is to build reviewable, implementation-independent acceptance evidence across Chromium, Gecko, and WebKit for BPR-003/BPR-004/BPR-009, then perform an acceptance-oriented exact-head protocol re-review. Lifecycle promotion remains a separate maintainer decision.
