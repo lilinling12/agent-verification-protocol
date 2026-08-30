@@ -101,15 +101,17 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [x] close BR-BR-001..BR-BR-010 Draft → Proposed blockers
 - [x] reconcile AEP-0011 and complete Draft → Proposed readiness audit
 - [x] AEP-0011 status advanced to Proposed for formal protocol review
-- [ ] complete formal Proposed protocol review
-- [ ] resolve acceptance blockers and record explicit AEP-0011 Proposed → Accepted decision
+- [x] complete formal Proposed protocol review
+- [ ] resolve BPR-001..BPR-009 acceptance blockers in AEP-0011
+- [ ] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker
+- [ ] record explicit protocol-maintainer AEP-0011 Proposed → Accepted decision
 - [ ] browser normative specification and requirement index
 - [ ] browser schema(s) for serialized state/projection resources where required
 - [ ] execution-sensitive browser resource TCK
-- [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by readiness audit
+- [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by reviewed protocol semantics
 - [ ] Playwright browser runtime against the portable TCK
 
-AEP-0011 is now **Proposed on the authorized PR #106 candidate branch, while `main` remains Draft until separately authorized merge adoption**. The lifecycle transition was explicitly authorized by the protocol maintainer on 2026-08-29 and is recorded in `docs/acceptance/alpha3-aep-0011-proposed-decision.md`. Proposed status means the reconciled design is sufficiently complete for formal protocol review; it is not Accepted, Final, normative release authority, or implementation authorization.
+AEP-0011 is **Proposed on `main`, not Accepted**. PR #106 was explicitly authorized for the `Draft → Proposed` lifecycle transition and adopted by squash merge at exact `main` commit `ccd05b71635b46218dfa14043320a60376339dc2`. Exact-main CI #637 (`33215011917`) and Relational Parity (`33215011884`) both passed on that merge commit. Proposed status authorizes formal protocol review only; it does not authorize Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, or attestation.
 
 Its initial problem/scope and standards-analysis baseline was adopted into `main` by authorized squash merge of PR #100 at exact commit `8f0c37e34202066ed79cc5d1`. Exact-main CI #622 (`33116957396`) and Relational Parity #15 (`33116957406`) both passed on that merge commit, and `docs/acceptance/alpha3-browser-draft-main-adoption.md` records that baseline adoption.
 
@@ -119,9 +121,9 @@ PR #104 reconciled those decisions into AEP-0011 and added the Draft → Propose
 
 PR #105 then reconciled the readiness baseline into ROADMAP/main-adoption evidence. Its exact reviewed head `19bfaaccd52d6be0a61ba916eb3029ba84493e63` passed CI #631 (`33150653985`), Governance #698 (`33150653980`), Release Validation #96 (`33150653969`), Relational Parity #24 (`33150654000`), focused review `5048751200`, and Ready-state Governance #699 (`33150761945`). After explicit squash authorization, PR #105 was adopted into `main` at exact commit `e2159b1daba4dc214b5dc05c233df28afa328a99`; exact-main CI #632 (`33212353304`) and Relational Parity #25 (`33212353330`) both passed.
 
-PR #106's preparation head `bdf483b98294cb11f49f7a96bfcbc2f4aaf5684b` passed CI #633 (`33213189621`), Governance #701 (`33213189552`), Relational Parity #26 (`33213189608`), and focused preparation review `5055271284` before the protocol maintainer explicitly authorized the `Draft → Proposed` lifecycle mutation. Because the authorization changes the branch head, the final status-mutation head must independently pass applicable gates and focused lifecycle review before #106 may become Ready.
+The formal Proposed protocol review is recorded by PR #107 against exact baseline `main@ccd05b71635b46218dfa14043320a60376339dc2`. It retains the protocol-first Browser resource direction but identifies nine acceptance blockers, BPR-001..BPR-009, covering stable public capability/profile naming, the unpartitioned `localStorage` boundary, cookie identity/projection fidelity, cookie temporal semantics, closed state-selection grammar, portable settlement witness semantics, exact DOMString representation, residual-state noninterference, and cross-engine acceptance evidence. `docs/design/alpha3-browser-resource-formal-proposed-review.md` records the review findings, and `docs/design/alpha3-browser-resource-proposed-review-blockers.md` is the authoritative blocker ledger for the next Proposed-phase protocol-change work.
 
-The next Browser milestone after this Proposed lifecycle candidate is adopted into `main` is **formal Proposed protocol review**. That review may identify acceptance blockers; it does not authorize `Proposed → Accepted`, Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright implementation, release selection, publication, signing, or attestation.
+Formal review completion does **not** resolve those blockers. The next Browser milestone is a separate AEP-0011 blocker-resolution protocol PR followed by exact-head acceptance-oriented re-review. AEP-0011 remains Proposed throughout that work unless and until the protocol maintainer separately and explicitly authorizes `Proposed → Accepted`. Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, and attestation remain unauthorized.
 
 ### Other resource implementations
 - [ ] network fault proxy
