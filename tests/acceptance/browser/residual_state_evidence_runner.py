@@ -6,11 +6,16 @@ Worker/Cache Storage and IndexedDB, then proves one admissible isolation policy:
 destroy the contaminated isolated context, create a fresh context, and
 materialize only the selected base-profile state.
 
-The runner intentionally uses ``http://localhost``. Service Worker registration
-requires a secure context, and localhost is the web-platform loopback exception
-for potentially trustworthy origins. Using an arbitrary synthetic hostname that
-merely resolves to 127.0.0.1 would test an invalid fixture rather than the
-residual-state rule.
+The runner uses ``http://localhost`` because Service Worker registration requires
+a secure context and localhost is the web-platform loopback exception for a
+potentially trustworthy origin.
+
+Service Worker client-controller timing is deliberately *not* an acceptance
+oracle. Engines may expose ``navigator.serviceWorker.controller`` at different
+points around activation/navigation. The evidence instead requires an active
+registration and, separately, observable fetch behavior produced by the Service
+Worker/Cache state. If the worker never materially affects behavior, BAE-011
+still fails.
 
 This module is acceptance evidence only. It is not Browser runtime, portable
 TCK, or protocol authority.
@@ -30,7 +35,7 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Iterator
 
-_FIXTURE_REVISION = "browser-residual-state-evidence-v0.2"
+_FIXTURE_REVISION = "browser-residual-state-evidence-v0.3"
 _HOST = "localhost"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
@@ -56,7 +61,7 @@ class EngineResult:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    server_version = "AVPBrowserResidualEvidence/0.2"
+    server_version = "AVPBrowserResidualEvidence/0.3"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = self.path.split("?", 1)[0]
@@ -112,8 +117,8 @@ self.addEventListener('fetch', event => {{
         try:
             self.wfile.write(body)
         except BrokenPipeError:
-            # A navigation can abandon a response after enough bytes have been
-            # received. That transport-level close is not Browser-state evidence.
+            # Navigations may abandon a response after enough bytes arrive.
+            # That transport close is not Browser-state evidence.
             return
 
 
@@ -142,7 +147,9 @@ def _set_selected_state(context: Any, port: int) -> None:
         page.evaluate(
             """state => {
               localStorage.clear();
-              for (const [key, value] of Object.entries(state)) localStorage.setItem(key, value);
+              for (const [key, value] of Object.entries(state)) {
+                localStorage.setItem(key, value);
+              }
             }""",
             _SELECTED_STORAGE,
         )
@@ -182,26 +189,30 @@ def _assert_service_worker_capability(page: Any) -> None:
     )
     if capability != {"secureContext": True, "serviceWorkerAvailable": True}:
         raise AssertionError(
-            "residual fixture does not expose the required trustworthy Service Worker context: "
+            "residual fixture lacks the required trustworthy Service Worker context: "
             f"{capability!r}"
         )
 
 
 def _install_service_worker_and_cache(context: Any, port: int) -> None:
+    """Install residue while avoiding engine-specific controller timing as oracle."""
+
     page = context.new_page()
     try:
         page.goto(_url(port, "/state"))
         _assert_service_worker_capability(page)
-        page.evaluate(
+        state = page.evaluate(
             """async () => {
-              await navigator.serviceWorker.register('/sw.js');
-              await navigator.serviceWorker.ready;
+              const registration = await navigator.serviceWorker.register('/sw.js');
+              const ready = await navigator.serviceWorker.ready;
+              return {
+                scope: registration.scope,
+                active: ready.active !== null && ready.active.state === 'activated',
+              };
             }"""
         )
-        # Navigation is performed outside page.evaluate so the execution context
-        # is never destroyed while an evaluation promise is still pending.
-        page.reload()
-        page.wait_for_function("navigator.serviceWorker.controller !== null")
+        if not state.get("active"):
+            raise AssertionError(f"Service Worker did not reach active state: {state!r}")
     finally:
         page.close()
 
@@ -254,7 +265,7 @@ def _seed_indexed_db(context: Any, port: int) -> None:
 
 
 def _read_indexed_db(context: Any, port: int) -> str | None:
-    """Read the controlled IndexedDB value without creating a missing database."""
+    """Read controlled IndexedDB state without creating a missing database."""
 
     page = context.new_page()
     try:
@@ -321,9 +332,11 @@ def _assert_clean_excluded_state(context: Any, port: int) -> None:
         raise AssertionError(
             f"clean isolated context unexpectedly had Service Worker registrations: {registrations}"
         )
-    caches = _cache_names(context, port)
-    if caches:
-        raise AssertionError(f"clean isolated context unexpectedly had Cache residue: {caches!r}")
+    cache_names = _cache_names(context, port)
+    if cache_names:
+        raise AssertionError(
+            f"clean isolated context unexpectedly had Cache residue: {cache_names!r}"
+        )
     indexed_db = _read_indexed_db(context, port)
     if indexed_db is not None:
         raise AssertionError(
@@ -358,23 +371,25 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
             raise AssertionError(f"clean context resource unexpectedly changed: {clean_resource!r}")
         if residual_resource != "service-worker-cache":
             raise AssertionError(
-                "Service Worker/Cache residual state did not affect behavior: "
+                "Service Worker/Cache residual state did not materially affect behavior: "
                 f"{residual_resource!r}"
             )
 
-        residual_registrations = _service_worker_registration_count(residual, port)
-        if residual_registrations < 1:
+        registrations = _service_worker_registration_count(residual, port)
+        if registrations < 1:
             raise AssertionError("Service Worker registration residue was not observable")
-        residual_caches = _cache_names(residual, port)
-        if _CACHE_NAME not in residual_caches:
-            raise AssertionError(f"controlled Cache residue was not observable: {residual_caches!r}")
-        residual_idb = _read_indexed_db(residual, port)
-        if residual_idb != _DB_VALUE:
-            raise AssertionError(f"IndexedDB residual state not observed: {residual_idb!r}")
+        cache_names = _cache_names(residual, port)
+        if _CACHE_NAME not in cache_names:
+            raise AssertionError(
+                f"controlled Cache residue was not observable: {cache_names!r}"
+            )
+        indexed_db = _read_indexed_db(residual, port)
+        if indexed_db != _DB_VALUE:
+            raise AssertionError(f"IndexedDB residual state not observed: {indexed_db!r}")
 
         # One admissible noninterference strategy: discard the contaminated
         # isolated session, create a fresh session, then materialize only the
-        # selected Browser-v0.1 state. Excluded residue must not cross that
+        # selected Browser-v0.1 state. Excluded residue must not cross the
         # isolation boundary.
         residual.close()
         recreated = browser.new_context()
@@ -392,6 +407,7 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
             status="pass",
             details={
                 "fixture_origin_is_potentially_trustworthy": True,
+                "service_worker_controller_timing_used_as_oracle": False,
                 "selected_state_equal_before_excluded_mutation": True,
                 "selected_state_equal_after_excluded_mutation": True,
                 "service_worker_registration_observed": True,
