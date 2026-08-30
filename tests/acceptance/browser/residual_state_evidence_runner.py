@@ -1,13 +1,19 @@
 """Execute non-normative residual-state noninterference evidence for AEP-0011.
 
 BAE-011 proves that equal selected Browser v0.1 state does not imply equal
-behavior when excluded browser state differs.  The fixture exercises two
-material excluded surfaces: Service Worker/Cache Storage and IndexedDB.
+behavior when excluded browser state differs. The fixture exercises Service
+Worker/Cache Storage and IndexedDB, then proves one admissible isolation policy:
+destroy the contaminated isolated context, create a fresh context, and
+materialize only the selected base-profile state.
 
-The acceptance conclusion is not that AVP should restore those surfaces.  It is
-that Browser v0.1 must bind an isolation/policy condition or fail closed when a
-Scenario materially depends on them.  This module is test-only evidence, not a
-portable Browser runtime or TCK implementation.
+The runner intentionally uses ``http://localhost``. Service Worker registration
+requires a secure context, and localhost is the web-platform loopback exception
+for potentially trustworthy origins. Using an arbitrary synthetic hostname that
+merely resolves to 127.0.0.1 would test an invalid fixture rather than the
+residual-state rule.
+
+This module is acceptance evidence only. It is not Browser runtime, portable
+TCK, or protocol authority.
 """
 
 from __future__ import annotations
@@ -24,8 +30,8 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Iterator
 
-_FIXTURE_REVISION = "browser-residual-state-evidence-v0.1"
-_HOST = "a.test"
+_FIXTURE_REVISION = "browser-residual-state-evidence-v0.2"
+_HOST = "localhost"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
 _DB_NAME = "avp-residual-db"
@@ -50,15 +56,12 @@ class EngineResult:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    server_version = "AVPBrowserResidualEvidence/0.1"
+    server_version = "AVPBrowserResidualEvidence/0.2"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = self.path.split("?", 1)[0]
         if path == "/seed-cookie":
-            self._send(
-                b"seeded",
-                headers=(("Set-Cookie", _SELECTED_COOKIE),),
-            )
+            self._send(b"seeded", headers=(("Set-Cookie", _SELECTED_COOKIE),))
             return
         if path == "/sw.js":
             body = f"""
@@ -106,7 +109,12 @@ self.addEventListener('fetch', event => {{
         for name, value in headers:
             self.send_header(name, value)
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except BrokenPipeError:
+            # A navigation can abandon a response after enough bytes have been
+            # received. That transport-level close is not Browser-state evidence.
+            return
 
 
 @contextmanager
@@ -165,24 +173,59 @@ def _project_selected_state(context: Any, port: int) -> dict[str, Any]:
         page.close()
 
 
+def _assert_service_worker_capability(page: Any) -> None:
+    capability = page.evaluate(
+        """() => ({
+          secureContext: window.isSecureContext,
+          serviceWorkerAvailable: 'serviceWorker' in navigator,
+        })"""
+    )
+    if capability != {"secureContext": True, "serviceWorkerAvailable": True}:
+        raise AssertionError(
+            "residual fixture does not expose the required trustworthy Service Worker context: "
+            f"{capability!r}"
+        )
+
+
 def _install_service_worker_and_cache(context: Any, port: int) -> None:
     page = context.new_page()
     try:
         page.goto(_url(port, "/state"))
+        _assert_service_worker_capability(page)
         page.evaluate(
             """async () => {
               await navigator.serviceWorker.register('/sw.js');
               await navigator.serviceWorker.ready;
-              if (!navigator.serviceWorker.controller) {
-                location.reload();
-                await new Promise(resolve => {
-                  if (navigator.serviceWorker.controller) { resolve(true); return; }
-                  navigator.serviceWorker.addEventListener('controllerchange', () => resolve(true), {once: true});
-                });
-              }
-              return true;
             }"""
         )
+        # Navigation is performed outside page.evaluate so the execution context
+        # is never destroyed while an evaluation promise is still pending.
+        page.reload()
+        page.wait_for_function("navigator.serviceWorker.controller !== null")
+    finally:
+        page.close()
+
+
+def _service_worker_registration_count(context: Any, port: int) -> int:
+    page = context.new_page()
+    try:
+        page.goto(_url(port, "/state"))
+        _assert_service_worker_capability(page)
+        return int(
+            page.evaluate(
+                "navigator.serviceWorker.getRegistrations().then(registrations => registrations.length)"
+            )
+        )
+    finally:
+        page.close()
+
+
+def _cache_names(context: Any, port: int) -> tuple[str, ...]:
+    page = context.new_page()
+    try:
+        page.goto(_url(port, "/state"))
+        names = page.evaluate("caches.keys()")
+        return tuple(sorted(str(name) for name in names))
     finally:
         page.close()
 
@@ -237,10 +280,18 @@ def _read_indexed_db(context: Any, port: int) -> str | None:
               request.onerror = () => reject(request.error);
               request.onsuccess = () => {
                 const db = request.result;
-                if (!db.objectStoreNames.contains(storeName)) { db.close(); resolve(null); return; }
+                if (!db.objectStoreNames.contains(storeName)) {
+                  db.close();
+                  resolve(null);
+                  return;
+                }
                 const tx = db.transaction(storeName, 'readonly');
                 const get = tx.objectStore(storeName).get(key);
-                get.onsuccess = () => { const value = get.result ?? null; db.close(); resolve(value); };
+                get.onsuccess = () => {
+                  const value = get.result ?? null;
+                  db.close();
+                  resolve(value);
+                };
                 get.onerror = () => reject(get.error);
               };
             })""",
@@ -264,10 +315,26 @@ def _read_controlled_resource(context: Any, port: int) -> str:
         page.close()
 
 
+def _assert_clean_excluded_state(context: Any, port: int) -> None:
+    registrations = _service_worker_registration_count(context, port)
+    if registrations != 0:
+        raise AssertionError(
+            f"clean isolated context unexpectedly had Service Worker registrations: {registrations}"
+        )
+    caches = _cache_names(context, port)
+    if caches:
+        raise AssertionError(f"clean isolated context unexpectedly had Cache residue: {caches!r}")
+    indexed_db = _read_indexed_db(context, port)
+    if indexed_db is not None:
+        raise AssertionError(
+            f"clean isolated context unexpectedly had IndexedDB residue: {indexed_db!r}"
+        )
+
+
 def _case_bae_011(browser: Any, port: int) -> CaseResult:
     clean = browser.new_context()
     residual = browser.new_context()
-    clean_recreated = None
+    recreated = None
     try:
         _set_selected_state(clean, port)
         _set_selected_state(residual, port)
@@ -276,10 +343,7 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
         residual_selected_before = _project_selected_state(residual, port)
         if clean_selected != residual_selected_before:
             raise AssertionError("contexts did not begin with identical selected state")
-
-        clean_idb_before = _read_indexed_db(clean, port)
-        if clean_idb_before is not None:
-            raise AssertionError(f"clean context unexpectedly had IndexedDB residue: {clean_idb_before!r}")
+        _assert_clean_excluded_state(clean, port)
 
         _install_service_worker_and_cache(residual, port)
         _seed_indexed_db(residual, port)
@@ -294,53 +358,63 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
             raise AssertionError(f"clean context resource unexpectedly changed: {clean_resource!r}")
         if residual_resource != "service-worker-cache":
             raise AssertionError(
-                f"Service Worker/Cache residual state did not affect behavior: {residual_resource!r}"
+                "Service Worker/Cache residual state did not affect behavior: "
+                f"{residual_resource!r}"
             )
 
+        residual_registrations = _service_worker_registration_count(residual, port)
+        if residual_registrations < 1:
+            raise AssertionError("Service Worker registration residue was not observable")
+        residual_caches = _cache_names(residual, port)
+        if _CACHE_NAME not in residual_caches:
+            raise AssertionError(f"controlled Cache residue was not observable: {residual_caches!r}")
         residual_idb = _read_indexed_db(residual, port)
         if residual_idb != _DB_VALUE:
             raise AssertionError(f"IndexedDB residual state not observed: {residual_idb!r}")
 
-        # Prove one admissible noninterference strategy: destroy the contaminated
-        # isolated context and create a fresh independently isolated context,
-        # then materialize only the selected Browser-v0.1 state.  The excluded
-        # Service Worker/Cache/IndexedDB residue must not survive that boundary.
+        # One admissible noninterference strategy: discard the contaminated
+        # isolated session, create a fresh session, then materialize only the
+        # selected Browser-v0.1 state. Excluded residue must not cross that
+        # isolation boundary.
         residual.close()
-        clean_recreated = browser.new_context()
-        _set_selected_state(clean_recreated, port)
-        recreated_selected = _project_selected_state(clean_recreated, port)
-        recreated_resource = _read_controlled_resource(clean_recreated, port)
-        recreated_idb = _read_indexed_db(clean_recreated, port)
-
+        recreated = browser.new_context()
+        _set_selected_state(recreated, port)
+        recreated_selected = _project_selected_state(recreated, port)
         if recreated_selected != clean_selected:
             raise AssertionError("fresh isolated context changed selected baseline")
+        _assert_clean_excluded_state(recreated, port)
+        recreated_resource = _read_controlled_resource(recreated, port)
         if recreated_resource != "network-origin":
             raise AssertionError("Service Worker/Cache residue crossed fresh isolation boundary")
-        if recreated_idb is not None:
-            raise AssertionError("IndexedDB residue crossed fresh isolation boundary")
 
         return CaseResult(
             case_id="BAE-011",
             status="pass",
             details={
+                "fixture_origin_is_potentially_trustworthy": True,
                 "selected_state_equal_before_excluded_mutation": True,
                 "selected_state_equal_after_excluded_mutation": True,
+                "service_worker_registration_observed": True,
+                "cache_storage_residue_observed": True,
                 "service_worker_cache_changed_behavior": True,
                 "indexeddb_residual_value_observed": True,
                 "selected_state_equality_proved_excluded_equivalence": False,
                 "fresh_isolated_context_removed_service_worker_cache_residue": True,
                 "fresh_isolated_context_removed_indexeddb_residue": True,
-                "noninterference_strategy_proven": "destroy contaminated isolated context; recreate fresh context; materialize selected base state only",
+                "noninterference_strategy_proven": (
+                    "destroy contaminated isolated context; recreate fresh context; "
+                    "materialize selected base state only"
+                ),
                 "protocol_disposition": (
-                    "base restore must bind/establish an isolation policy equivalent to the proven boundary, "
-                    "or fail closed when Scenario behavior materially depends on excluded state"
+                    "base restore must bind/establish an isolation policy equivalent to the proven "
+                    "boundary, or fail closed when Scenario behavior materially depends on excluded state"
                 ),
             },
         )
     finally:
         clean.close()
-        if clean_recreated is not None:
-            clean_recreated.close()
+        if recreated is not None:
+            recreated.close()
         try:
             residual.close()
         except Exception:
@@ -395,6 +469,7 @@ def run(output: Path) -> int:
             "python": platform.python_version(),
             "headless": True,
             "host": _HOST,
+            "originTrustPolicy": "http localhost potentially-trustworthy loopback exception",
             "excludedSurfaces": ["service-worker", "cache-storage", "indexeddb"],
         },
         "engines": [asdict(engine) for engine in engines],
