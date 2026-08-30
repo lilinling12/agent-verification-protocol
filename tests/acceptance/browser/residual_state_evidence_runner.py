@@ -15,7 +15,8 @@ Playwright is evidence transport only. In particular, Playwright documents its
 Service Worker support as Chromium-only. A non-Chromium managed build that
 cannot demonstrate the Service Worker fetch-interception subproof is therefore
 recorded as transport-insufficient, not as a protocol failure and never as a
-protocol pass. An independently observed interception still counts as evidence.
+protocol pass. An independently observed interception remains useful evidence,
+but an unsupported transport cannot close engine-family evidence.
 
 This module is acceptance evidence only. It is not Browser runtime, portable
 TCK, or protocol authority.
@@ -35,7 +36,7 @@ from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Iterator
 
-_FIXTURE_REVISION = "browser-residual-state-evidence-v0.5"
+_FIXTURE_REVISION = "browser-residual-state-evidence-v0.6"
 _HOST = "localhost"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
@@ -62,7 +63,7 @@ class EngineResult:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    server_version = "AVPBrowserResidualEvidence/0.5"
+    server_version = "AVPBrowserResidualEvidence/0.6"
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         path = self.path.split("?", 1)[0]
@@ -421,7 +422,11 @@ def _case_bae_011(browser: Any, port: int, engine_family: str) -> CaseResult:
 
         transport_support = _playwright_service_worker_support(engine_family)
         if residual_resource == "service-worker-cache":
-            service_worker_outcome = "pass"
+            service_worker_outcome = (
+                "pass"
+                if transport_support == "documented-supported"
+                else "observed-unsupported-transport"
+            )
         elif residual_resource == "network-origin" and transport_support != "documented-supported":
             # Playwright documents SW support as Chromium-only. This branch is a
             # transport limitation classification, not a Gecko/WebKit semantic
@@ -458,8 +463,9 @@ def _case_bae_011(browser: Any, port: int, engine_family: str) -> CaseResult:
         closure_required = None
         if status == "partial":
             closure_required = (
-                "obtain the Service Worker/cache behavior subproof from a shipping/native transport "
-                "for this engine family; this Playwright result makes no engine-semantic conclusion"
+                "obtain the Service Worker/cache behavior subproof from a documented shipping/native "
+                "transport for this engine family; any Playwright non-Chromium observation remains "
+                "diagnostic and does not close engine-family evidence"
             )
 
         return CaseResult(
