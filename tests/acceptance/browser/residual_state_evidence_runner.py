@@ -28,6 +28,11 @@ _FIXTURE_REVISION = "browser-residual-state-evidence-v0.1"
 _HOST = "a.test"
 _SELECTED_COOKIE = "avp_selected=baseline; Path=/; SameSite=Lax"
 _SELECTED_STORAGE = {"selected": "baseline"}
+_DB_NAME = "avp-residual-db"
+_DB_STORE = "state"
+_DB_KEY = "probe"
+_DB_VALUE = "residual-value"
+_CACHE_NAME = "avp-residual-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,22 +61,22 @@ class _FixtureHandler(BaseHTTPRequestHandler):
             )
             return
         if path == "/sw.js":
-            body = b"""
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open('avp-residual-v1').then(cache =>
+            body = f"""
+self.addEventListener('install', event => {{
+  event.waitUntil(caches.open('{_CACHE_NAME}').then(cache =>
     cache.put('/controlled-resource', new Response('service-worker-cache'))
   ).then(() => self.skipWaiting()));
-});
+}});
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', event => {{
   const url = new URL(event.request.url);
-  if (url.pathname === '/controlled-resource') {
+  if (url.pathname === '/controlled-resource') {{
     event.respondWith(caches.match('/controlled-resource').then(response =>
       response || fetch(event.request)
     ));
-  }
-});
-"""
+  }}
+}});
+""".encode("utf-8")
             self._send(body, content_type="text/javascript; charset=utf-8")
             return
         if path == "/controlled-resource":
@@ -166,16 +171,16 @@ def _install_service_worker_and_cache(context: Any, port: int) -> None:
         page.goto(_url(port, "/state"))
         page.evaluate(
             """async () => {
-              const registration = await navigator.serviceWorker.register('/sw.js');
+              await navigator.serviceWorker.register('/sw.js');
               await navigator.serviceWorker.ready;
               if (!navigator.serviceWorker.controller) {
+                location.reload();
                 await new Promise(resolve => {
-                  navigator.serviceWorker.addEventListener('controllerchange', resolve, {once: true});
+                  if (navigator.serviceWorker.controller) { resolve(true); return; }
+                  navigator.serviceWorker.addEventListener('controllerchange', () => resolve(true), {once: true});
                 });
               }
-              const cache = await caches.open('avp-residual-v1');
-              await cache.put('/controlled-resource', new Response('service-worker-cache'));
-              return registration.scope;
+              return true;
             }"""
         )
     finally:
@@ -187,40 +192,59 @@ def _seed_indexed_db(context: Any, port: int) -> None:
     try:
         page.goto(_url(port, "/state"))
         page.evaluate(
-            """() => new Promise((resolve, reject) => {
-              const request = indexedDB.open('avp-residual-db', 1);
-              request.onupgradeneeded = () => request.result.createObjectStore('state');
+            """([dbName, storeName, key, value]) => new Promise((resolve, reject) => {
+              const request = indexedDB.open(dbName, 1);
+              request.onupgradeneeded = () => request.result.createObjectStore(storeName);
               request.onerror = () => reject(request.error);
               request.onsuccess = () => {
                 const db = request.result;
-                const tx = db.transaction('state', 'readwrite');
-                tx.objectStore('state').put('residual-value', 'probe');
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).put(value, key);
                 tx.oncomplete = () => { db.close(); resolve(true); };
                 tx.onerror = () => reject(tx.error);
               };
-            })"""
+            })""",
+            [_DB_NAME, _DB_STORE, _DB_KEY, _DB_VALUE],
         )
     finally:
         page.close()
 
 
 def _read_indexed_db(context: Any, port: int) -> str | None:
+    """Read the controlled IndexedDB value without creating a missing database."""
+
     page = context.new_page()
     try:
         page.goto(_url(port, "/state"))
         return page.evaluate(
-            """() => new Promise((resolve, reject) => {
-              const request = indexedDB.open('avp-residual-db');
+            """([dbName, storeName, key]) => new Promise(async (resolve, reject) => {
+              if (typeof indexedDB.databases !== 'function') {
+                reject(new Error('indexedDB.databases() unavailable for side-effect-free residue probe'));
+                return;
+              }
+              let databases;
+              try {
+                databases = await indexedDB.databases();
+              } catch (error) {
+                reject(error);
+                return;
+              }
+              if (!databases.some(database => database.name === dbName)) {
+                resolve(null);
+                return;
+              }
+              const request = indexedDB.open(dbName);
               request.onerror = () => reject(request.error);
               request.onsuccess = () => {
                 const db = request.result;
-                if (!db.objectStoreNames.contains('state')) { db.close(); resolve(null); return; }
-                const tx = db.transaction('state', 'readonly');
-                const get = tx.objectStore('state').get('probe');
+                if (!db.objectStoreNames.contains(storeName)) { db.close(); resolve(null); return; }
+                const tx = db.transaction(storeName, 'readonly');
+                const get = tx.objectStore(storeName).get(key);
                 get.onsuccess = () => { const value = get.result ?? null; db.close(); resolve(value); };
                 get.onerror = () => reject(get.error);
               };
-            })"""
+            })""",
+            [_DB_NAME, _DB_STORE, _DB_KEY],
         )
     finally:
         page.close()
@@ -253,6 +277,10 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
         if clean_selected != residual_selected_before:
             raise AssertionError("contexts did not begin with identical selected state")
 
+        clean_idb_before = _read_indexed_db(clean, port)
+        if clean_idb_before is not None:
+            raise AssertionError(f"clean context unexpectedly had IndexedDB residue: {clean_idb_before!r}")
+
         _install_service_worker_and_cache(residual, port)
         _seed_indexed_db(residual, port)
 
@@ -269,11 +297,8 @@ def _case_bae_011(browser: Any, port: int) -> CaseResult:
                 f"Service Worker/Cache residual state did not affect behavior: {residual_resource!r}"
             )
 
-        clean_idb = _read_indexed_db(clean, port)
         residual_idb = _read_indexed_db(residual, port)
-        if clean_idb is not None:
-            raise AssertionError(f"clean context unexpectedly had IndexedDB residue: {clean_idb!r}")
-        if residual_idb != "residual-value":
+        if residual_idb != _DB_VALUE:
             raise AssertionError(f"IndexedDB residual state not observed: {residual_idb!r}")
 
         # Prove one admissible noninterference strategy: destroy the contaminated
