@@ -1,0 +1,221 @@
+name: Browser Shipping Cookie Fidelity Evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-shipping-cookie-fidelity-evidence.yml'
+      - 'tests/acceptance/browser/shipping_cookie_fidelity_evidence_runner.py'
+      - 'tests/acceptance/browser/bind_evidence_source.py'
+      - 'docs/design/alpha3-browser-cross-engine-acceptance-evidence.md'
+      - 'rfcs/AEP-0011-browser-resource-profile.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-shipping-cookie-fidelity-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVP_EVIDENCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  shipping-linux:
+    name: Shipping Cookie Fidelity — ${{ matrix.engine }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chrome, firefox]
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned native WebDriver client
+        run: python -m pip install 'selenium==4.48.0'
+
+      - name: Record shipping browser and driver identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "runner_os=${RUNNER_OS:-unknown}"
+          echo "runner_arch=${RUNNER_ARCH:-unknown}"
+          echo "image_os=${ImageOS:-unknown}"
+          echo "image_version=${ImageVersion:-unknown}"
+          if [[ '${{ matrix.engine }}' == 'chrome' ]]; then
+            google-chrome --version
+            if [[ -n "${CHROMEWEBDRIVER:-}" && -x "${CHROMEWEBDRIVER}/chromedriver" ]]; then
+              "${CHROMEWEBDRIVER}/chromedriver" --version
+            else
+              chromedriver --version
+            fi
+          else
+            firefox --version
+            if [[ -n "${GECKOWEBDRIVER:-}" && -x "${GECKOWEBDRIVER}/geckodriver" ]]; then
+              "${GECKOWEBDRIVER}/geckodriver" --version
+            else
+              geckodriver --version
+            fi
+          fi
+
+      - name: Configure controlled loopback test origins
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '127.0.0.1 a.test sub.a.test b.test' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts a.test sub.a.test b.test
+
+      - name: Execute shipping cookie-fidelity evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p browser-evidence
+          xvfb-run -a python tests/acceptance/browser/shipping_cookie_fidelity_evidence_runner.py \
+            --engine '${{ matrix.engine }}' \
+            --output 'browser-evidence/browser-shipping-cookie-fidelity-${{ matrix.engine }}.json'
+
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            'browser-evidence/browser-shipping-cookie-fidelity-${{ matrix.engine }}.json' \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+
+      - name: Show compact cookie-fidelity disposition
+        if: always()
+        shell: bash
+        run: |
+          file='browser-evidence/browser-shipping-cookie-fidelity-${{ matrix.engine }}.json'
+          if [[ -f "$file" ]]; then
+            python - "$file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          document = json.loads(Path(sys.argv[1]).read_text())
+          identity = document.get('browserIdentity', {})
+          print(
+              f"source={document.get('repositorySha')} binding={document.get('sourceBinding')} "
+              f"product={identity.get('product')} version={identity.get('browser_version')}"
+          )
+          for case in document.get('cases', []):
+              details = case.get('details', {})
+              print(
+                  f"{case['case_id']}={case['status']} "
+                  f"projection={details.get('projectionAccepted')} "
+                  f"restoreEligible={details.get('restoreEligible')} "
+                  f"closure={details.get('closureRequired')}"
+              )
+          PY
+          fi
+
+      - name: Upload exact-head shipping cookie-fidelity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-shipping-cookie-fidelity-${{ matrix.engine }}-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-shipping-cookie-fidelity-${{ matrix.engine }}.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  shipping-safari:
+    name: Shipping Cookie Fidelity — safari
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned native WebDriver client
+        run: python -m pip install 'selenium==4.48.0'
+
+      - name: Enable and record Safari native WebDriver identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "runner_os=${RUNNER_OS:-unknown}"
+          echo "runner_arch=${RUNNER_ARCH:-unknown}"
+          echo "image_os=${ImageOS:-unknown}"
+          echo "image_version=${ImageVersion:-unknown}"
+          sw_vers
+          defaults read /Applications/Safari.app/Contents/Info CFBundleShortVersionString
+          /usr/bin/safaridriver --version
+          sudo /usr/bin/safaridriver --enable
+
+      - name: Configure controlled loopback test origins
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '127.0.0.1 a.test sub.a.test b.test' | sudo tee -a /etc/hosts >/dev/null
+          dscacheutil -q host -a name a.test
+          dscacheutil -q host -a name sub.a.test
+          dscacheutil -q host -a name b.test
+
+      - name: Execute Safari shipping cookie-fidelity evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p browser-evidence
+          python tests/acceptance/browser/shipping_cookie_fidelity_evidence_runner.py \
+            --engine safari \
+            --output browser-evidence/browser-shipping-cookie-fidelity-safari.json
+
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-shipping-cookie-fidelity-safari.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+
+      - name: Show compact Safari cookie-fidelity disposition
+        if: always()
+        shell: bash
+        run: |
+          file='browser-evidence/browser-shipping-cookie-fidelity-safari.json'
+          if [[ -f "$file" ]]; then
+            python - "$file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          document = json.loads(Path(sys.argv[1]).read_text())
+          identity = document.get('browserIdentity', {})
+          print(
+              f"source={document.get('repositorySha')} binding={document.get('sourceBinding')} "
+              f"product={identity.get('product')} version={identity.get('browser_version')}"
+          )
+          for case in document.get('cases', []):
+              details = case.get('details', {})
+              print(
+                  f"{case['case_id']}={case['status']} "
+                  f"projection={details.get('projectionAccepted')} "
+                  f"restoreEligible={details.get('restoreEligible')} "
+                  f"closure={details.get('closureRequired')}"
+              )
+          PY
+          fi
+
+      - name: Upload exact-head Safari shipping cookie-fidelity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-shipping-cookie-fidelity-safari-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-shipping-cookie-fidelity-safari.json
+          if-no-files-found: warn
+          retention-days: 30
