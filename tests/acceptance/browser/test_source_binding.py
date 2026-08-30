@@ -22,7 +22,7 @@ class BrowserEvidenceSourceBindingTest(unittest.TestCase):
             )
 
             with patch(
-                "tests.acceptance.browser.bind_evidence_source.current_head_sha",
+                "acceptance.browser.bind_evidence_source.current_head_sha",
                 return_value=expected,
             ):
                 bind_evidence_source(path, expected)
@@ -42,7 +42,7 @@ class BrowserEvidenceSourceBindingTest(unittest.TestCase):
             path.write_text("{}", encoding="utf-8")
 
             with patch(
-                "tests.acceptance.browser.bind_evidence_source.current_head_sha",
+                "acceptance.browser.bind_evidence_source.current_head_sha",
                 return_value="b" * 40,
             ):
                 with self.assertRaisesRegex(RuntimeError, "does not match"):
