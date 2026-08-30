@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/browser-cookie-partition-evidence.yml'
       - 'tests/acceptance/browser/cookie_partition_evidence_runner.py'
+      - 'tests/acceptance/browser/bind_evidence_source.py'
       - 'docs/acceptance/alpha3-browser-cross-engine-evidence-slice-1.md'
       - 'docs/design/alpha3-browser-cross-engine-acceptance-evidence.md'
       - 'rfcs/AEP-0011-browser-resource-profile.md'
@@ -17,6 +18,9 @@ concurrency:
   group: browser-cookie-partition-evidence-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  AVP_EVIDENCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   cross-engine-cookie-partition:
     name: SameSite / Temporal / Partition — Pre-Acceptance Evidence
@@ -27,6 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -56,6 +61,12 @@ jobs:
           python tests/acceptance/browser/cookie_partition_evidence_runner.py \
             --output browser-evidence/browser-cookie-partition-evidence.json
 
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-cookie-partition-evidence.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+
       - name: Show compact evidence disposition
         if: always()
         shell: bash
@@ -68,6 +79,7 @@ jobs:
           document = json.loads(
               Path('browser-evidence/browser-cookie-partition-evidence.json').read_text()
           )
+          print(f"source={document.get('repositorySha')} binding={document.get('sourceBinding')}")
           for engine in document['engines']:
               cases = ', '.join(
                   f"{case['case_id']}={case['status']}" for case in engine['cases']
@@ -91,7 +103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: browser-cookie-partition-evidence-${{ github.sha }}
+          name: browser-cookie-partition-evidence-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
           path: browser-evidence/browser-cookie-partition-evidence.json
           if-no-files-found: warn
           retention-days: 30
