@@ -374,7 +374,7 @@ jobs:
           expected = "${{ matrix.mysql-version }}"
           observed = reported.split("-")[0]
           if observed != expected:
-            raise SystemExit(f"expected MySQL {expected}, observed {reported}")
+              raise SystemExit(f"expected MySQL {expected}, observed {reported}")
           print(f"MySQL integration server identity OK: {reported}")
           PY
       - name: Execute real MySQL relational adapter acceptance suite
