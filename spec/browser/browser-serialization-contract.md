@@ -28,13 +28,23 @@ The canonical BrowserStateManifest JSON object MUST contain exactly these fields
 - `revision` = `0.1`;
 - `canonicalRepresentation` = `avp-browser-v0.1-rfc8785-jcs`;
 - `localStorageOrigins` = the complete selected canonical tuple-origin list governed by AVP-BROWSER-003 and AVP-BROWSER-010;
-- `cookieDomains` = the complete selected canonical stored-domain list governed by AVP-BROWSER-004 and AVP-BROWSER-010.
+- `cookieDomains` = the complete selected canonical stored-domain list governed by AVP-BROWSER-004 and AVP-BROWSER-010;
+- `executionBindings` = a closed identity-binding map for Browser-profile-required execution policy/reference identities already resolved and identity-bound by the materialized Scenario/Fabric contract.
 
 No other field is permitted in BrowserStateManifest v0.1.
 
-The phrase "profile-required execution-policy or identity binding" in the Browser profile does not create an untyped Manifest property bag. Execution-relevant inputs outside this closed logical Manifest remain immutably bound through the existing Scenario/Fabric execution-input and identity mechanisms required by AVP-BROWSER-013. A future need to serialize an additional Browser-specific portable binding requires a governed profile/schema revision.
+`executionBindings` MUST be a JSON object. Each member name is a non-empty stable binding reference used by the materialized Scenario/Fabric contract. Each member value MUST contain exactly:
 
-`localStorageOrigins` and `cookieDomains` are set-like semantically but MUST be serialized in the canonical order required by AVP-BROWSER-010 before JCS and digest computation. JSON Schema `uniqueItems` is necessary but does not prove WHATWG/domain canonicality or ordering; semantic conformance MUST verify those rules.
+- `identity` — the resolved non-empty immutable identity value; and
+- `identityType` — exactly one of `content`, `version`, or `symbolic`, reusing the Scenario v0.1 external-reference identity vocabulary.
+
+A Browser Manifest execution binding MUST NOT originate a second independent identity claim. For every `executionBindings` member, the same binding reference, identity value, and identity type MUST already be represented in identity-bound semantic content of the owning materialized Scenario/Fabric execution contract. Missing, unresolved, conflicting, or provenance-only binding material MUST fail before Browser provisioning or Subject execution. Provider names, process ids, mutable paths, native handles, automation objects, or untyped provider property/value records MUST NOT be inserted as Browser execution bindings merely because an implementation exposes them.
+
+The map MAY be empty only when no additional Browser-profile-required execution policy/reference identity is required beyond identity-bound semantic content already sufficient for the selected profile and Scenario. It MUST NOT be used to hide material execution inputs that AVP-BROWSER-013 requires to be identity-bound.
+
+Because `executionBindings` is an object rather than a profile-defined array, its member ordering is canonicalized by RFC 8785 JCS object-member ordering. This avoids inventing a provider-derived or new Browser array-order semantic. `localStorageOrigins` and `cookieDomains` remain set-like semantically but MUST be serialized in the canonical order required by AVP-BROWSER-010 before JCS and digest computation. JSON Schema `uniqueItems` is necessary but does not prove WHATWG/domain canonicality or ordering; semantic conformance MUST verify those rules.
+
+A future need for a different Browser-specific execution-binding identity level or serialized field requires a governed profile/schema revision; it MUST NOT be introduced through an open extension/property bag.
 
 ## 3. BrowserStateImage serialized shape
 
