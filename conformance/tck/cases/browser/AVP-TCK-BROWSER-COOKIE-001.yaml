@@ -1,0 +1,33 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-COOKIE-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-007, AVP-BROWSER-008, AVP-BROWSER-009]
+applicability: mandatory
+type: semantic-and-execution-sensitive
+vector:
+  portableIdentity: [name, domain, hostOnly, path]
+  requiredState: [name, value, domain, hostOnly, path, persistent, secure, httpOnly, sameSite]
+  persistentAdditionalState: [expiry]
+  sameSiteStates: [Default, Strict, Lax, None]
+  positiveControls:
+    - host-only-and-domain-cookie-distinguished
+    - explicit-default-samesite-preserved
+    - persistent-expiry-preserved-losslessly
+    - session-cookie-without-expiry
+  negativeControls:
+    - host-only-inferred-from-leading-dot
+    - default-samesite-normalized-to-lax
+    - partitioned-cookie-admitted-as-unpartitioned
+    - lossy-provider-export-treated-as-authoritative
+    - persistent-expiry-rounded-or-truncated
+    - temporally-ineligible-cookie-restored-as-equivalent
+expect:
+  portableIdentityPreserved: true
+  losslessProjectionRequired: true
+  sameSiteDefaultDistinct: true
+  temporalEligibilityRequired: true
+  negativeControlsRejected: true
