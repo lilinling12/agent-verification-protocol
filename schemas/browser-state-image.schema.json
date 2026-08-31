@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:browser-state-image:0.1",
+  "title": "AVP Browser State Image",
+  "type": "object",
+  "required": ["apiVersion", "kind", "manifestDigest", "cookies", "origins"],
+  "properties": {
+    "apiVersion": {"const": "avp.browser/v0.1"},
+    "kind": {"const": "BrowserStateImage"},
+    "manifestDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "cookies": {"type": "array", "items": {"$ref": "#/$defs/cookie"}},
+    "origins": {"type": "array", "items": {"$ref": "#/$defs/originState"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "domStringBytes": {"type": "string", "pattern": "^[A-Za-z0-9_-]*$"},
+    "cookieOctets": {"type": "string", "pattern": "^[\\x20-\\x7E]*$"},
+    "localStorageEntry": {
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": {
+        "key": {"$ref": "#/$defs/domStringBytes"},
+        "value": {"$ref": "#/$defs/domStringBytes"}
+      },
+      "additionalProperties": false
+    },
+    "originState": {
+      "type": "object",
+      "required": ["origin", "localStorage"],
+      "properties": {
+        "origin": {"type": "string", "minLength": 1},
+        "localStorage": {"type": "array", "items": {"$ref": "#/$defs/localStorageEntry"}}
+      },
+      "additionalProperties": false
+    },
+    "expiry": {
+      "type": "object",
+      "required": ["unixSeconds", "nanoseconds"],
+      "properties": {
+        "unixSeconds": {"type": "string", "pattern": "^(0|-?[1-9][0-9]*)$"},
+        "nanoseconds": {"type": "integer", "minimum": 0, "maximum": 999999999}
+      },
+      "additionalProperties": false
+    },
+    "sessionCookie": {
+      "type": "object",
+      "required": ["name", "value", "domain", "hostOnly", "path", "persistent", "secure", "httpOnly", "sameSite"],
+      "properties": {
+        "name": {"$ref": "#/$defs/cookieOctets"},
+        "value": {"$ref": "#/$defs/cookieOctets"},
+        "domain": {"type": "string", "minLength": 1},
+        "hostOnly": {"type": "boolean"},
+        "path": {"$ref": "#/$defs/cookieOctets"},
+        "persistent": {"const": false},
+        "secure": {"type": "boolean"},
+        "httpOnly": {"type": "boolean"},
+        "sameSite": {"enum": ["Default", "Strict", "Lax", "None"]}
+      },
+      "additionalProperties": false
+    },
+    "persistentCookie": {
+      "type": "object",
+      "required": ["name", "value", "domain", "hostOnly", "path", "persistent", "expiry", "secure", "httpOnly", "sameSite"],
+      "properties": {
+        "name": {"$ref": "#/$defs/cookieOctets"},
+        "value": {"$ref": "#/$defs/cookieOctets"},
+        "domain": {"type": "string", "minLength": 1},
+        "hostOnly": {"type": "boolean"},
+        "path": {"$ref": "#/$defs/cookieOctets"},
+        "persistent": {"const": true},
+        "expiry": {"$ref": "#/$defs/expiry"},
+        "secure": {"type": "boolean"},
+        "httpOnly": {"type": "boolean"},
+        "sameSite": {"enum": ["Default", "Strict", "Lax", "None"]}
+      },
+      "additionalProperties": false
+    },
+    "cookie": {
+      "oneOf": [
+        {"$ref": "#/$defs/sessionCookie"},
+        {"$ref": "#/$defs/persistentCookie"}
+      ]
+    }
+  }
+}
