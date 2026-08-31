@@ -8,12 +8,14 @@ from .backend import (
     PlaywrightBrowserObserver,
     PlaywrightBrowserResource,
 )
+from .settlement import PlaywrightBrowserMutationControl
 
 __all__ = [
     "CookieProvenance",
     "PlaywrightBrowserBackendHarness",
     "PlaywrightBrowserFixtureControl",
     "PlaywrightBrowserIdentityVerifier",
+    "PlaywrightBrowserMutationControl",
     "PlaywrightBrowserObserver",
     "PlaywrightBrowserResource",
 ]
