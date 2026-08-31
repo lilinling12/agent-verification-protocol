@@ -18,13 +18,10 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from avp_ref.tck_adapter.browser_harness import (
-    BrowserVerificationError,
-    decode_dom_string_code_units,
-)
+from avp_ref.tck_adapter.browser_harness import BrowserVerificationError
 
 from .backend import PlaywrightBrowserFixtureControl, PlaywrightBrowserResource
 
@@ -47,7 +44,7 @@ class BrowserArtifactLocator:
 class BrowserArtifactAuthorization:
     """Opaque evaluator-owned retrieval authority distinct from Artifact identity."""
 
-    _token: str
+    _token: str = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +52,7 @@ class BrowserRetainedArtifact:
     """Evaluator-side retained Artifact record used by the security proof."""
 
     locator: BrowserArtifactLocator
-    authorization: BrowserArtifactAuthorization
+    authorization: BrowserArtifactAuthorization = field(repr=False)
 
 
 class PlaywrightBrowserSecurityControl:
@@ -64,7 +61,7 @@ class PlaywrightBrowserSecurityControl:
     def __init__(self) -> None:
         self._fixture_control = PlaywrightBrowserFixtureControl()
         self._artifact_bytes: dict[str, bytes] = {}
-        self._artifact_authorizations: dict[str, str] = {}
+        self._artifact_authorizations: dict[str, set[str]] = {}
 
     @staticmethod
     def _resource(sut: Any) -> PlaywrightBrowserResource:
@@ -168,8 +165,8 @@ class PlaywrightBrowserSecurityControl:
             raise BrowserVerificationError("retained Browser Artifact bytes must be non-empty")
         digest = "sha256:" + hashlib.sha256(content).hexdigest()
         token = secrets.token_urlsafe(32)
-        self._artifact_bytes[digest] = bytes(content)
-        self._artifact_authorizations[digest] = token
+        self._artifact_bytes.setdefault(digest, bytes(content))
+        self._artifact_authorizations.setdefault(digest, set()).add(token)
         return BrowserRetainedArtifact(
             locator=BrowserArtifactLocator(digest=digest),
             authorization=BrowserArtifactAuthorization(_token=token),
@@ -188,8 +185,11 @@ class PlaywrightBrowserSecurityControl:
             raise BrowserVerificationError(
                 "Artifact digest identity is not retrieval authorization"
             )
-        expected = self._artifact_authorizations.get(locator.digest)
-        if expected is None or not secrets.compare_digest(expected, authorization._token):
+        accepted = self._artifact_authorizations.get(locator.digest, set())
+        if not any(
+            secrets.compare_digest(token, authorization._token)
+            for token in accepted
+        ):
             raise BrowserVerificationError("Artifact retrieval authorization is invalid")
         try:
             return self._artifact_bytes[locator.digest]
@@ -215,9 +215,3 @@ class PlaywrightBrowserSecurityControl:
                 "redacted Browser Artifact reused unredacted Artifact identity"
             )
         return unredacted, redacted
-
-
-def decoded_dom_string(value: str) -> str:
-    """Decode controlled fixture DOMString code units without exposing provider state."""
-
-    return "".join(chr(unit) for unit in decode_dom_string_code_units(value))
