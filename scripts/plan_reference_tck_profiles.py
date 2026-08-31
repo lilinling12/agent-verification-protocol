@@ -41,7 +41,17 @@ def _require_string(value: object, label: str) -> str:
     return value
 
 
-def _profile_cases(profile_path: Path) -> frozenset[str]:
+def _conditional_requirement_id(value: object, label: str) -> str:
+    """Return the requirement id from the governed conditional profile shape."""
+
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{label} must be an object with id and when")
+    requirement_id = _require_string(value.get("id"), f"{label} id")
+    _require_string(value.get("when"), f"{label} when")
+    return requirement_id
+
+
+def _profile_requirements(profile_path: Path) -> frozenset[str]:
     document = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
     if not isinstance(document, Mapping):
         raise ValueError(f"{profile_path} must contain a mapping")
@@ -49,17 +59,23 @@ def _profile_cases(profile_path: Path) -> frozenset[str]:
     if not isinstance(requirements, Mapping):
         raise ValueError(f"{profile_path} is missing requirements")
 
-    # Profile documents name requirements, while the global registry owns the
-    # authoritative requirement -> case relation. This helper deliberately does
-    # not infer case IDs from file names or provider/runtime behavior.
+    # ConformanceProfile defines mandatory requirements as requirement-id strings
+    # and conditional requirements as {id, when} objects. The global registry,
+    # not this helper, remains authoritative for requirement -> case ownership.
     mandatory = requirements.get("mandatory", [])
     conditional = requirements.get("conditional", [])
     if not isinstance(mandatory, list) or not isinstance(conditional, list):
         raise ValueError(f"{profile_path} requirement lists must be arrays")
-    return frozenset(
-        _require_string(item, f"{profile_path} requirement")
-        for item in [*mandatory, *conditional]
+
+    requirement_ids = [
+        _require_string(item, f"{profile_path} mandatory requirement")
+        for item in mandatory
+    ]
+    requirement_ids.extend(
+        _conditional_requirement_id(item, f"{profile_path} conditional requirement")
+        for item in conditional
     )
+    return frozenset(requirement_ids)
 
 
 def _registry_case_ownership(registry_path: Path) -> dict[str, frozenset[str]]:
@@ -176,10 +192,10 @@ def build_plan(repository_root: Path) -> ReferenceTCKPlan:
         )
 
     # Validate that each profile document is structurally readable and that its
-    # requirement list is non-empty. Requirement-to-case authority is then read
+    # requirement set is non-empty. Requirement-to-case authority is then read
     # from the already-governed central TCK registry.
     for path in profile_paths:
-        if not _profile_cases(path):
+        if not _profile_requirements(path):
             raise ValueError(f"profile {path.stem} has no requirements")
 
     profile_case_ids = _registry_case_ownership(
