@@ -3,7 +3,7 @@
   "$id": "urn:avp:schemas:browser-state-manifest:0.1",
   "title": "AVP Browser State Manifest",
   "type": "object",
-  "required": ["apiVersion", "kind", "profile", "revision", "canonicalRepresentation", "localStorageOrigins", "cookieDomains"],
+  "required": ["apiVersion", "kind", "profile", "revision", "canonicalRepresentation", "localStorageOrigins", "cookieDomains", "executionBindings"],
   "properties": {
     "apiVersion": {"const": "avp.browser/v0.1"},
     "kind": {"const": "BrowserStateManifest"},
@@ -19,6 +19,19 @@
       "type": "array",
       "uniqueItems": true,
       "items": {"type": "string", "minLength": 1}
+    },
+    "executionBindings": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["identity", "identityType"],
+        "properties": {
+          "identity": {"type": "string", "minLength": 1},
+          "identityType": {"enum": ["content", "version", "symbolic"]}
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false
