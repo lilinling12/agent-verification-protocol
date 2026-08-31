@@ -10,6 +10,7 @@ handles and automation commands stay behind concrete implementations.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import re
 from collections.abc import Mapping, Sequence
@@ -127,7 +128,7 @@ def decode_dom_string_code_units(encoded: str) -> tuple[int, ...]:
             altchars=b"-_",
             validate=True,
         )
-    except (ValueError, base64.binascii.Error) as exc:
+    except (ValueError, binascii.Error) as exc:
         raise BrowserCanonicalizationError("invalid DOMString base64url encoding") from exc
 
     if len(raw) % 2:
@@ -173,7 +174,9 @@ def _cookie_octets(value: Any, label: str) -> bytes:
     try:
         raw = value.encode("ascii")
     except UnicodeEncodeError as exc:
-        raise BrowserCanonicalizationError(f"{label} must preserve ASCII cookie octets") from exc
+        raise BrowserCanonicalizationError(
+            f"{label} must preserve ASCII cookie octets"
+        ) from exc
     if any(byte < 0x20 or byte > 0x7E for byte in raw):
         raise BrowserCanonicalizationError(f"{label} contains unsupported cookie octets")
     return raw
@@ -300,7 +303,10 @@ def _canonical_local_storage(entries: Any) -> list[dict[str, str]]:
     return [entry for _, entry in result]
 
 
-def _canonical_cookie(cookie: Mapping[str, Any], verifier: BrowserIdentityVerifier) -> dict[str, Any]:
+def _canonical_cookie(
+    cookie: Mapping[str, Any],
+    verifier: BrowserIdentityVerifier,
+) -> dict[str, Any]:
     persistent = cookie.get("persistent")
     if not isinstance(persistent, bool):
         raise BrowserCanonicalizationError("cookie persistent must be boolean")
@@ -397,7 +403,9 @@ def canonicalize_state_image(
     if image["kind"] != "BrowserStateImage":
         raise BrowserCanonicalizationError("BrowserStateImage kind mismatch")
     if image["manifestDigest"] != manifest_digest:
-        raise BrowserCanonicalizationError("BrowserStateImage does not bind exact Manifest digest")
+        raise BrowserCanonicalizationError(
+            "BrowserStateImage does not bind exact Manifest digest"
+        )
     if not _DIGEST_RE.fullmatch(str(image["manifestDigest"])):
         raise BrowserCanonicalizationError("BrowserStateImage manifestDigest is malformed")
 
@@ -425,10 +433,15 @@ def canonicalize_state_image(
             raise BrowserCanonicalizationError("duplicate StateImage origin identity")
         seen_origins.add(origin)
         origins.append(
-            {"origin": origin, "localStorage": _canonical_local_storage(origin_state["localStorage"])}
+            {
+                "origin": origin,
+                "localStorage": _canonical_local_storage(origin_state["localStorage"]),
+            }
         )
     if seen_origins != selected_origins:
-        raise BrowserCanonicalizationError("StateImage does not contain every selected origin exactly once")
+        raise BrowserCanonicalizationError(
+            "StateImage does not contain every selected origin exactly once"
+        )
     origins.sort(key=lambda item: _origin_sort_key(item["origin"]))
 
     selected_domains = set(canonical_manifest["cookieDomains"])
@@ -439,7 +452,9 @@ def canonicalize_state_image(
             raise BrowserCanonicalizationError("cookie must be an object")
         cookie = _canonical_cookie(raw_cookie, verifier)
         if cookie["domain"] not in selected_domains:
-            raise BrowserCanonicalizationError("StateImage contains a cookie outside Manifest selection")
+            raise BrowserCanonicalizationError(
+                "StateImage contains a cookie outside Manifest selection"
+            )
         identity = _cookie_identity(cookie)
         if identity in seen_cookie_ids:
             raise BrowserCanonicalizationError("duplicate portable cookie identity")
@@ -495,7 +510,7 @@ def materialize_browser_fixture(
     resolved_origins: Mapping[str, str],
     verifier: BrowserIdentityVerifier,
 ) -> MaterializedBrowserFixture:
-    """Resolve all origin slots before provisioning and freeze canonical identity."""
+    """Resolve every origin slot before provisioning and freeze canonical identity."""
 
     _require_exact_keys(
         source,
@@ -541,6 +556,13 @@ def materialize_browser_fixture(
     if len(set(exact_origins.values())) != len(exact_origins):
         raise BrowserCanonicalizationError("two origin slots resolved to the same tuple origin")
 
+    cookie_domains = source["cookieDomains"]
+    execution_bindings = source["executionBindings"]
+    if not isinstance(cookie_domains, (list, tuple)):
+        raise BrowserCanonicalizationError("fixture cookieDomains must be an array")
+    if not isinstance(execution_bindings, Mapping):
+        raise BrowserCanonicalizationError("fixture executionBindings must be an object")
+
     manifest = {
         "apiVersion": _BROWSER_API_VERSION,
         "kind": "BrowserStateManifest",
@@ -548,8 +570,8 @@ def materialize_browser_fixture(
         "revision": _BROWSER_REVISION,
         "canonicalRepresentation": _BROWSER_REPRESENTATION,
         "localStorageOrigins": [exact_origins[slot] for slot in selected_slots],
-        "cookieDomains": list(source["cookieDomains"]),
-        "executionBindings": _thaw(source["executionBindings"]),
+        "cookieDomains": list(cookie_domains),
+        "executionBindings": _thaw(execution_bindings),
     }
     manifest = canonicalize_manifest(manifest, verifier)
     manifest_bytes = _jcs_bytes(manifest)
@@ -558,10 +580,17 @@ def materialize_browser_fixture(
     baseline = source["baseline"]
     if not isinstance(baseline, Mapping):
         raise BrowserCanonicalizationError("fixture baseline must be an object")
-    _require_exact_keys(baseline, {"localStorageByOriginSlot", "cookies"}, "fixture baseline")
+    _require_exact_keys(
+        baseline,
+        {"localStorageByOriginSlot", "cookies"},
+        "fixture baseline",
+    )
     local_storage_by_slot = baseline["localStorageByOriginSlot"]
+    cookies = baseline["cookies"]
     if not isinstance(local_storage_by_slot, Mapping):
         raise BrowserCanonicalizationError("localStorageByOriginSlot must be an object")
+    if not isinstance(cookies, (list, tuple)):
+        raise BrowserCanonicalizationError("fixture cookies must be an array")
     if set(local_storage_by_slot) != set(selected_slots):
         raise BrowserCanonicalizationError(
             "baseline localStorage must define every selected origin slot exactly once"
@@ -576,20 +605,34 @@ def materialize_browser_fixture(
         for entry in entries:
             if not isinstance(entry, Mapping):
                 raise BrowserCanonicalizationError("fixture localStorage entry must be an object")
-            _require_exact_keys(entry, {"keyCodeUnits", "valueCodeUnits"}, "fixture localStorage entry")
+            _require_exact_keys(
+                entry,
+                {"keyCodeUnits", "valueCodeUnits"},
+                "fixture localStorage entry",
+            )
+            key_units = entry["keyCodeUnits"]
+            value_units = entry["valueCodeUnits"]
+            if not isinstance(key_units, (list, tuple)) or not isinstance(
+                value_units, (list, tuple)
+            ):
+                raise BrowserCanonicalizationError(
+                    "fixture DOMString code units must be arrays"
+                )
             encoded_entries.append(
                 {
-                    "key": encode_dom_string_code_units(entry["keyCodeUnits"]),
-                    "value": encode_dom_string_code_units(entry["valueCodeUnits"]),
+                    "key": encode_dom_string_code_units(key_units),
+                    "value": encode_dom_string_code_units(value_units),
                 }
             )
-        origins.append({"origin": exact_origins[slot], "localStorage": encoded_entries})
+        origins.append(
+            {"origin": exact_origins[slot], "localStorage": encoded_entries}
+        )
 
     image = {
         "apiVersion": _BROWSER_API_VERSION,
         "kind": "BrowserStateImage",
         "manifestDigest": manifest_digest,
-        "cookies": _thaw(baseline["cookies"]),
+        "cookies": _thaw(cookies),
         "origins": origins,
     }
     image = canonicalize_state_image(image, manifest, verifier)
@@ -619,7 +662,9 @@ class BrowserSettlementLedger:
 
     @property
     def unresolved_mutations(self) -> tuple[str, ...]:
-        return tuple(sorted(label for label, terminal in self._mutations.items() if not terminal))
+        return tuple(
+            sorted(label for label, terminal in self._mutations.items() if not terminal)
+        )
 
     def accept_relevant_mutation(self, label: str) -> None:
         if not self._admission_open:
@@ -642,7 +687,8 @@ class BrowserSettlementLedger:
         unresolved = self.unresolved_mutations
         if unresolved:
             raise BrowserSettlementError(
-                f"accepted profile-relevant mutations remain unresolved: {list(unresolved)}"
+                "accepted profile-relevant mutations remain unresolved: "
+                f"{list(unresolved)}"
             )
 
 
@@ -664,6 +710,19 @@ class BrowserSUT(Protocol):
 @runtime_checkable
 class BrowserAuthoritativeObserver(Protocol):
     """Evaluator-authorized observation path independent of SUT success claims."""
+
+    def verify_execution_conditions(
+        self,
+        sut: BrowserSUT,
+        fixture: MaterializedBrowserFixture,
+    ) -> None: ...
+
+    def verify_restore_eligibility(
+        self,
+        sut: BrowserSUT,
+        fixture: MaterializedBrowserFixture,
+        snapshot: SnapshotRef,
+    ) -> None: ...
 
     def project_selected_state(
         self,
@@ -697,11 +756,25 @@ class BrowserFixtureControl(Protocol):
         entries: Sequence[Mapping[str, str]],
     ) -> None: ...
 
-    def seed_partitioned_cookie(self, sut: BrowserSUT, cookie: Mapping[str, Any]) -> None: ...
+    def seed_partitioned_cookie(
+        self,
+        sut: BrowserSUT,
+        cookie: Mapping[str, Any],
+    ) -> None: ...
 
-    def set_execution_binding(self, sut: BrowserSUT, reference: str, identity: str) -> None: ...
+    def set_execution_binding(
+        self,
+        sut: BrowserSUT,
+        reference: str,
+        identity: str,
+    ) -> None: ...
 
-    def set_excluded_state_interference(self, sut: BrowserSUT, *, interfering: bool) -> None: ...
+    def set_excluded_state_interference(
+        self,
+        sut: BrowserSUT,
+        *,
+        interfering: bool,
+    ) -> None: ...
 
     def seed_evaluator_private_state(self, sut: BrowserSUT) -> None: ...
 
@@ -746,8 +819,13 @@ class BrowserConformanceHarness:
         settlement: BrowserSettlementLedger,
     ) -> StateProjection:
         settlement.require_positive_witness()
+        self._backend.observer.verify_execution_conditions(sut, self._fixture)
         raw = self._backend.observer.project_selected_state(sut, self._fixture)
-        canonical = canonicalize_state_image(raw, self._fixture.manifest, self._verifier)
+        canonical = canonicalize_state_image(
+            raw,
+            self._fixture.manifest,
+            self._verifier,
+        )
         digest = _sha256_bytes(_jcs_bytes(canonical))
         return StateProjection(
             projection_id="browser.authoritative",
@@ -763,7 +841,9 @@ class BrowserConformanceHarness:
         observed = self.authoritative_projection(sut, settlement)
         snapshot = sut.snapshot()
         if snapshot.handle_id != sut.handle_id:
-            raise BrowserVerificationError("snapshot is not owned by the Browser resource handle")
+            raise BrowserVerificationError(
+                "snapshot is not owned by the Browser resource handle"
+            )
         if snapshot.state_digest != observed.digest:
             raise BrowserVerificationError(
                 "snapshot state digest does not match independent authoritative projection"
@@ -771,18 +851,21 @@ class BrowserConformanceHarness:
         previous = self._snapshot_targets.get(snapshot.snapshot_id)
         target = (snapshot.handle_id, observed.digest)
         if previous is not None and previous != target:
-            raise BrowserVerificationError("snapshot id was reused for different Browser state")
+            raise BrowserVerificationError(
+                "snapshot id was reused for different Browser state"
+            )
         self._snapshot_targets[snapshot.snapshot_id] = target
         return snapshot
 
     def verified_reset(
         self,
         sut: BrowserSUT,
-        settlement: BrowserSettlementLedger,
+        before_settlement: BrowserSettlementLedger,
+        after_settlement: BrowserSettlementLedger,
     ) -> ResetResult:
-        before = self.authoritative_projection(sut, settlement)
+        before = self.authoritative_projection(sut, before_settlement)
         sut.reset()
-        after = self.authoritative_projection(sut, settlement)
+        after = self.authoritative_projection(sut, after_settlement)
         if after.digest != self._fixture.baseline_image_digest:
             raise BrowserVerificationError(
                 "reset command completed without re-establishing canonical baseline state"
@@ -799,7 +882,8 @@ class BrowserConformanceHarness:
         self,
         sut: BrowserSUT,
         snapshot: SnapshotRef,
-        settlement: BrowserSettlementLedger,
+        before_settlement: BrowserSettlementLedger,
+        after_settlement: BrowserSettlementLedger,
     ) -> RestoreResult:
         if snapshot.handle_id != sut.handle_id:
             raise BrowserVerificationError("foreign Browser SnapshotRef")
@@ -808,11 +892,18 @@ class BrowserConformanceHarness:
             raise BrowserVerificationError("stale or unknown Browser SnapshotRef")
         expected_handle, expected_digest = expected
         if expected_handle != sut.handle_id or expected_digest != snapshot.state_digest:
-            raise BrowserVerificationError("Browser SnapshotRef ownership/state binding changed")
+            raise BrowserVerificationError(
+                "Browser SnapshotRef ownership/state binding changed"
+            )
 
-        before = self.authoritative_projection(sut, settlement)
+        before = self.authoritative_projection(sut, before_settlement)
+        self._backend.observer.verify_restore_eligibility(
+            sut,
+            self._fixture,
+            snapshot,
+        )
         sut.restore(snapshot)
-        after = self.authoritative_projection(sut, settlement)
+        after = self.authoritative_projection(sut, after_settlement)
         if after.digest != expected_digest:
             raise BrowserVerificationError(
                 "restore command completed without independently reprojecting target state"
