@@ -13,7 +13,11 @@
   },
   "additionalProperties": false,
   "$defs": {
-    "domStringBytes": {"type": "string", "pattern": "^[A-Za-z0-9_-]*$"},
+    "domStringBytes": {
+      "type": "string",
+      "description": "Canonical unpadded base64url for a whole number of network-byte-order UTF-16 code units. Encoded length is 0, 3, or 6 modulo 8 and terminal pad bits are zero.",
+      "pattern": "^(?:[A-Za-z0-9_-]{8})*(?:[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048]|[A-Za-z0-9_-]{5}[AQgw])?$"
+    },
     "cookieOctets": {"type": "string", "pattern": "^[\\x20-\\x7E]*$"},
     "localStorageEntry": {
       "type": "object",
