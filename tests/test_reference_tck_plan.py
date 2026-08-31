@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 
@@ -11,6 +12,7 @@ _SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "plan_reference_tck_
 _SPEC = importlib.util.spec_from_file_location("plan_reference_tck_profiles", _SCRIPT)
 assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _MODULE
 _SPEC.loader.exec_module(_MODULE)
 classify_profiles = _MODULE.classify_profiles
 
