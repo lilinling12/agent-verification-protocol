@@ -8,117 +8,175 @@ requirements:
     statement: Browser resources bind the governed state.browser profile plus exactly one Manifest and one baseline StateImage state-identity Artifact without provider-native identity substitution or a content-address cycle.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-001
+    schema: schemas/browser-state-manifest.schema.json
+    conformance: [AVP-TCK-BROWSER-IDENTITY-001]
   - id: AVP-BROWSER-002
     level: MUST
     area: manifest
-    statement: BrowserStateManifest immutably binds profile identity, complete selection sets, canonical representation revision, and required Browser execution-policy or identity bindings.
+    statement: BrowserStateManifest immutably binds profile identity, complete selection sets, canonical representation revision, while execution inputs outside the closed logical Manifest remain bound through existing Scenario/Fabric identity mechanisms.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-002
+    schema: schemas/browser-state-manifest.schema.json
+    conformance: [AVP-TCK-BROWSER-IDENTITY-001]
   - id: AVP-BROWSER-003
     level: MUST
     area: localstorage-selection
     statement: localStorage selection is a finite duplicate-free exact canonical tuple-origin complete-map selection limited to admitted unpartitioned state and excludes open-ended provider-native selectors.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-003
+    schema: schemas/browser-state-manifest.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-004
     level: MUST
     area: cookie-selection
     statement: Cookie selection is a finite duplicate-free exact canonical stored-domain complete-set rule for unpartitioned cookies and excludes partition selectors or provider-native query semantics.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-004
+    schema: schemas/browser-state-manifest.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-005
     level: MUST
     area: web-storage-representation
     statement: Selected localStorage keys and values preserve the exact DOMString UTF-16 code-unit sequence using the governed network-byte-order plus unpadded base64url representation without Unicode repair.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-005
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-006
     level: MUST
     area: localstorage-ordering
     statement: localStorage entries are canonically ordered by unsigned UTF-16 key code units and reject provider enumeration, insertion, locale, transport, or host-language ordering as authority.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-006
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-007
     level: MUST
     area: cookie-model
     statement: Selected unpartitioned cookies use portable identity (name, domain, hostOnly, path), preserve the required state surface, and keep SameSite Default distinct where the stored-cookie model does.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-007
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-COOKIE-001]
   - id: AVP-BROWSER-008
     level: MUST
     area: cookie-projection
     statement: Authoritative cookie projection fails closed unless every required portable identity and state field can be established losslessly without guessing from provider convenience representations or defaults.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-008
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-COOKIE-001]
   - id: AVP-BROWSER-009
     level: MUST
     area: cookie-temporal-eligibility
     statement: Successful restore/reset preserves material cookie temporal behavior, keeps SameSite Default distinct, and fails closed when unresolved creation-time effects prevent a defensible STATE_EQUIVALENT claim.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-009
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-COOKIE-001]
   - id: AVP-BROWSER-010
     level: MUST
     area: canonical-ordering
     statement: Manifest and StateImage collections use the profile-defined canonical origin/domain/cookie/localStorage ordering before JCS so provider enumeration cannot alter content identity.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-010
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-011
     level: MUST
     area: canonical-identity
     statement: Browser Manifest/Image identity is SHA-256 over profile-ordered RFC 8785 JCS bytes and noncanonical or duplicate identity input fails closed as canonical Browser identity.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-011
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SELECTION-CANONICAL-001]
   - id: AVP-BROWSER-012
     level: MUST
     area: state-image
     statement: BrowserStateImage binds the exact Manifest and contains the complete selected authoritative unpartitioned cookie and localStorage state exactly once without missing, extra, transformed, scope-shifted, or partition-misclassified content.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-012
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-STATE-IMAGE-001]
   - id: AVP-BROWSER-013
     level: MUST
     area: execution-identity
     statement: Browser execution inputs outside the logical StateImage that materially affect the Scenario bind immutable execution identity and fail closed on missing identity or drift.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-013
+    conformance: [AVP-TCK-BROWSER-EXECUTION-RESIDUAL-001]
   - id: AVP-BROWSER-014
     level: MUST
     area: excluded-state
     statement: Materially relevant excluded Browser state must be proven noninterfering, immutably policy or identity bound, or declared fail-closed insufficient rather than silently omitted from the verification claim.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-014
+    conformance: [AVP-TCK-BROWSER-EXECUTION-RESIDUAL-001]
   - id: AVP-BROWSER-015
     level: MUST
     area: settlement
     statement: Accepted authoritative Browser projection requires a positive profile-relevant settlement witness; sleeps, quiet windows, network-idle heuristics, backend completion, and provider event queues cannot self-certify settlement.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-015
+    conformance: [AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001]
   - id: AVP-BROWSER-016
     level: MUST
     area: snapshot
     statement: Browser snapshot produces canonical complete selected StateImage evidence bound to an Environment/resource-owned SnapshotRef rather than provider-native snapshot or session identity.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-016
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001]
   - id: AVP-BROWSER-017
     level: MUST
     area: reset
     statement: Reset succeeds only after valid bindings, required settlement, and independent canonical reprojection prove exact baseline BrowserStateImage identity.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-017
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001]
   - id: AVP-BROWSER-018
     level: MUST
     area: restore
     statement: Successful Browser restore independently re-establishes target StateImage identity, satisfies temporal eligibility, and reports exactly STATE_EQUIVALENT; EXACT is forbidden for the base profile.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-018
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001]
   - id: AVP-BROWSER-019
     level: MUST
     area: security-visibility
     statement: Browser authoritative state and privileged automation remain separated across Subject, Evaluator, and Control authority; Artifact identity never grants disclosure or retrieval authorization.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-019
+    conformance: [AVP-TCK-BROWSER-SECURITY-001]
   - id: AVP-BROWSER-020
     level: MUST
     area: executed-conformance
     statement: Browser conformance executes provider-neutral observable behavior and rejects metadata-identical broken implementations without branching portable expectations on browser or automation product names.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-020
+    conformance: [AVP-TCK-BROWSER-EXECUTED-CAPABILITY-001]
+  - id: AVP-BROWSER-021
+    level: MUST
+    area: resource-isolation
+    statement: Browser profile resources use resourceKind browser and sibling resources preserve independent selected cookie/localStorage state without provider-native identity substitution.
+    spec: spec/browser/browser-serialization-contract.md
+    anchor: avp-browser-021
+    conformance: [AVP-TCK-BROWSER-IDENTITY-001]
+  - id: AVP-BROWSER-022
+    level: MUST
+    area: manifest-serialization
+    statement: BrowserStateManifest has one closed portable serialized shape with profile identity, canonical representation revision, and canonical exact origin/domain selection arrays only.
+    spec: spec/browser/browser-serialization-contract.md
+    anchor: avp-browser-022
+    schema: schemas/browser-state-manifest.schema.json
+    conformance: [AVP-TCK-BROWSER-IDENTITY-001]
+  - id: AVP-BROWSER-023
+    level: MUST
+    area: image-serialization
+    statement: BrowserStateImage has one closed portable serialized shape for complete origins/localStorage and cookie state, including lossless persistent-cookie expiry instant representation and canonical array ordering.
+    spec: spec/browser/browser-serialization-contract.md
+    anchor: avp-browser-023
+    schema: schemas/browser-state-image.schema.json
+    conformance: [AVP-TCK-BROWSER-STATE-IMAGE-001]
