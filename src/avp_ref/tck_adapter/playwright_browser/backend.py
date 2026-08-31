@@ -276,10 +276,61 @@ class PlaywrightBrowserFixtureControl:
         _set_local_storage(self._resource(sut), origin, entries)
 
     def seed_partitioned_cookie(self, sut: Any, cookie: Mapping[str, Any]) -> None:
-        del sut, cookie
-        raise BrowserVerificationError(
-            "partitioned-cookie control is reserved for the executed-TCK provider slice"
-        )
+        """Create controlled CHIPS state without making partition identity portable.
+
+        ``topLevelSite`` is evaluator/control input used only to establish the
+        concrete provider partition. It is deliberately absent from BrowserStateImage
+        and from portable cookie provenance/identity.
+        """
+
+        resource = self._resource(sut)
+        required = {"name", "value", "domain", "path", "topLevelSite"}
+        if set(cookie) != required:
+            raise BrowserVerificationError(
+                "partitioned-cookie control shape must be exactly "
+                "name/value/domain/path/topLevelSite"
+            )
+        name = cookie["name"]
+        value = cookie["value"]
+        domain = cookie["domain"]
+        path = cookie["path"]
+        top_level_site = cookie["topLevelSite"]
+        if not all(isinstance(item, str) and item for item in (name, value, domain, path, top_level_site)):
+            raise BrowserVerificationError(
+                "partitioned-cookie control string fields must be non-empty"
+            )
+        if not path.startswith("/"):
+            raise BrowserVerificationError("partitioned-cookie path must start with '/'")
+        resource._verifier.verify_canonical_cookie_domain(domain)
+        resource._verifier.verify_canonical_origin(top_level_site)
+
+        provider_cookie = {
+            "name": name,
+            "value": value,
+            "domain": "." + domain,
+            "path": path,
+            "secure": True,
+            "httpOnly": True,
+            "sameSite": "None",
+            "partitionKey": top_level_site,
+        }
+        try:
+            resource._context.add_cookies([provider_cookie])
+        except Exception as exc:
+            raise BrowserVerificationError(
+                "provider could not establish controlled partitioned cookie state"
+            ) from exc
+
+        matches = [
+            observed
+            for observed in resource._context.cookies()
+            if _visible_cookie_key(observed) == (name, domain, path)
+            and _is_partitioned_cookie(observed)
+        ]
+        if len(matches) != 1:
+            raise BrowserVerificationError(
+                "controlled partitioned cookie is not independently observable"
+            )
 
     def set_execution_binding(self, sut: Any, reference: str, identity: str) -> None:
         resource = self._resource(sut)
@@ -497,6 +548,13 @@ def _visible_cookie_key(cookie: Mapping[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def _is_partitioned_cookie(cookie: Mapping[str, Any]) -> bool:
+    """Identify provider-observed partitioned state without exporting its key."""
+
+    partition_key = cookie.get("partitionKey")
+    return isinstance(partition_key, str) and bool(partition_key)
+
+
 def _exact_pattern(value: str):
     return re.compile(rf"\A{re.escape(value)}\Z")
 
@@ -559,7 +617,7 @@ def _seed_cookie(resource: PlaywrightBrowserResource, record: CookieProvenance) 
     matches = [
         cookie
         for cookie in resource._context.cookies()
-        if _visible_cookie_key(cookie) == key
+        if not _is_partitioned_cookie(cookie) and _visible_cookie_key(cookie) == key
     ]
     if len(matches) != 1:
         _clear_cookie_record(resource, record)
@@ -653,6 +711,11 @@ def _project_cookies(
     selected_domains = set(fixture.manifest["cookieDomains"])
     visible: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
     for cookie in resource._context.cookies():
+        # Browser v0.1 selects unpartitioned cookies only. Provider partition
+        # metadata is used solely to exclude CHIPS state; it is never projected
+        # or incorporated into portable cookie identity.
+        if _is_partitioned_cookie(cookie):
+            continue
         key = _visible_cookie_key(cookie)
         if key[1] in selected_domains:
             visible.setdefault(key, []).append(cookie)
