@@ -43,7 +43,10 @@ class PlaywrightBrowserMutationControl:
         return sut
 
     @staticmethod
-    def _mutation_key(resource: PlaywrightBrowserResource, mutation_id: str) -> tuple[str, str]:
+    def _mutation_key(
+        resource: PlaywrightBrowserResource,
+        mutation_id: str,
+    ) -> tuple[str, str]:
         if not isinstance(mutation_id, str) or not mutation_id:
             raise BrowserVerificationError("mutation id must be a non-empty string")
         return resource.handle_id, mutation_id
@@ -77,11 +80,21 @@ class PlaywrightBrowserMutationControl:
         resource = self._resource(sut)
         key = self._mutation_key(resource, mutation_id)
         if key in self._sessions:
-            raise BrowserVerificationError(f"duplicate Browser mutation id: {mutation_id}")
+            raise BrowserVerificationError(
+                f"duplicate Browser mutation id: {mutation_id}"
+            )
         if origin not in set(resource._fixture.manifest["localStorageOrigins"]):
-            raise BrowserVerificationError("delayed mutation origin is outside Manifest selection")
-        if isinstance(delay_ms, bool) or not isinstance(delay_ms, int) or not 1 <= delay_ms <= 10_000:
-            raise BrowserVerificationError("delayed mutation delay_ms must be an integer in [1, 10000]")
+            raise BrowserVerificationError(
+                "delayed mutation origin is outside Manifest selection"
+            )
+        if (
+            isinstance(delay_ms, bool)
+            or not isinstance(delay_ms, int)
+            or not 1 <= delay_ms <= 10_000
+        ):
+            raise BrowserVerificationError(
+                "delayed mutation delay_ms must be an integer in [1, 10000]"
+            )
 
         payload = self._entry_payload(entry)
         page = resource._context.new_page()
@@ -108,7 +121,11 @@ class PlaywrightBrowserMutationControl:
             page=page,
         )
 
-    def observe_network_idle_before_terminal(self, sut: Any, mutation_id: str) -> bool:
+    def observe_network_idle_before_terminal(
+        self,
+        sut: Any,
+        mutation_id: str,
+    ) -> bool:
         """Return whether provider network-idle occurred while work was unresolved.
 
         This method exists only to prove that network-idle is insufficient. Its
@@ -117,7 +134,9 @@ class PlaywrightBrowserMutationControl:
 
         session = self._session(sut, mutation_id)
         session.page.wait_for_load_state("networkidle")
-        return not bool(session.page.evaluate("window.__avpMutationTerminal === true"))
+        return not bool(
+            session.page.evaluate("window.__avpMutationTerminal === true")
+        )
 
     def is_terminal(self, sut: Any, mutation_id: str) -> bool:
         session = self._session(sut, mutation_id)
@@ -129,7 +148,9 @@ class PlaywrightBrowserMutationControl:
         session = self._session(sut, mutation_id)
         session.page.wait_for_function("window.__avpMutationTerminal === true")
         if not self.is_terminal(sut, mutation_id):
-            raise BrowserVerificationError("explicit Browser mutation terminal was not established")
+            raise BrowserVerificationError(
+                "explicit Browser mutation terminal was not established"
+            )
 
     def release_mutation(self, sut: Any, mutation_id: str) -> None:
         resource = self._resource(sut)
@@ -140,12 +161,10 @@ class PlaywrightBrowserMutationControl:
         session.page.close()
 
     def close(self) -> None:
-        for session in tuple(self._sessions.values()):
-            try:
-                session.page.close()
-            except Exception:
-                pass
+        sessions = tuple(self._sessions.values())
         self._sessions.clear()
+        for session in sessions:
+            session.page.close()
 
     def _session(self, sut: Any, mutation_id: str) -> _MutationSession:
         resource = self._resource(sut)
@@ -153,7 +172,9 @@ class PlaywrightBrowserMutationControl:
         try:
             session = self._sessions[key]
         except KeyError as exc:
-            raise BrowserHarnessError(f"unknown Browser mutation id: {mutation_id}") from exc
+            raise BrowserHarnessError(
+                f"unknown Browser mutation id: {mutation_id}"
+            ) from exc
         if session.resource_handle_id != resource.handle_id:
             raise BrowserVerificationError("Browser mutation belongs to another resource")
         return session
