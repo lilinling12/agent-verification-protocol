@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import unittest
 from pathlib import Path
 from typing import Any, Mapping, Sequence
-
-import pytest
 
 from avp_ref.environment.models import RestoreEquivalence, SnapshotRef
 from avp_ref.tck_adapter.browser_harness import (
@@ -256,201 +255,204 @@ def _settled() -> BrowserSettlementLedger:
     return ledger
 
 
-def test_domstring_code_units_are_lossless_and_canonical() -> None:
-    assert encode_dom_string_code_units([0x0061]) == "AGE"
-    assert encode_dom_string_code_units([0x0061, 0x0062]) == "AGEAYg"
-    assert encode_dom_string_code_units([0xD800]) == "2AA"
-    assert decode_dom_string_code_units("2AA") == (0xD800,)
+class BrowserConformanceHarnessTest(unittest.TestCase):
+    def test_domstring_code_units_are_lossless_and_canonical(self) -> None:
+        self.assertEqual(encode_dom_string_code_units([0x0061]), "AGE")
+        self.assertEqual(encode_dom_string_code_units([0x0061, 0x0062]), "AGEAYg")
+        self.assertEqual(encode_dom_string_code_units([0xD800]), "2AA")
+        self.assertEqual(decode_dom_string_code_units("2AA"), (0xD800,))
 
-    for invalid in ("AA", "AAAA", "AAA=", "AAB"):
-        with pytest.raises(BrowserCanonicalizationError):
-            decode_dom_string_code_units(invalid)
+        for invalid in ("AA", "AAAA", "AAA=", "AAB"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(BrowserCanonicalizationError):
+                    decode_dom_string_code_units(invalid)
 
+    def test_fixture_materialization_resolves_and_freezes_exact_origins(self) -> None:
+        fixture, _ = _materialized()
+        self.assertEqual(
+            fixture.manifest["localStorageOrigins"],
+            ("http://a.test:41001", "http://b.test:41002"),
+        )
+        self.assertEqual(fixture.baseline_image["origins"][1]["localStorage"], ())
+        self.assertTrue(fixture.manifest_digest.startswith("sha256:"))
+        self.assertTrue(fixture.baseline_image_digest.startswith("sha256:"))
 
-def test_fixture_materialization_resolves_and_freezes_exact_origins() -> None:
-    fixture, _ = _materialized()
-    assert fixture.manifest["localStorageOrigins"] == (
-        "http://a.test:41001",
-        "http://b.test:41002",
-    )
-    assert fixture.baseline_image["origins"][1]["localStorage"] == ()
-    assert fixture.manifest_digest.startswith("sha256:")
-    assert fixture.baseline_image_digest.startswith("sha256:")
+        with self.assertRaises(TypeError):
+            fixture.manifest["profile"] = "changed"  # type: ignore[index]
 
-    with pytest.raises(TypeError):
-        fixture.manifest["profile"] = "changed"  # type: ignore[index]
-
-
-def test_fixture_materialization_fails_closed_for_unresolved_or_duplicate_slots() -> None:
-    source = _fixture_source()
-    verifier = _FixtureIdentityVerifier(
-        ("http://a.test:41001", "http://b.test:41002")
-    )
-
-    with pytest.raises(BrowserCanonicalizationError):
-        materialize_browser_fixture(
-            source,
-            resolved_origins={"primary": "http://a.test:41001"},
-            verifier=verifier,
+    def test_fixture_materialization_fails_closed_for_unresolved_or_duplicate_slots(
+        self,
+    ) -> None:
+        source = _fixture_source()
+        verifier = _FixtureIdentityVerifier(
+            ("http://a.test:41001", "http://b.test:41002")
         )
 
-    with pytest.raises(BrowserCanonicalizationError):
-        materialize_browser_fixture(
-            source,
-            resolved_origins={
-                "primary": "http://a.test:41001",
-                "secondary": "http://a.test:41001",
-            },
-            verifier=verifier,
+        with self.assertRaises(BrowserCanonicalizationError):
+            materialize_browser_fixture(
+                source,
+                resolved_origins={"primary": "http://a.test:41001"},
+                verifier=verifier,
+            )
+
+        with self.assertRaises(BrowserCanonicalizationError):
+            materialize_browser_fixture(
+                source,
+                resolved_origins={
+                    "primary": "http://a.test:41001",
+                    "secondary": "http://a.test:41001",
+                },
+                verifier=verifier,
+            )
+
+    def test_canonical_state_identity_is_independent_of_observation_enumeration(
+        self,
+    ) -> None:
+        fixture, verifier = _materialized()
+        first = _thaw(fixture.baseline_image)
+        second = _thaw(fixture.baseline_image)
+        second["origins"].reverse()
+        second["cookies"].reverse()
+        second["origins"][1]["localStorage"].reverse()
+
+        first_canonical = canonicalize_state_image(first, fixture.manifest, verifier)
+        second_canonical = canonicalize_state_image(second, fixture.manifest, verifier)
+        self.assertEqual(first_canonical, second_canonical)
+        self.assertEqual(
+            canonical_state_image_digest(first, fixture.manifest, verifier),
+            fixture.baseline_image_digest,
+        )
+        self.assertEqual(
+            canonical_state_image_digest(second, fixture.manifest, verifier),
+            fixture.baseline_image_digest,
         )
 
+    def test_positive_settlement_rejects_provider_idle_while_mutation_is_unresolved(
+        self,
+    ) -> None:
+        fixture, verifier = _materialized()
+        backend = _MemoryBackend(verifier)
+        harness = BrowserConformanceHarness(backend, fixture, verifier)
+        sut = harness.provision()
+        ledger = BrowserSettlementLedger()
+        ledger.accept_relevant_mutation("local-storage-write")
+        ledger.close_subject_admission()
+        sut.provider_idle = True
 
-def test_canonical_state_identity_is_independent_of_observation_enumeration() -> None:
-    fixture, verifier = _materialized()
-    first = _thaw(fixture.baseline_image)
-    second = _thaw(fixture.baseline_image)
-    second["origins"].reverse()
-    second["cookies"].reverse()
-    second["origins"][1]["localStorage"].reverse()
+        with self.assertRaises(BrowserSettlementError):
+            harness.authoritative_projection(sut, ledger)
 
-    first_canonical = canonicalize_state_image(first, fixture.manifest, verifier)
-    second_canonical = canonicalize_state_image(second, fixture.manifest, verifier)
-    assert first_canonical == second_canonical
-    assert (
-        canonical_state_image_digest(first, fixture.manifest, verifier)
-        == fixture.baseline_image_digest
-    )
-    assert (
-        canonical_state_image_digest(second, fixture.manifest, verifier)
-        == fixture.baseline_image_digest
-    )
+        ledger.mark_terminal("local-storage-write")
+        self.assertEqual(
+            harness.authoritative_projection(sut, ledger).digest,
+            fixture.baseline_image_digest,
+        )
 
+        with self.assertRaises(BrowserSettlementError):
+            ledger.accept_relevant_mutation("after-close")
 
-def test_positive_settlement_rejects_provider_idle_while_mutation_is_unresolved() -> None:
-    fixture, verifier = _materialized()
-    backend = _MemoryBackend(verifier)
-    harness = BrowserConformanceHarness(backend, fixture, verifier)
-    sut = harness.provision()
-    ledger = BrowserSettlementLedger()
-    ledger.accept_relevant_mutation("local-storage-write")
-    ledger.close_subject_admission()
-    sut.provider_idle = True
+    def test_reset_requires_a_distinct_post_operation_settlement_witness(self) -> None:
+        fixture, verifier = _materialized()
+        harness = BrowserConformanceHarness(_MemoryBackend(verifier), fixture, verifier)
+        sut = harness.provision()
 
-    with pytest.raises(BrowserSettlementError):
-        harness.authoritative_projection(sut, ledger)
+        with self.assertRaises(BrowserSettlementError):
+            harness.verified_reset(sut, _settled(), BrowserSettlementLedger())
 
-    ledger.mark_terminal("local-storage-write")
-    assert (
-        harness.authoritative_projection(sut, ledger).digest
-        == fixture.baseline_image_digest
-    )
+    def test_snapshot_reset_restore_are_verified_by_independent_reprojection(self) -> None:
+        fixture, verifier = _materialized()
+        backend = _MemoryBackend(verifier)
+        harness = BrowserConformanceHarness(backend, fixture, verifier)
+        sut = harness.provision()
 
-    with pytest.raises(BrowserSettlementError):
-        ledger.accept_relevant_mutation("after-close")
+        snapshot = harness.verified_snapshot(sut, _settled())
+        control = harness.fixture_control
+        mutated = _thaw(fixture.baseline_image["cookies"][0])
+        mutated["value"] = "mutated"
+        sut._state["cookies"][0] = mutated
 
+        reset_result = harness.verified_reset(sut, _settled(), _settled())
+        self.assertTrue(reset_result.equivalent_to_initial)
+        self.assertEqual(reset_result.after_digest, fixture.baseline_image_digest)
 
-def test_reset_requires_a_distinct_post_operation_settlement_witness() -> None:
-    fixture, verifier = _materialized()
-    harness = BrowserConformanceHarness(_MemoryBackend(verifier), fixture, verifier)
-    sut = harness.provision()
-
-    post = BrowserSettlementLedger()
-    with pytest.raises(BrowserSettlementError):
-        harness.verified_reset(sut, _settled(), post)
-
-
-def test_snapshot_reset_restore_are_verified_by_independent_reprojection() -> None:
-    fixture, verifier = _materialized()
-    backend = _MemoryBackend(verifier)
-    harness = BrowserConformanceHarness(backend, fixture, verifier)
-    sut = harness.provision()
-
-    snapshot = harness.verified_snapshot(sut, _settled())
-    control = harness.fixture_control
-    mutated = _thaw(fixture.baseline_image["cookies"][0])
-    mutated["value"] = "mutated"
-    sut._state["cookies"][0] = mutated
-
-    reset_result = harness.verified_reset(sut, _settled(), _settled())
-    assert reset_result.equivalent_to_initial is True
-    assert reset_result.after_digest == fixture.baseline_image_digest
-
-    sut._state["cookies"][0]["value"] = "again"
-    restore_result = harness.verified_restore(
-        sut,
-        snapshot,
-        _settled(),
-        _settled(),
-    )
-    assert restore_result.equivalence is RestoreEquivalence.STATE_EQUIVALENT
-    assert restore_result.after_digest == snapshot.state_digest
-    assert not hasattr(sut, "seed_cookie")
-    assert hasattr(control, "seed_cookie")
-
-
-def test_false_reset_and_false_restore_success_are_rejected() -> None:
-    fixture, verifier = _materialized()
-
-    reset_harness = BrowserConformanceHarness(
-        _MemoryBackend(verifier, false_reset=True),
-        fixture,
-        verifier,
-    )
-    reset_sut = reset_harness.provision()
-    reset_sut._state["cookies"][0]["value"] = "mutated"
-    with pytest.raises(BrowserVerificationError):
-        reset_harness.verified_reset(reset_sut, _settled(), _settled())
-
-    restore_harness = BrowserConformanceHarness(
-        _MemoryBackend(verifier, false_restore=True),
-        fixture,
-        verifier,
-    )
-    restore_sut = restore_harness.provision()
-    snapshot = restore_harness.verified_snapshot(restore_sut, _settled())
-    restore_sut._state["cookies"][0]["value"] = "mutated"
-    with pytest.raises(BrowserVerificationError):
-        restore_harness.verified_restore(
-            restore_sut,
+        sut._state["cookies"][0]["value"] = "again"
+        restore_result = harness.verified_restore(
+            sut,
             snapshot,
             _settled(),
             _settled(),
         )
+        self.assertIs(restore_result.equivalence, RestoreEquivalence.STATE_EQUIVALENT)
+        self.assertEqual(restore_result.after_digest, snapshot.state_digest)
+        self.assertFalse(hasattr(sut, "seed_cookie"))
+        self.assertTrue(hasattr(control, "seed_cookie"))
+
+    def test_false_reset_and_false_restore_success_are_rejected(self) -> None:
+        fixture, verifier = _materialized()
+
+        reset_harness = BrowserConformanceHarness(
+            _MemoryBackend(verifier, false_reset=True),
+            fixture,
+            verifier,
+        )
+        reset_sut = reset_harness.provision()
+        reset_sut._state["cookies"][0]["value"] = "mutated"
+        with self.assertRaises(BrowserVerificationError):
+            reset_harness.verified_reset(reset_sut, _settled(), _settled())
+
+        restore_harness = BrowserConformanceHarness(
+            _MemoryBackend(verifier, false_restore=True),
+            fixture,
+            verifier,
+        )
+        restore_sut = restore_harness.provision()
+        snapshot = restore_harness.verified_snapshot(restore_sut, _settled())
+        restore_sut._state["cookies"][0]["value"] = "mutated"
+        with self.assertRaises(BrowserVerificationError):
+            restore_harness.verified_restore(
+                restore_sut,
+                snapshot,
+                _settled(),
+                _settled(),
+            )
+
+    def test_foreign_snapshot_and_temporally_ineligible_restore_fail_closed(self) -> None:
+        fixture, verifier = _materialized()
+        harness = BrowserConformanceHarness(_MemoryBackend(verifier), fixture, verifier)
+        sut = harness.provision()
+        snapshot = harness.verified_snapshot(sut, _settled())
+
+        foreign = SnapshotRef(
+            snapshot_id=snapshot.snapshot_id,
+            handle_id="other-browser",
+            state_digest=snapshot.state_digest,
+            logical_time=snapshot.logical_time,
+            consistency=snapshot.consistency,
+            adapter_name=snapshot.adapter_name,
+        )
+        with self.assertRaises(BrowserVerificationError):
+            harness.verified_restore(sut, foreign, _settled(), _settled())
+
+        sut.restore_eligible = False
+        with self.assertRaises(BrowserVerificationError):
+            harness.verified_restore(sut, snapshot, _settled(), _settled())
+
+    def test_execution_condition_drift_is_rejected_before_authoritative_projection(
+        self,
+    ) -> None:
+        fixture, verifier = _materialized()
+        backend = _MemoryBackend(verifier)
+        harness = BrowserConformanceHarness(backend, fixture, verifier)
+        sut = harness.provision()
+        backend.fixture_control.set_excluded_state_interference(sut, interfering=True)
+
+        with self.assertRaises(BrowserVerificationError):
+            harness.authoritative_projection(sut, _settled())
+
+    def test_reference_profile_support_remains_atomic_and_pending(self) -> None:
+        supported = ReferenceConformanceAdapter().supported_case_ids
+        self.assertTrue(supported.isdisjoint(_BROWSER_CASE_IDS))
 
 
-def test_foreign_snapshot_and_temporally_ineligible_restore_fail_closed() -> None:
-    fixture, verifier = _materialized()
-    harness = BrowserConformanceHarness(_MemoryBackend(verifier), fixture, verifier)
-    sut = harness.provision()
-    snapshot = harness.verified_snapshot(sut, _settled())
-
-    foreign = SnapshotRef(
-        snapshot_id=snapshot.snapshot_id,
-        handle_id="other-browser",
-        state_digest=snapshot.state_digest,
-        logical_time=snapshot.logical_time,
-        consistency=snapshot.consistency,
-        adapter_name=snapshot.adapter_name,
-    )
-    with pytest.raises(BrowserVerificationError):
-        harness.verified_restore(sut, foreign, _settled(), _settled())
-
-    sut.restore_eligible = False
-    with pytest.raises(BrowserVerificationError):
-        harness.verified_restore(sut, snapshot, _settled(), _settled())
-
-
-def test_execution_condition_drift_is_rejected_before_authoritative_projection() -> None:
-    fixture, verifier = _materialized()
-    backend = _MemoryBackend(verifier)
-    harness = BrowserConformanceHarness(backend, fixture, verifier)
-    sut = harness.provision()
-    backend.fixture_control.set_excluded_state_interference(sut, interfering=True)
-
-    with pytest.raises(BrowserVerificationError):
-        harness.authoritative_projection(sut, _settled())
-
-
-def test_reference_profile_support_remains_atomic_and_pending() -> None:
-    supported = ReferenceConformanceAdapter().supported_case_ids
-    assert supported.isdisjoint(_BROWSER_CASE_IDS)
+if __name__ == "__main__":
+    unittest.main()
