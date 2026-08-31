@@ -28,7 +28,7 @@ class ReferenceTCKPlanTests(unittest.TestCase):
             },
             supported_case_ids=frozenset({"S-1", "C-1", "C-2"}),
         )
-        self.assertEqual(plan.run_profiles, ("candidate", "stable"))
+        self.assertEqual(plan.run_profiles, ("stable", "candidate"))
         self.assertEqual(plan.pending_candidate_profiles, ())
 
     def test_allows_completely_unimplemented_candidate_as_explicit_pending(self) -> None:
