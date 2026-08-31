@@ -48,7 +48,9 @@ class _FixtureIdentityVerifier:
 
     def verify_canonical_cookie_domain(self, domain: str) -> None:
         if domain != "a.test":
-            raise BrowserCanonicalizationError(f"fixture domain is not admitted: {domain}")
+            raise BrowserCanonicalizationError(
+                f"fixture domain is not admitted: {domain}"
+            )
 
 
 def _fixture_source() -> dict[str, Any]:
@@ -127,28 +129,44 @@ class _MemoryBrowserSUT:
 
 
 class _MemoryObserver:
+    def verify_execution_conditions(
+        self,
+        sut: _MemoryBrowserSUT,
+        fixture: MaterializedBrowserFixture,
+    ) -> None:
+        del fixture
+        if not sut.execution_conditions_valid:
+            raise BrowserVerificationError(
+                "execution input drift or excluded-state interference"
+            )
+
+    def verify_restore_eligibility(
+        self,
+        sut: _MemoryBrowserSUT,
+        fixture: MaterializedBrowserFixture,
+        snapshot: SnapshotRef,
+    ) -> None:
+        del fixture, snapshot
+        if not sut.restore_eligible:
+            raise BrowserVerificationError(
+                "cookie temporal restore eligibility is unresolved"
+            )
+
     def project_selected_state(
         self,
         sut: _MemoryBrowserSUT,
         fixture: MaterializedBrowserFixture,
     ) -> Mapping[str, Any]:
         del fixture
-        if not sut.execution_conditions_valid:
-            raise BrowserVerificationError("execution input drift or excluded-state interference")
         return _thaw(sut._state)
 
-    def verify_restore_eligibility(
+
+class _MemoryFixtureControl:
+    def seed_baseline(
         self,
         sut: _MemoryBrowserSUT,
         fixture: MaterializedBrowserFixture,
     ) -> None:
-        del fixture
-        if not sut.restore_eligible:
-            raise BrowserVerificationError("cookie temporal restore eligibility is unresolved")
-
-
-class _MemoryFixtureControl:
-    def seed_baseline(self, sut: _MemoryBrowserSUT, fixture: MaterializedBrowserFixture) -> None:
         sut._state = _thaw(fixture.baseline_image)
 
     def seed_cookie(
@@ -173,14 +191,28 @@ class _MemoryFixtureControl:
                 return
         raise AssertionError(f"unknown origin: {origin}")
 
-    def seed_partitioned_cookie(self, sut: _MemoryBrowserSUT, cookie: Mapping[str, Any]) -> None:
+    def seed_partitioned_cookie(
+        self,
+        sut: _MemoryBrowserSUT,
+        cookie: Mapping[str, Any],
+    ) -> None:
         del sut, cookie
 
-    def set_execution_binding(self, sut: _MemoryBrowserSUT, reference: str, identity: str) -> None:
+    def set_execution_binding(
+        self,
+        sut: _MemoryBrowserSUT,
+        reference: str,
+        identity: str,
+    ) -> None:
         del reference, identity
         sut.execution_conditions_valid = False
 
-    def set_excluded_state_interference(self, sut: _MemoryBrowserSUT, *, interfering: bool) -> None:
+    def set_excluded_state_interference(
+        self,
+        sut: _MemoryBrowserSUT,
+        *,
+        interfering: bool,
+    ) -> None:
         sut.execution_conditions_valid = not interfering
 
     def seed_evaluator_private_state(self, sut: _MemoryBrowserSUT) -> None:
@@ -230,7 +262,7 @@ def test_domstring_code_units_are_lossless_and_canonical() -> None:
     assert encode_dom_string_code_units([0xD800]) == "2AA"
     assert decode_dom_string_code_units("2AA") == (0xD800,)
 
-    for invalid in ("AA", "AAA", "AAA=", "AAB"):
+    for invalid in ("AA", "AAAA", "AAA=", "AAB"):
         with pytest.raises(BrowserCanonicalizationError):
             decode_dom_string_code_units(invalid)
 
@@ -251,7 +283,9 @@ def test_fixture_materialization_resolves_and_freezes_exact_origins() -> None:
 
 def test_fixture_materialization_fails_closed_for_unresolved_or_duplicate_slots() -> None:
     source = _fixture_source()
-    verifier = _FixtureIdentityVerifier(("http://a.test:41001", "http://b.test:41002"))
+    verifier = _FixtureIdentityVerifier(
+        ("http://a.test:41001", "http://b.test:41002")
+    )
 
     with pytest.raises(BrowserCanonicalizationError):
         materialize_browser_fixture(
@@ -282,8 +316,14 @@ def test_canonical_state_identity_is_independent_of_observation_enumeration() ->
     first_canonical = canonicalize_state_image(first, fixture.manifest, verifier)
     second_canonical = canonicalize_state_image(second, fixture.manifest, verifier)
     assert first_canonical == second_canonical
-    assert canonical_state_image_digest(first, fixture.manifest, verifier) == fixture.baseline_image_digest
-    assert canonical_state_image_digest(second, fixture.manifest, verifier) == fixture.baseline_image_digest
+    assert (
+        canonical_state_image_digest(first, fixture.manifest, verifier)
+        == fixture.baseline_image_digest
+    )
+    assert (
+        canonical_state_image_digest(second, fixture.manifest, verifier)
+        == fixture.baseline_image_digest
+    )
 
 
 def test_positive_settlement_rejects_provider_idle_while_mutation_is_unresolved() -> None:
@@ -300,10 +340,23 @@ def test_positive_settlement_rejects_provider_idle_while_mutation_is_unresolved(
         harness.authoritative_projection(sut, ledger)
 
     ledger.mark_terminal("local-storage-write")
-    assert harness.authoritative_projection(sut, ledger).digest == fixture.baseline_image_digest
+    assert (
+        harness.authoritative_projection(sut, ledger).digest
+        == fixture.baseline_image_digest
+    )
 
     with pytest.raises(BrowserSettlementError):
         ledger.accept_relevant_mutation("after-close")
+
+
+def test_reset_requires_a_distinct_post_operation_settlement_witness() -> None:
+    fixture, verifier = _materialized()
+    harness = BrowserConformanceHarness(_MemoryBackend(verifier), fixture, verifier)
+    sut = harness.provision()
+
+    post = BrowserSettlementLedger()
+    with pytest.raises(BrowserSettlementError):
+        harness.verified_reset(sut, _settled(), post)
 
 
 def test_snapshot_reset_restore_are_verified_by_independent_reprojection() -> None:
@@ -311,20 +364,24 @@ def test_snapshot_reset_restore_are_verified_by_independent_reprojection() -> No
     backend = _MemoryBackend(verifier)
     harness = BrowserConformanceHarness(backend, fixture, verifier)
     sut = harness.provision()
-    settled = _settled()
 
-    snapshot = harness.verified_snapshot(sut, settled)
+    snapshot = harness.verified_snapshot(sut, _settled())
     control = harness.fixture_control
     mutated = _thaw(fixture.baseline_image["cookies"][0])
     mutated["value"] = "mutated"
     sut._state["cookies"][0] = mutated
 
-    reset_result = harness.verified_reset(sut, settled, _settled())
+    reset_result = harness.verified_reset(sut, _settled(), _settled())
     assert reset_result.equivalent_to_initial is True
     assert reset_result.after_digest == fixture.baseline_image_digest
 
     sut._state["cookies"][0]["value"] = "again"
-    restore_result = harness.verified_restore(sut, snapshot, settled, _settled())
+    restore_result = harness.verified_restore(
+        sut,
+        snapshot,
+        _settled(),
+        _settled(),
+    )
     assert restore_result.equivalence is RestoreEquivalence.STATE_EQUIVALENT
     assert restore_result.after_digest == snapshot.state_digest
     assert not hasattr(sut, "seed_cookie")
@@ -335,7 +392,9 @@ def test_false_reset_and_false_restore_success_are_rejected() -> None:
     fixture, verifier = _materialized()
 
     reset_harness = BrowserConformanceHarness(
-        _MemoryBackend(verifier, false_reset=True), fixture, verifier
+        _MemoryBackend(verifier, false_reset=True),
+        fixture,
+        verifier,
     )
     reset_sut = reset_harness.provision()
     reset_sut._state["cookies"][0]["value"] = "mutated"
@@ -343,13 +402,20 @@ def test_false_reset_and_false_restore_success_are_rejected() -> None:
         reset_harness.verified_reset(reset_sut, _settled(), _settled())
 
     restore_harness = BrowserConformanceHarness(
-        _MemoryBackend(verifier, false_restore=True), fixture, verifier
+        _MemoryBackend(verifier, false_restore=True),
+        fixture,
+        verifier,
     )
     restore_sut = restore_harness.provision()
     snapshot = restore_harness.verified_snapshot(restore_sut, _settled())
     restore_sut._state["cookies"][0]["value"] = "mutated"
     with pytest.raises(BrowserVerificationError):
-        restore_harness.verified_restore(restore_sut, snapshot, _settled(), _settled())
+        restore_harness.verified_restore(
+            restore_sut,
+            snapshot,
+            _settled(),
+            _settled(),
+        )
 
 
 def test_foreign_snapshot_and_temporally_ineligible_restore_fail_closed() -> None:
