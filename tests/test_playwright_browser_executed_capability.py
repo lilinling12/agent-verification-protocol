@@ -20,7 +20,6 @@ from avp_ref.tck_adapter.browser_harness import (
     BrowserSettlementError,
     BrowserSettlementLedger,
     BrowserVerificationError,
-    canonical_state_image_digest,
     encode_dom_string_code_units,
 )
 from avp_ref.tck_adapter.playwright_browser import PlaywrightBrowserBackendHarness
@@ -283,23 +282,31 @@ class PlaywrightBrowserExecutedCapabilityTest(unittest.TestCase):
             expected_digest=self.fixture.baseline_image_digest,
         )
 
-    def test_provider_order_snapshot_claim_is_rejected(self) -> None:
+    def test_provider_order_snapshot_digest_claim_is_rejected(self) -> None:
         harness = self._harness()
         sut = harness.provision()
-        snapshot = harness.verified_snapshot(sut, _settled())
-        broken = SnapshotRef(
-            snapshot_id=snapshot.snapshot_id + "-provider-order",
-            handle_id=snapshot.handle_id,
-            state_digest="sha256:" + "0" * 64,
-            logical_time=snapshot.logical_time,
-            consistency=snapshot.consistency,
-            adapter_name=snapshot.adapter_name,
-        )
-        self._require_same_metadata()
-        self.evaluator.require_rejected(
-            lambda: harness.verified_restore(sut, broken, _settled(), _settled()),
-            obligation="reject provider-order identity claim",
-        )
+        original_snapshot = sut.snapshot
+
+        def provider_order_snapshot() -> SnapshotRef:
+            actual = original_snapshot()
+            return SnapshotRef(
+                snapshot_id=actual.snapshot_id,
+                handle_id=actual.handle_id,
+                state_digest="sha256:" + "0" * 64,
+                logical_time=actual.logical_time,
+                consistency=actual.consistency,
+                adapter_name=actual.adapter_name,
+            )
+
+        sut.snapshot = provider_order_snapshot
+        try:
+            self._require_same_metadata()
+            self.evaluator.require_rejected(
+                lambda: harness.verified_snapshot(sut, _settled()),
+                obligation="reject provider-order snapshot digest claim",
+            )
+        finally:
+            sut.snapshot = original_snapshot
 
     def test_restore_success_without_reprojection_is_rejected(self) -> None:
         harness = self._harness()
@@ -308,7 +315,12 @@ class PlaywrightBrowserExecutedCapabilityTest(unittest.TestCase):
         harness.fixture_control.seed_local_storage(
             sut,
             self.origins["secondary"],
-            ({"key": encode_dom_string_code_units((120,)), "value": encode_dom_string_code_units((49,))},),
+            (
+                {
+                    "key": encode_dom_string_code_units((120,)),
+                    "value": encode_dom_string_code_units((49,)),
+                },
+            ),
         )
         original_restore = sut.restore
         sut.restore = lambda ignored: None
@@ -329,6 +341,37 @@ class PlaywrightBrowserExecutedCapabilityTest(unittest.TestCase):
         self._require_same_metadata()
         with self.assertRaises(BrowserSettlementError):
             harness.authoritative_projection(sut, unsettled)
+
+    def test_evaluator_private_leak_is_rejected_with_identical_metadata(self) -> None:
+        harness = self._harness()
+        sut = harness.provision()
+        private_value = "evaluator-private-browser-value"
+        harness.fixture_control.seed_local_storage(
+            sut,
+            self.origins["secondary"],
+            (
+                {
+                    "key": encode_dom_string_code_units(tuple(map(ord, "private-key"))),
+                    "value": encode_dom_string_code_units(tuple(map(ord, private_value))),
+                },
+            ),
+        )
+        page = sut._context.new_page()
+        try:
+            page.goto(self.origins["secondary"], wait_until="domcontentloaded")
+            observed_private = str(page.evaluate("localStorage.getItem('private-key')"))
+        finally:
+            page.close()
+        self.assertEqual(private_value, observed_private)
+        self._require_same_metadata()
+        self.evaluator.require_rejected(
+            lambda: self.evaluator.require_subject_visibility(
+                {"value": "public-observation", "leaked": observed_private},
+                authorized_surface={"value": "public-observation"},
+                evaluator_private_values=(private_value,),
+            ),
+            obligation="prevent evaluator-private state leakage to Subject surface",
+        )
 
     def test_excluded_state_interference_cannot_be_ignored(self) -> None:
         harness = self._harness()
