@@ -14,9 +14,9 @@ vector:
     capabilityId: state.browser
     profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
     revision: "0.1"
-  identityMediaTypes:
-    - application/vnd.avp.browser-state-manifest+json
-    - application/vnd.avp.browser-state-image+json
+  identityResourceKinds:
+    - BrowserStateManifest
+    - BrowserStateImage
   manifestContainsBaselineReference: false
   manifestExecutionBindings:
     browserBuild:
@@ -51,7 +51,7 @@ vector:
 expect:
   compatible: true
   resourceKindAccepted: browser
-  identityRolesByMediaType: true
+  identityRolesByGovernedKind: true
   acyclicIdentity: true
   executionBindingsReuseUpstreamIdentity: true
   siblingSelectedStateIsolated: true
