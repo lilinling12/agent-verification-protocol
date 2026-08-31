@@ -18,6 +18,20 @@ vector:
     - application/vnd.avp.browser-state-manifest+json
     - application/vnd.avp.browser-state-image+json
   manifestContainsBaselineReference: false
+  manifestExecutionBindings:
+    browserBuild:
+      identity: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      identityType: content
+    storageIsolationPolicy:
+      identity: unpartitioned-proof-policy-v1
+      identityType: version
+  upstreamIdentityBindings:
+    browserBuild:
+      identity: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      identityType: content
+    storageIsolationPolicy:
+      identity: unpartitioned-proof-policy-v1
+      identityType: version
   siblingResources:
     - resourceId: browser-a
       selectedCookieState: session-a
@@ -30,10 +44,15 @@ vector:
     - provider-native-handle-as-resource-id
     - sibling-selected-state-sharing
     - manifest-baseline-reference-cycle
+    - unresolved-manifest-execution-binding
+    - manifest-execution-binding-conflicts-with-upstream-identity
+    - provenance-only-execution-binding
+    - untyped-provider-property-in-execution-bindings
 expect:
   compatible: true
   resourceKindAccepted: browser
   identityRolesByMediaType: true
   acyclicIdentity: true
+  executionBindingsReuseUpstreamIdentity: true
   siblingSelectedStateIsolated: true
   negativeControlsRejected: true
