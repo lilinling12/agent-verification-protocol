@@ -13,7 +13,7 @@ requirements:
   - id: AVP-BROWSER-002
     level: MUST
     area: manifest
-    statement: BrowserStateManifest immutably binds profile identity, complete selection sets, canonical representation revision, while execution inputs outside the closed logical Manifest remain bound through existing Scenario/Fabric identity mechanisms.
+    statement: BrowserStateManifest immutably binds profile identity, complete selection sets, canonical representation revision, and Browser-profile-required execution identity bindings that reuse already identity-bound Scenario/Fabric semantics rather than provider-native state.
     spec: spec/browser/browser-state-contract.md
     anchor: avp-browser-002
     schema: schemas/browser-state-manifest.schema.json
@@ -167,7 +167,7 @@ requirements:
   - id: AVP-BROWSER-022
     level: MUST
     area: manifest-serialization
-    statement: BrowserStateManifest has one closed portable serialized shape with profile identity, canonical representation revision, and canonical exact origin/domain selection arrays only.
+    statement: BrowserStateManifest has one closed portable serialized shape with profile identity, canonical representation revision, canonical exact origin/domain selection arrays, and typed executionBindings that must agree with existing Scenario/Fabric identity-bound semantics.
     spec: spec/browser/browser-serialization-contract.md
     anchor: avp-browser-022
     schema: schemas/browser-state-manifest.schema.json
