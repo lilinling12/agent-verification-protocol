@@ -1,6 +1,6 @@
 # Alpha 3 Playwright Browser Provider Foundation Closure Audit
 
-Status: **FOUNDATION REVIEW-CLOSED — FULL BROWSER PROFILE SUPPORT BLOCKED BY EXACT COOKIE EXPIRY FIDELITY**
+Status: **FOUNDATION REVIEW-CLOSED — FULL BROWSER PROFILE SUPPORT NOT YET ESTABLISHED**
 
 Provider foundation semantic head: `208bed15f8c6bae9278171495313a94f6262031f`  
 Owning pull request: `#117`  
@@ -20,7 +20,7 @@ This audit closes the first concrete provider **foundation** only. It does not a
 
 ## 1. Closure decision
 
-The Playwright/Chromium foundation is sufficiently implemented and independently exercised to serve as a concrete backend for the next provider investigation work.
+The Playwright/Chromium foundation is sufficiently implemented and independently exercised to serve as a concrete backend for the next executed-provider work.
 
 The foundation has demonstrated, against a real installed Chromium build:
 
@@ -34,11 +34,11 @@ The foundation has demonstrated, against a real installed Chromium build:
 - selected-state reset without deleting excluded cookie state;
 - snapshot/reset/restore mechanics with independent harness reprojection;
 - fail-closed execution-binding drift and temporal-eligibility controls;
-- fail-closed detection when provider cookie expiry transport cannot preserve exact portable expiry.
+- fail-closed detection when a requested synthetic cookie expiry is not representable by the concrete browser/provider path.
 
 The foundation is therefore **review-closed for these responsibilities**.
 
-It is **not eligible to claim the complete `avp-browser-unpartitioned-cookie-localstorage-v0.1` profile** because the current Playwright/Chromium cookie transport cannot losslessly round-trip the shared portable fixture's persistent expiry value with non-zero nanoseconds.
+Complete `avp-browser-unpartitioned-cookie-localstorage-v0.1` conformance is **not yet established**, because the remaining mandatory execution controls and provider-neutral Browser TCK evaluator are not implemented. The previously recorded conclusion that arbitrary-nanosecond cookie expiry alone blocks the entire profile was too broad and is corrected below.
 
 ## 2. Exact-head validation evidence
 
@@ -49,28 +49,23 @@ At semantic head `208bed15f8c6bae9278171495313a94f6262031f`:
 - Browser Reference `#6`: **SUCCESS**
 - Relational Parity `#133`: **SUCCESS**
 
-Browser Reference `#6` used:
+The subsequent closure-record head also passed its complete validation set before this correction.
+
+Browser Reference used:
 
 - Playwright Python `1.62.0`;
 - Chrome for Testing `151.0.7922.34` / Playwright Chromium revision `1234`;
 - Python `3.13` on Ubuntu `24.04`;
 - wheel-installed optional Browser dependency path rather than the repository source environment.
 
-The real Browser integration suite executed eight tests and reported:
-
-```text
-Ran 8 tests in 18.908s
-OK
-```
-
-The suite explicitly proved:
+The real Browser integration suite executed eight tests and reported `OK`. It explicitly proved:
 
 1. cookie selection remains independent from localStorage selection;
 2. execution-binding and temporal controls fail closed;
 3. the materialized fixture binds the running browser identity;
-4. provider-compatible baseline state independently reprojects to canonical identity;
+4. a browser-representable baseline independently reprojects to canonical identity;
 5. reset preserves excluded cookie state;
-6. the unchanged shared portable fixture fails closed when exact expiry precision is lost;
+6. an intentionally non-representable synthetic expiry fails closed rather than being rounded and falsely reported as exact;
 7. snapshot/reset/restore use real browser state and independent reprojection;
 8. sibling Browser resources do not share selected authoritative state.
 
@@ -96,7 +91,7 @@ One Browser Resource is backed by one independently created Playwright `BrowserC
 
 PASS.
 
-Domain-scoped cookies use a leading-dot domain only as Playwright seeding syntax. Portable stored-domain identity remains the canonical provenance value without the presentation dot. `hostOnly` is never inferred from the provider's domain text.
+Domain-scoped cookies use a leading-dot domain only as Playwright seeding syntax. Portable stored-domain identity remains the canonical provenance value without the presentation dot. `hostOnly` is never inferred from provider domain text.
 
 ## 4. Cookie observation and provenance review
 
@@ -106,7 +101,7 @@ PASS after closure fix.
 
 The first provider implementation queried cookies only through selected `localStorageOrigins`. That incorrectly coupled two independent Browser Manifest selections and could omit a selected cookie domain with no corresponding selected localStorage origin.
 
-The corrected implementation enumerates current context cookies and filters their normalized observed domain against the Manifest `cookieDomains`. A real Chromium regression test materializes localStorage only for `b.test` while keeping selected cookies for `a.test`; the selected `a.test` domain cookie remains observable and participates in the canonical projection.
+The corrected implementation enumerates current context cookies and filters their normalized observed domain against Manifest `cookieDomains`. A real Chromium regression materializes localStorage only for `b.test` while keeping selected cookies for `a.test`; the selected `a.test` domain cookie remains observable and participates in canonical projection.
 
 ### 4.2 Lossy cookie identity/state uses current observation plus provenance
 
@@ -114,48 +109,62 @@ PASS for foundation scope.
 
 Current browser observation is correlated with evaluator/control-owned provenance. Missing, ambiguous, conflicting, or untracked selected cookies fail closed.
 
-The provider does not reconstruct `hostOnly`, `SameSite=Default`, or exact expiry merely from Playwright's exported cookie object.
+The provider does not reconstruct `hostOnly`, `SameSite=Default`, or expiry merely from Playwright's exported cookie object.
 
-### 4.3 Persistent expiry is not overstated
+### 4.3 Expiry representation versus browser representability
 
-PASS after closure fix; **full-profile blocker remains**.
+PASS after correction of the closure interpretation.
 
-The shared provider-neutral fixture intentionally includes a persistent cookie with:
+The BrowserStateImage wire model represents persistent expiry as:
+
+```text
+(unixSeconds, nanoseconds)
+```
+
+That representation can losslessly describe an expiry instant independently of any particular browser's native resolution. It does **not** imply that every conforming browser must be capable of storing every mathematically representable nanosecond value.
+
+The Browser normative requirement is that every **selected cookie actually admitted into authoritative browser state** have its required state, including its actual persistent expiry instant, established without ambiguity. If a requested seed value is rounded or truncated before becoming browser state, an evaluator must not claim that the requested value was stored exactly.
+
+The provider therefore correctly fails closed when asked to seed the synthetic fixture value:
 
 ```text
 unixSeconds = 1800000000
 nanoseconds = 123456789
 ```
 
-The original provider foundation compared only integer expiry seconds and then reused provenance nanoseconds. That could falsely report a lossless BrowserStateImage even if Playwright/Chromium truncated the fractional expiry.
+through Chromium when that value is not representable by Chromium's actual cookie time model.
 
-The corrected provider converts the actual observed Playwright expiry into an exact `(unixSeconds, nanoseconds)` pair and compares it against provenance before admitting the cookie into authoritative state.
+That fail-closed result demonstrates provider honesty. It does **not by itself establish a profile-level blocker**.
 
-Real Chromium evidence confirms that the unchanged shared fixture does not preserve the exact non-zero nanosecond value through this provider path. Provisioning therefore fails closed, as required.
+The portable TCK reinforces this distinction:
 
-The portable fixture, schema, specification, and TCK were **not changed** to accommodate Playwright.
+- `AVP-TCK-BROWSER-STATE-IMAGE-001` is `schema-and-semantic` and uses `123456789ns` to exercise the closed serialized StateImage representation;
+- `AVP-TCK-BROWSER-COOKIE-001` is `semantic-and-execution-sensitive` and requires persistent expiry to be preserved losslessly, but does not mandate that real browser execution materialize that specific arbitrary-nanosecond vector.
 
-## 5. Provider-compatible lifecycle fixture boundary
+For a real provider execution, the positive expiry control may use a browser-representable persistent expiry as long as the evaluator independently proves that the browser's actual stored expiry is projected exactly and any rounded/truncated requested value is rejected.
 
-PASS, with explicit non-authority status.
+No Browser Spec, Schema, or TCK weakening is required for this interpretation.
 
-The integration suite derives a test-only copy of the portable fixture whose persistent cookie expiry uses `nanoseconds = 0`. This copy exists only to exercise the implemented provider foundation lifecycle under a value the provider can independently observe exactly.
+## 5. Fixture-role boundary
 
-It is not a portable fixture replacement, is not TCK authority, and cannot be used to claim support for the unchanged portable Browser profile.
+The repository currently uses one shared Browser fixture source for backend-neutral harness/canonicalization work. That fixture legitimately contains a non-zero arbitrary nanosecond value because the in-memory harness can exercise the full portable serialization domain.
 
-The distinction is intentional:
+A concrete browser execution fixture has a different responsibility: it must choose logical state that the tested browser can actually materialize while still exercising every portable semantic requirement.
+
+Therefore the next provider work should explicitly separate these fixture roles rather than treating either as authority over the other:
 
 ```text
-portable shared fixture
-    -> exact non-zero-nanosecond expiry
-    -> Playwright provider loses fidelity
-    -> FAIL CLOSED
+serialization/canonical fixture
+    -> may exercise full wire-domain values such as 123456789ns
+    -> validates canonical model and representation
 
-provider-compatible foundation fixture
-    -> provider-observable exact expiry
-    -> lifecycle/isolation foundation smoke may execute
-    -> NO full-profile conformance claim
+provider-neutral executable fixture
+    -> uses values representable across the claimed browser execution set
+    -> still requires exact observation and rejects rounding/truncation
+    -> does not narrow the BrowserStateImage wire model
 ```
+
+A test-only derived zero-nanosecond fixture was sufficient for the foundation smoke, but the executed-TCK slice should replace that ad-hoc derivation with an explicitly governed provider-neutral executable fixture before conformance activation.
 
 ## 6. Selected versus excluded state review
 
@@ -187,14 +196,7 @@ Provider enumeration order is not authoritative; the shared harness canonicalize
 
 PASS for foundation scope.
 
-The concrete provider performs snapshot/reset/restore mechanics, but the shared backend-neutral Browser harness remains responsible for:
-
-- positive settlement gating;
-- independent authoritative projection;
-- snapshot ownership/state binding;
-- reset baseline verification;
-- restore target reprojection;
-- reporting successful restore fidelity exactly as `STATE_EQUIVALENT`.
+The concrete provider performs snapshot/reset/restore mechanics, but the shared backend-neutral Browser harness remains responsible for positive settlement gating, independent authoritative projection, SnapshotRef ownership/state binding, reset baseline verification, restore target reprojection, and successful restore fidelity exactly `STATE_EQUIVALENT`.
 
 Provider command success or provider-produced state is never sufficient by itself.
 
@@ -220,44 +222,45 @@ PASS — ownership remains intentionally inactive.
 
 `ReferenceConformanceAdapter` has not been modified to own any Browser case IDs. The eight mandatory Browser cases therefore remain unsupported by the default reference implementation.
 
-This is the correct state while full portable-fixture fidelity is not established.
+This remains correct because the provider-neutral executable fixture, real partitioned-cookie control, positive delayed-mutation settlement, real excluded-state interference, Subject/evaluator secrecy, metadata-identical negative controls, and provider-neutral Browser TCK evaluator are not yet complete.
 
-The following would be incorrect at this point:
+The following remain incorrect at this point:
 
-- adding all eight Browser IDs to `supported_case_ids`;
+- adding any partial subset of Browser IDs to `supported_case_ids`;
 - marking the Browser candidate profile as reference-supported;
-- using the provider-compatible fixture as a substitute for the portable fixture;
-- treating the successful Browser Reference foundation workflow as a Browser profile conformance result;
-- weakening expiry representation or replacing nanoseconds with provider precision;
+- treating successful Browser Reference foundation tests as a Browser profile conformance result;
+- weakening expiry representation to provider precision;
 - treating Playwright's exported cookie representation as protocol authority.
 
 ## 11. Remaining provider work before Browser profile activation
 
-Full Browser profile support remains blocked by at least the following provider-facing work:
+The next governed work is no longer an attempt to make Chromium store arbitrary nanoseconds. It is to close the executable conformance path honestly:
 
-1. **Exact persistent cookie expiry** — identify a concrete browser-control/observation mechanism that can establish and independently verify the portable seconds/nanoseconds representation, or demonstrate that the current provider cannot support this Browser profile.
-2. **Partitioned-cookie negative control** — create real partitioned state and prove it is not admitted into unpartitioned authoritative state.
-3. **Positive delayed-mutation settlement** — exercise accepted profile-relevant mutation tracking against real browser behavior without reducing settlement to provider idleness.
-4. **Excluded-state interference** — create and observe a material excluded-state interference condition rather than relying only on a synthetic flag.
-5. **Subject/evaluator secrecy** — prove evaluator-private selected state and privileged controls are not exposed through the Subject surface.
-6. **Metadata-identical negative controls** — run behaviorally broken implementations with identical metadata and require portable failures.
-7. **Provider-neutral Browser TCK evaluator** — only after every mandatory behavior can be executed honestly against the concrete backend.
-8. **Atomic support activation** — all eight Browser case IDs may be activated only when the complete mandatory profile passes; partial ownership remains forbidden.
+1. **Provider-neutral executable Browser fixture** — separate execution vectors from serialization-only vectors; choose a persistent expiry representable by the claimed browser set while preserving exact-observation and rounded/truncated negative controls.
+2. **Expiry capability proof** — document the concrete browser's native expiry resolution and verify that provider observation can recover the browser's actual stored expiry exactly at that resolution.
+3. **Partitioned-cookie negative control** — create real partitioned state and prove it is not admitted into unpartitioned authoritative state.
+4. **Positive delayed-mutation settlement** — exercise accepted profile-relevant mutation tracking against real browser behavior without reducing settlement to provider idleness.
+5. **Excluded-state interference** — create and observe a material excluded-state interference condition rather than relying only on a synthetic flag.
+6. **Subject/evaluator secrecy** — prove evaluator-private selected state and privileged controls are not exposed through the Subject surface.
+7. **Metadata-identical negative controls** — run behaviorally broken implementations with identical metadata and require portable failures.
+8. **Provider-neutral Browser TCK evaluator** — route all mandatory cases through the concrete backend without provider-name branching.
+9. **Atomic support activation** — all eight Browser case IDs may be activated only when the complete mandatory profile passes; partial ownership remains forbidden.
 
 ## 12. Closure result
 
-Final result for semantic head `208bed15f8c6bae9278171495313a94f6262031f`:
+Corrected result:
 
 - Playwright Browser provider foundation architecture: **REVIEW-CLOSED**.
-- Concrete Chromium selected-state/isolation/lifecycle foundation: **VERIFIED for provider-compatible exact-expiry inputs**.
+- Concrete Chromium selected-state/isolation/lifecycle foundation: **VERIFIED for browser-representable expiry inputs**.
 - Current observation/provenance fail-closed behavior: **VERIFIED**.
 - Selected/excluded state preservation: **VERIFIED**.
-- Shared portable fixture exact non-zero-nanosecond expiry: **NOT LOSSLESSLY SUPPORTED; FAIL-CLOSED VERIFIED**.
-- Complete Browser v0.1 reference conformance: **NOT ESTABLISHED**.
-- Eight Browser TCK case ownership: **MUST REMAIN INACTIVE**.
-- Browser profile candidate status in installed-wheel planning: **MUST REMAIN implementation-pending / no conformance claim**.
+- Synthetic arbitrary-nanosecond seed that Chromium cannot represent: **FAIL-CLOSED VERIFIED**.
+- Arbitrary-nanosecond wire representation: **REMAINS VALID PORTABLE SERIALIZATION SEMANTICS**.
+- Arbitrary-nanosecond Chromium storage capability: **NOT REQUIRED FOR PROFILE CONFORMANCE**; the actual stored browser expiry must instead be projected losslessly.
+- Complete Browser v0.1 reference conformance: **NOT YET ESTABLISHED** for the remaining execution controls/evaluator work.
+- Eight Browser TCK case ownership: **MUST REMAIN INACTIVE UNTIL COMPLETE PROFILE EXECUTION PASSES**.
 - AEP-0011 Final: **NOT AUTHORIZED**.
 - Merge of #117 or its parent stack: **NOT AUTHORIZED**.
 - Release/tag/publication/signing/attestation: **NOT AUTHORIZED**.
 
-The next governed work unit is **exact Browser cookie-expiry capability investigation and provider control/observation design**, not Browser TCK support activation.
+The next governed work unit is **Browser executable-fixture and expiry-capability closure**, followed by the remaining real execution controls — not an AEP semantic weakening and not immediate Browser TCK activation.
