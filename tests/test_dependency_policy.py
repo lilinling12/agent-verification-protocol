@@ -28,6 +28,7 @@ class DependencyPolicyTest(unittest.TestCase):
         self.pyproject = self.root / "pyproject.toml"
         self.constraints = self.root / "constraints.txt"
         self.workflow = self.root / "ci.yml"
+        self.browser_workflow = self.root / "browser-reference.yml"
         self.workflow.write_text(
             "\n".join(
                 (
@@ -38,6 +39,15 @@ class DependencyPolicyTest(unittest.TestCase):
                     "AVP_POSTGRESQL_DSN=postgresql://fixture.invalid/avp",
                     ".mysql-venv/bin/python -m pip install 'dist/example.whl[mysql]'",
                     "AVP_MYSQL_DSN=mysql://fixture.invalid/avp",
+                )
+            ),
+            encoding="utf-8",
+        )
+        self.browser_workflow.write_text(
+            "\n".join(
+                (
+                    ".browser-venv/bin/python -m pip install 'dist/example.whl[browser]'",
+                    "AVP_PLAYWRIGHT_BROWSER=chromium",
                 )
             ),
             encoding="utf-8",
@@ -57,6 +67,9 @@ class DependencyPolicyTest(unittest.TestCase):
                     "",
                     "[project.optional-dependencies]",
                     "dev = []",
+                    "browser = []",
+                    "postgresql = []",
+                    "mysql = []",
                 )
             ),
             encoding="utf-8",
@@ -67,7 +80,17 @@ class DependencyPolicyTest(unittest.TestCase):
         )
         with patch.object(self.validator, "PYPROJECT", self.pyproject), patch.object(
             self.validator, "CONSTRAINTS", self.constraints
-        ), patch.object(self.validator, "CI_WORKFLOW", self.workflow):
+        ), patch.object(self.validator, "CI_WORKFLOW", self.workflow), patch.object(
+            self.validator, "BROWSER_WORKFLOW", self.browser_workflow
+        ), patch.dict(
+            self.validator._INTEGRATION_EXTRAS,
+            {
+                "postgresql": (self.workflow, "AVP_POSTGRESQL_DSN"),
+                "mysql": (self.workflow, "AVP_MYSQL_DSN"),
+                "browser": (self.browser_workflow, "AVP_PLAYWRIGHT_BROWSER"),
+            },
+            clear=True,
+        ):
             self.validator.main()
 
     def test_accepts_reviewed_build_backend_version_upgrade(self) -> None:
@@ -83,6 +106,17 @@ class DependencyPolicyTest(unittest.TestCase):
     def test_rejects_non_exact_build_backend_requirement(self) -> None:
         with self.assertRaisesRegex(SystemExit, "must be an exact NAME==VERSION pin"):
             self._run(build_requirement="setuptools>=84.0.0", constrained_version="84.0.0")
+
+    def test_rejects_missing_browser_optional_wheel_path(self) -> None:
+        self.browser_workflow.write_text(
+            "AVP_PLAYWRIGHT_BROWSER=chromium\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            SystemExit,
+            "CI must retain a browser optional-wheel integration path",
+        ):
+            self._run(build_requirement="setuptools==84.0.0", constrained_version="84.0.0")
 
 
 if __name__ == "__main__":
