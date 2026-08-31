@@ -1,11 +1,12 @@
 # AEP-0011 — Browser Resource Profile v0.1
 
-- Status: Proposed
+- Status: Accepted
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-27
 - Portability audit: `docs/design/alpha3-browser-resource-portability-audit.md`
 - Proposed-readiness evidence: `docs/design/alpha3-browser-resource-proposed-readiness-audit.md`
 - Lifecycle decision: `docs/acceptance/alpha3-aep-0011-proposed-decision.md`
+- Accepted decision: `docs/acceptance/alpha3-aep-0011-accepted-decision.md`
 - Formal Proposed review: `docs/design/alpha3-browser-resource-formal-proposed-review.md`
 - Proposed-review blocker ledger: `docs/design/alpha3-browser-resource-proposed-review-blockers.md`
 - Acceptance-oriented review: `docs/acceptance/alpha3-aep-0011-acceptance-review.md`
@@ -33,7 +34,7 @@ revision: "0.1"
 
 The capability is a Browser **state** capability. It does not imply a complete browser-profile checkpoint and does not grant a universal Browser Agent action API. Partition-aware storage, richer browser state, actions, and observations require separately governed capabilities.
 
-AEP-0011 remains **Proposed**. Proposed status makes these decisions reviewable; it does not make the Browser profile Accepted, normative, released, or authorized for Browser Spec/Schema/TCK/runtime implementation.
+AEP-0011 is **Accepted, not Final**. Accepted status approves this portable Browser direction and authorizes downstream normative closure through the governed `Spec -> requirement index -> Schema -> TCK -> conformance harness` authority chain. It does not make the profile released or Final, does not make provider/runtime behavior protocol authority, and does not authorize backend-first Browser implementation before the portable authority slice is reviewable.
 
 ## Problem
 
@@ -668,9 +669,9 @@ The formal Proposed review and later acceptance-oriented re-review are authorita
 - **BPR-007 — PROTOCOL DECISION INCORPORATED:** exact `DOMString` values use protocol-owned UTF-16-code-unit/base64url representation and code-unit ordering.
 - **BPR-008 — PROTOCOL DECISION INCORPORATED:** materially relevant excluded state requires noninterference, immutable policy/identity binding, or fail-closed insufficiency.
 - **BPR-009 — ACCEPTANCE-EVIDENCE MATRIX SATISFIED:** required Chromium/Gecko/WebKit evidence is recorded by the acceptance-evidence disposition.
-- **BPR-010 — PROTOCOL DECISION INCORPORATED; FOCUSED ACCEPTANCE EVIDENCE REQUIRED:** Manifest/Image collection order is profile-defined before JCS so equivalent logical state cannot obtain different content identity from provider enumeration order.
+- **BPR-010 — PROTOCOL DECISION INCORPORATED; FOCUSED ACCEPTANCE EVIDENCE SATISFIED:** Manifest/Image collection order is profile-defined before JCS so equivalent logical state cannot obtain different content identity from provider enumeration order; BAE-013 and the repeated exact-head acceptance review close this blocker.
 
-These dispositions do not self-approve AEP-0011. BPR-010 requires focused executable evidence and repeated exact-head acceptance review before lifecycle promotion can be considered.
+BPR-001 through BPR-010 are closed for the Accepted AEP-0011 direction. Their evidence and review records remain acceptance provenance and do not make downstream Schema, TCK, harness, or reference implementation behavior protocol authority.
 
 ## Draft design-blocker disposition
 
@@ -680,16 +681,17 @@ In particular, earlier wording that described tuple-origin `localStorage` withou
 
 ## Governance boundary
 
-AEP-0011 remains **Proposed**. This BPR-010 resolution does not authorize `Proposed -> Accepted` and does not authorize Browser normative Spec/requirement-index/schema/TCK, backend-neutral harness, Playwright/Selenium/WebDriver/CDP/BiDi reference implementation, release selection, publication, signing, attestation, repository split, or plugin-framework work.
+AEP-0011 is **Accepted, not Final**. The explicit protocol-maintainer decision is recorded in `docs/acceptance/alpha3-aep-0011-accepted-decision.md`.
 
-The next governed Browser work is:
+Acceptance authorizes Browser normative closure in authority order:
 
-1. add focused provider-neutral BPR-010 acceptance evidence proving permutation-invariant canonical Manifest/Image identity and rejecting provider enumeration order as authority;
-2. run exact-head CI/Governance/applicable Browser evidence;
-3. repeat the acceptance-oriented exact-head protocol re-review;
-4. only if that review finds no remaining semantic blocker, request a separate explicit protocol-maintainer `Proposed -> Accepted` decision.
+1. derive the Browser normative specification and requirement index from this Accepted direction;
+2. define closed machine-readable schemas where serialized Browser protocol resources require them;
+3. create the provider-neutral, execution-sensitive Browser TCK from the normative requirements;
+4. close backend-neutral conformance-harness and privileged fixture-control prerequisites identified by readiness review;
+5. only after the portable authority slice is reviewable, implement a Browser provider/reference runtime against that authority.
 
-Generic continuation does not authorize item 4. Repository merge remains separately authorized.
+Acceptance does **not** authorize AEP-0011 `Final`, provider-native semantics as portable authority, backend-first Playwright/Selenium/WebDriver/CDP/BiDi implementation, release selection, publication, signing, attestation, repository split, plugin-framework work, speculative `BaseBrowserBackend` / `Base*Adapter` hierarchies, or merge of the active stacked PR chain. Repository merge remains a separate explicit authorization.
 
 ## References
 
@@ -699,6 +701,8 @@ Generic continuation does not authorize item 4. Repository merge remains separat
 - Formal Proposed review — `docs/design/alpha3-browser-resource-formal-proposed-review.md`
 - Acceptance-oriented review — `docs/acceptance/alpha3-aep-0011-acceptance-review.md`
 - Acceptance-evidence disposition — `docs/acceptance/alpha3-browser-aep0011-acceptance-evidence-disposition.md`
+- BPR-010 closure review — `docs/acceptance/alpha3-aep-0011-bpr010-closure-review.md`
+- Accepted decision — `docs/acceptance/alpha3-aep-0011-accepted-decision.md`
 - Proposed-review blocker ledger — `docs/design/alpha3-browser-resource-proposed-review-blockers.md`
 - WHATWG HTML — <https://html.spec.whatwg.org/>
 - WHATWG Web IDL — <https://webidl.spec.whatwg.org/>
