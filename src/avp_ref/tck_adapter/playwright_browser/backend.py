@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import copy
 import itertools
+import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping, Sequence
 
 from avp_ref.environment.models import SnapshotRef
@@ -28,6 +30,8 @@ from avp_ref.tck_adapter.browser_harness import (
 )
 
 from .driver import sync_playwright_runtime
+
+_NANOS_PER_SECOND = 1_000_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,13 +479,98 @@ def _cookie_for_playwright(
         assert record.expiry_seconds is not None
         assert record.expiry_nanoseconds is not None
         value["expires"] = int(record.expiry_seconds) + (
-            record.expiry_nanoseconds / 1_000_000_000
+            record.expiry_nanoseconds / _NANOS_PER_SECOND
         )
     return value
 
 
+def _normalized_provider_domain(value: object) -> str:
+    domain = str(value or "")
+    return domain[1:] if domain.startswith(".") else domain
+
+
+def _visible_cookie_key(cookie: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(cookie.get("name", "")),
+        _normalized_provider_domain(cookie.get("domain")),
+        str(cookie.get("path", "")),
+    )
+
+
+def _exact_pattern(value: str):
+    return re.compile(rf"\A{re.escape(value)}\Z")
+
+
+def _domain_pattern(value: str):
+    return re.compile(rf"\A\.?{re.escape(value)}\Z")
+
+
+def _clear_cookie_record(
+    resource: PlaywrightBrowserResource,
+    record: CookieProvenance,
+) -> None:
+    # Playwright cannot filter on hostOnly. Clearing by the observable tuple may
+    # therefore remove both host-only/domain-scoped variants when they collide.
+    # Such a collision is already non-projectable and fails closed before a
+    # verified reset/restore reaches this operation.
+    resource._context.clear_cookies(
+        name=_exact_pattern(record.name),
+        domain=_domain_pattern(record.domain),
+        path=_exact_pattern(record.path),
+    )
+
+
+def _observed_expiry_pair(value: object) -> tuple[str, int]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise BrowserVerificationError("persistent cookie expiry is not observable")
+    try:
+        seconds = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise BrowserVerificationError("persistent cookie expiry is malformed") from exc
+    total_nanos = seconds * _NANOS_PER_SECOND
+    integral = total_nanos.to_integral_value()
+    if total_nanos != integral:
+        raise BrowserVerificationError(
+            "provider cookie expiry contains sub-nanosecond transport precision"
+        )
+    unix_seconds, nanoseconds = divmod(int(integral), _NANOS_PER_SECOND)
+    return str(unix_seconds), nanoseconds
+
+
+def _require_exact_observed_expiry(
+    record: CookieProvenance,
+    observed_cookie: Mapping[str, Any],
+) -> None:
+    if not record.persistent:
+        return
+    assert record.expiry_seconds is not None
+    assert record.expiry_nanoseconds is not None
+    observed = _observed_expiry_pair(observed_cookie.get("expires"))
+    expected = (record.expiry_seconds, record.expiry_nanoseconds)
+    if observed != expected:
+        raise BrowserVerificationError(
+            "persistent cookie expiry loses exact seconds/nanoseconds fidelity"
+        )
+
+
 def _seed_cookie(resource: PlaywrightBrowserResource, record: CookieProvenance) -> None:
     resource._context.add_cookies([_cookie_for_playwright(record, resource._fixture)])
+    key = (record.name, record.domain, record.path)
+    matches = [
+        cookie
+        for cookie in resource._context.cookies()
+        if _visible_cookie_key(cookie) == key
+    ]
+    if len(matches) != 1:
+        _clear_cookie_record(resource, record)
+        raise BrowserVerificationError(
+            "seeded cookie is missing or ambiguous in provider observation"
+        )
+    try:
+        _require_exact_observed_expiry(record, matches[0])
+    except Exception:
+        _clear_cookie_record(resource, record)
+        raise
     resource._provenance[record.identity] = record
 
 
@@ -518,8 +607,16 @@ def _set_local_storage(
 
 
 def _clear_selected_state(resource: PlaywrightBrowserResource) -> None:
-    resource._context.clear_cookies()
-    resource._provenance.clear()
+    selected_domains = set(resource._fixture.manifest["cookieDomains"])
+    selected_records = tuple(
+        record
+        for record in resource._provenance.values()
+        if record.domain in selected_domains
+    )
+    for record in selected_records:
+        _clear_cookie_record(resource, record)
+        resource._provenance.pop(record.identity, None)
+
     for origin in resource._fixture.manifest["localStorageOrigins"]:
         page = resource._context.new_page()
         try:
@@ -550,23 +647,16 @@ def _replace_selected_state(
         _seed_cookie(resource, record)
 
 
-def _visible_cookie_key(cookie: Mapping[str, Any]) -> tuple[str, str, str]:
-    domain = str(cookie.get("domain", ""))
-    if domain.startswith("."):
-        # Correlation normalization only. Never infer hostOnly from this syntax.
-        domain = domain[1:]
-    return str(cookie.get("name", "")), domain, str(cookie.get("path", ""))
-
-
 def _project_cookies(
     resource: PlaywrightBrowserResource, fixture: MaterializedBrowserFixture
 ) -> list[dict[str, Any]]:
-    observed = resource._context.cookies(list(fixture.manifest["localStorageOrigins"]))
-    visible: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
-    for cookie in observed:
-        visible.setdefault(_visible_cookie_key(cookie), []).append(cookie)
-
     selected_domains = set(fixture.manifest["cookieDomains"])
+    visible: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
+    for cookie in resource._context.cookies():
+        key = _visible_cookie_key(cookie)
+        if key[1] in selected_domains:
+            visible.setdefault(key, []).append(cookie)
+
     projected: list[dict[str, Any]] = []
     expected_visible: set[tuple[str, str, str]] = set()
     for record in resource._provenance.values():
@@ -588,19 +678,10 @@ def _project_cookies(
             raise BrowserVerificationError("cookie httpOnly flag conflicts with provenance")
         if record.same_site != "Default" and current.get("sameSite") != record.same_site:
             raise BrowserVerificationError("cookie SameSite conflicts with provenance")
-        if record.persistent:
-            observed_expiry = current.get("expires")
-            if not isinstance(observed_expiry, (int, float)) or observed_expiry <= 0:
-                raise BrowserVerificationError("persistent cookie expiry is not observable")
-            assert record.expiry_seconds is not None
-            if int(observed_expiry) != int(record.expiry_seconds):
-                raise BrowserVerificationError("persistent cookie expiry second conflicts")
+        _require_exact_observed_expiry(record, current)
         projected.append(record.portable())
 
-    extras = [
-        key for key in visible
-        if key[1] in selected_domains and key not in expected_visible
-    ]
+    extras = [key for key in visible if key not in expected_visible]
     if extras:
         raise BrowserVerificationError(
             "selected browser cookie exists without evaluator/control provenance"
