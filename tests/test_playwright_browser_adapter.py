@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
 import threading
@@ -13,6 +14,7 @@ from avp_ref.environment.models import RestoreEquivalence
 from avp_ref.tck_adapter.browser_harness import (
     BrowserConformanceHarness,
     BrowserSettlementLedger,
+    BrowserVerificationError,
     encode_dom_string_code_units,
 )
 from avp_ref.tck_adapter.playwright_browser import PlaywrightBrowserBackendHarness
@@ -55,9 +57,25 @@ def _settled() -> BrowserSettlementLedger:
     return ledger
 
 
-def _fixture_source():
+def _fixture_source() -> dict:
     path = ROOT / "conformance/fixtures/browser-state/v0.1/fixture-source.json"
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _playwright_compatible_fixture_source() -> dict:
+    """Use only provider-observable expiry precision for foundation lifecycle smoke.
+
+    The shared portable fixture deliberately contains non-zero nanoseconds. Chromium's
+    Playwright cookie transport is not assumed to preserve that precision. The provider
+    must fail closed on the shared fixture; this derived source is intentionally limited
+    to an exactly observable expiry and is not portable TCK authority.
+    """
+
+    source = copy.deepcopy(_fixture_source())
+    for cookie in source["baseline"]["cookies"]:
+        if cookie["persistent"]:
+            cookie["expiry"]["nanoseconds"] = 0
+    return source
 
 
 @unittest.skipUnless(
@@ -69,13 +87,13 @@ class PlaywrightBrowserAdapterTest(unittest.TestCase):
         self.server = _fixture_server()
         self.port = self.server.__enter__()
         self.backend = PlaywrightBrowserBackendHarness(engine="chromium")
-        origins = {
+        self.origins = {
             "primary": f"http://a.test:{self.port}",
             "secondary": f"http://b.test:{self.port}",
         }
         self.fixture = self.backend.materialize_fixture(
-            _fixture_source(),
-            resolved_origins=origins,
+            _playwright_compatible_fixture_source(),
+            resolved_origins=self.origins,
         )
         self.harness = BrowserConformanceHarness(
             self.backend,
@@ -84,20 +102,61 @@ class PlaywrightBrowserAdapterTest(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
-        self.backend.close()
-        self.server.__exit__(None, None, None)
+        try:
+            self.backend.close()
+        finally:
+            self.server.__exit__(None, None, None)
+
+    def test_shared_portable_fixture_fails_closed_when_expiry_precision_is_lossy(self) -> None:
+        portable_fixture = self.backend.materialize_fixture(
+            _fixture_source(),
+            resolved_origins=self.origins,
+        )
+        with self.assertRaisesRegex(
+            BrowserVerificationError,
+            "expiry loses exact seconds/nanoseconds fidelity",
+        ):
+            self.backend.provision(portable_fixture)
 
     def test_materialized_fixture_binds_running_browser_identity(self) -> None:
         self.assertEqual(
             dict(self.backend.browser_build_binding),
             dict(self.fixture.manifest["executionBindings"]["browserBuild"]),
         )
-        self.assertEqual("version", self.fixture.manifest["executionBindings"]["browserBuild"]["identityType"])
+        self.assertEqual(
+            "version",
+            self.fixture.manifest["executionBindings"]["browserBuild"]["identityType"],
+        )
 
-    def test_real_browser_baseline_projection_matches_shared_canonical_identity(self) -> None:
+    def test_real_browser_baseline_projection_matches_compatible_canonical_identity(self) -> None:
         sut = self.harness.provision()
         observed = self.harness.authoritative_projection(sut, _settled())
         self.assertEqual(self.fixture.baseline_image_digest, observed.digest)
+
+    def test_cookie_selection_is_independent_of_localstorage_selection(self) -> None:
+        source = _playwright_compatible_fixture_source()
+        source["selectedLocalStorageOriginSlots"] = ["secondary"]
+        source["baseline"]["localStorageByOriginSlot"] = {
+            "secondary": source["baseline"]["localStorageByOriginSlot"]["secondary"]
+        }
+        source["baseline"]["cookies"] = [
+            cookie
+            for cookie in source["baseline"]["cookies"]
+            if not cookie["hostOnly"]
+        ]
+        fixture = self.backend.materialize_fixture(source, resolved_origins=self.origins)
+        harness = BrowserConformanceHarness(
+            self.backend,
+            fixture,
+            self.backend.identity_verifier,
+        )
+        sut = harness.provision()
+
+        observed = harness.authoritative_projection(sut, _settled())
+
+        self.assertEqual(fixture.baseline_image_digest, observed.digest)
+        self.assertEqual(["a.test"], list(fixture.manifest["cookieDomains"]))
+        self.assertEqual([self.origins["secondary"]], list(fixture.manifest["localStorageOrigins"]))
 
     def test_two_resources_do_not_share_selected_authoritative_state(self) -> None:
         first = self.harness.provision()
@@ -121,6 +180,29 @@ class PlaywrightBrowserAdapterTest(unittest.TestCase):
         self.assertNotEqual(self.fixture.baseline_image_digest, changed_first.digest)
         self.assertEqual(baseline_second.digest, unchanged_second.digest)
         self.assertEqual(self.fixture.baseline_image_digest, unchanged_second.digest)
+
+    def test_reset_preserves_excluded_cookie_state(self) -> None:
+        sut = self.harness.provision()
+        excluded = {
+            "name": "excluded_cookie",
+            "value": "keep-me",
+            "url": self.origins["secondary"] + "/",
+        }
+        sut._context.add_cookies([excluded])  # concrete-provider acceptance probe
+
+        self.harness.verified_reset(sut, _settled(), _settled())
+
+        remaining = {
+            (cookie["name"], cookie["value"], cookie["domain"])
+            for cookie in sut._context.cookies()
+        }
+        self.assertTrue(
+            any(name == "excluded_cookie" and value == "keep-me" for name, value, _ in remaining)
+        )
+        self.assertEqual(
+            self.fixture.baseline_image_digest,
+            self.harness.authoritative_projection(sut, _settled()).digest,
+        )
 
     def test_snapshot_reset_restore_use_real_browser_state_and_independent_reprojection(self) -> None:
         sut = self.harness.provision()
@@ -163,7 +245,6 @@ class PlaywrightBrowserAdapterTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "execution-input identity drift"):
             self.harness.authoritative_projection(sut, _settled())
 
-        # Re-provision a clean resource so temporal eligibility is tested independently.
         other = self.harness.provision()
         other_snapshot = self.harness.verified_snapshot(other, _settled())
         self.harness.fixture_control.set_restore_temporal_eligibility(
