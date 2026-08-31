@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avp:schemas:browser-state-manifest:0.1",
+  "title": "AVP Browser State Manifest",
+  "type": "object",
+  "required": ["apiVersion", "kind", "profile", "revision", "canonicalRepresentation", "localStorageOrigins", "cookieDomains"],
+  "properties": {
+    "apiVersion": {"const": "avp.browser/v0.1"},
+    "kind": {"const": "BrowserStateManifest"},
+    "profile": {"const": "avp-browser-unpartitioned-cookie-localstorage-v0.1"},
+    "revision": {"const": "0.1"},
+    "canonicalRepresentation": {"const": "avp-browser-v0.1-rfc8785-jcs"},
+    "localStorageOrigins": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "cookieDomains": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}
