@@ -456,3 +456,43 @@ cases:
     profile: avp-relational-state-v0.1
     requirements: [AVP-RELATIONAL-017]
     applicability: mandatory
+  - id: AVP-TCK-BROWSER-IDENTITY-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-IDENTITY-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-001, AVP-BROWSER-002, AVP-BROWSER-021, AVP-BROWSER-022]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-SELECTION-CANONICAL-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-SELECTION-CANONICAL-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-003, AVP-BROWSER-004, AVP-BROWSER-005, AVP-BROWSER-006, AVP-BROWSER-010, AVP-BROWSER-011]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-COOKIE-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-COOKIE-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-007, AVP-BROWSER-008, AVP-BROWSER-009]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-STATE-IMAGE-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-STATE-IMAGE-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-012, AVP-BROWSER-023]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-EXECUTION-RESIDUAL-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-EXECUTION-RESIDUAL-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-013, AVP-BROWSER-014]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-015, AVP-BROWSER-016, AVP-BROWSER-017, AVP-BROWSER-018]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-SECURITY-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-SECURITY-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-019]
+    applicability: mandatory
+  - id: AVP-TCK-BROWSER-EXECUTED-CAPABILITY-001
+    path: conformance/tck/cases/browser/AVP-TCK-BROWSER-EXECUTED-CAPABILITY-001.yaml
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    requirements: [AVP-BROWSER-020]
+    applicability: mandatory
