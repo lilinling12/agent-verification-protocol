@@ -28,12 +28,17 @@ vector:
     - duplicate-cookie-domain-selection
     - duplicate-localstorage-key
     - duplicate-cookie-identity
+    - odd-decoded-byte-length-localstorage-key
+    - noncanonical-base64url-pad-bits-localstorage-value
+    - padded-base64url-localstorage-value
     - noncanonical-manifest-order-used-as-identity
     - provider-enumeration-order-used-as-identity
 expect:
   canonicalOriginOrder: [https://a.example, https://b.example]
   canonicalCookieDomainOrder: [a.example, b.example]
   unmatchedSurrogatePreserved: true
+  exactWholeUtf16CodeUnitEncodingRequired: true
+  canonicalUnpaddedBase64urlRequired: true
   permutationInvariantCanonicalIdentity: true
   rawNoncanonicalDigestRejectedAsBrowserIdentity: true
   invalidControlsRejected: true
