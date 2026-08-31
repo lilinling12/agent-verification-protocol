@@ -18,9 +18,20 @@ from .indexeddb import (
     IndexedDBObservation,
     PlaywrightBrowserIndexedDBControl,
 )
+from .security import (
+    BrowserArtifactAuthorization,
+    BrowserArtifactLocator,
+    BrowserRetainedArtifact,
+    BrowserSubjectObservation,
+    PlaywrightBrowserSecurityControl,
+)
 from .settlement import PlaywrightBrowserMutationControl
 
 __all__ = [
+    "BrowserArtifactAuthorization",
+    "BrowserArtifactLocator",
+    "BrowserRetainedArtifact",
+    "BrowserSubjectObservation",
     "CookieProvenance",
     "ExcludedStateInterferenceEvidence",
     "IndexedDBInterferenceEvidence",
@@ -33,5 +44,6 @@ __all__ = [
     "PlaywrightBrowserMutationControl",
     "PlaywrightBrowserObserver",
     "PlaywrightBrowserResource",
+    "PlaywrightBrowserSecurityControl",
     "ServiceWorkerCacheObservation",
 ]
