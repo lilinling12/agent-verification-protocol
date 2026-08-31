@@ -102,8 +102,8 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [x] reconcile AEP-0011 and complete Draft → Proposed readiness audit
 - [x] AEP-0011 status advanced to Proposed for formal protocol review
 - [x] complete formal Proposed protocol review
-- [ ] resolve BPR-001..BPR-009 acceptance blockers in AEP-0011
-- [ ] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker
+- [x] resolve BPR-001..BPR-010 acceptance blockers and required focused acceptance evidence on the reviewed candidate stack
+- [x] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker on the reviewed candidate stack
 - [ ] record explicit protocol-maintainer AEP-0011 Proposed → Accepted decision
 - [ ] browser normative specification and requirement index
 - [ ] browser schema(s) for serialized state/projection resources where required
@@ -121,9 +121,11 @@ PR #104 reconciled those decisions into AEP-0011 and added the Draft → Propose
 
 PR #105 then reconciled the readiness baseline into ROADMAP/main-adoption evidence. Its exact reviewed head `19bfaaccd52d6be0a61ba916eb3029ba84493e63` passed CI #631 (`33150653985`), Governance #698 (`33150653980`), Release Validation #96 (`33150653969`), Relational Parity #24 (`33150654000`), focused review `5048751200`, and Ready-state Governance #699 (`33150761945`). After explicit squash authorization, PR #105 was adopted into `main` at exact commit `e2159b1daba4dc214b5dc05c233df28afa328a99`; exact-main CI #632 (`33212353304`) and Relational Parity #25 (`33212353330`) both passed.
 
-The formal Proposed protocol review is recorded by PR #107 against exact baseline `main@ccd05b71635b46218dfa14043320a60376339dc2`. It retains the protocol-first Browser resource direction but identifies nine acceptance blockers, BPR-001..BPR-009, covering stable public capability/profile naming, the unpartitioned `localStorage` boundary, cookie identity/projection fidelity, cookie temporal semantics, closed state-selection grammar, portable settlement witness semantics, exact DOMString representation, residual-state noninterference, and cross-engine acceptance evidence. `docs/design/alpha3-browser-resource-formal-proposed-review.md` records the review findings, and `docs/design/alpha3-browser-resource-proposed-review-blockers.md` is the authoritative blocker ledger for the next Proposed-phase protocol-change work.
+The formal Proposed protocol review is recorded by PR #107 against exact baseline `main@ccd05b71635b46218dfa14043320a60376339dc2`. It identified BPR-001..BPR-009. PR #108 incorporated those protocol decisions; stacked PR #109 built and review-closed the required Chromium/Gecko/WebKit acceptance-evidence matrix, including shipping partition, residual-state, cookie-fidelity, and evaluator/control provenance evidence. The first acceptance-oriented re-review at exact head `66eb158952ff0b90e388f43ee3bae38bd750efbf` found one new semantic blocker, BPR-010, because Browser Manifest/Image collection ordering was not yet fixed before content-addressed identity.
 
-Formal review completion does **not** resolve those blockers. The next Browser milestone is a separate AEP-0011 blocker-resolution protocol PR followed by exact-head acceptance-oriented re-review. AEP-0011 remains Proposed throughout that work unless and until the protocol maintainer separately and explicitly authorizes `Proposed → Accepted`. Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, and attestation remain unauthorized.
+Stacked Draft PR #110 resolves BPR-010 protocol-first and adds provider-neutral BAE-013 permutation evidence. Exact evidence head `38f7110e5da0c4a8abf04578b25b90e30aa83ed4` passed all 13 applicable workflows; BAE-013 proved permutation-invariant canonical Manifest/Image identity and fail-closed duplicate identity handling. `docs/acceptance/alpha3-aep-0011-bpr010-closure-review.md` records the repeated semantic re-review and finds no remaining semantic blocker. These checks describe the **reviewed candidate stack**, not `main` adoption and not lifecycle promotion.
+
+AEP-0011 therefore remains **Proposed** until a separate explicit protocol-maintainer decision. Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, and attestation remain unauthorized. The next lifecycle step is the explicit `Proposed → Accepted` decision only after the metadata-only closure head is exact-head green; merge authorization remains separate.
 
 ### Other resource implementations
 - [ ] network fault proxy
