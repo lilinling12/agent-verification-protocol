@@ -135,8 +135,6 @@ class _Control:
         raise BrowserVerificationError(f"unknown origin: {origin}")
 
     def seed_partitioned_cookie(self, sut: _SUT, cookie: Mapping[str, Any]) -> None:
-        # Partitioned state is intentionally outside this profile's authoritative
-        # projection. The memory backend records no portable state for this control.
         del sut, cookie
 
     def set_execution_binding(self, sut: _SUT, reference: str, identity: str) -> None:
@@ -147,9 +145,6 @@ class _Control:
 
     def seed_evaluator_private_state(self, sut: _SUT) -> None:
         del sut
-
-    def set_restore_temporal_eligibility(self, sut: _SUT, *, eligible: bool) -> None:
-        sut.restore_eligible = eligible
 
 
 class _Backend:
@@ -187,47 +182,79 @@ def _case() -> dict[str, Any]:
     return yaml.safe_load(CASE.read_text(encoding="utf-8"))
 
 
+def _seed_partitioned_control(sut: _SUT) -> None:
+    # The memory backend models partitioned state as explicitly excluded from
+    # the Browser v0.1 authoritative projection.
+    del sut
+
+
+def _set_temporal_eligibility(sut: _SUT, eligible: bool) -> None:
+    sut.restore_eligible = eligible
+
+
+def _evaluator() -> BrowserCookieTCKEvaluator:
+    fixture, verifier = _fixture()
+    harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
+    return BrowserCookieTCKEvaluator(
+        harness=harness,
+        fixture=fixture,
+        verifier=verifier,
+        seed_partitioned_control=_seed_partitioned_control,
+        set_temporal_eligibility=_set_temporal_eligibility,
+    )
+
+
 class BrowserCookieTCKEvaluatorTest(unittest.TestCase):
     def test_executes_cookie_projection_and_negative_controls(self) -> None:
-        fixture, verifier = _fixture()
-        harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserCookieTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            verifier=verifier,
-        )
-
-        result = evaluator.evaluate(_case())
+        result = _evaluator().evaluate(_case())
 
         self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_rejects_portable_identity_contract_drift(self) -> None:
-        fixture, verifier = _fixture()
-        harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserCookieTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            verifier=verifier,
-        )
         case = _case()
         case["vector"]["portableIdentity"] = ["name", "domain", "path"]
 
         with self.assertRaisesRegex(TCKAdapterError, "portable cookie identity changed"):
-            evaluator.evaluate(case)
+            _evaluator().evaluate(case)
 
     def test_rejects_samesite_state_contract_drift(self) -> None:
-        fixture, verifier = _fixture()
-        harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserCookieTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            verifier=verifier,
-        )
         case = _case()
         case["vector"]["sameSiteStates"] = ["Strict", "Lax", "None"]
 
         with self.assertRaisesRegex(TCKAdapterError, "SameSite state set changed"):
-            evaluator.evaluate(case)
+            _evaluator().evaluate(case)
+
+    def test_rejects_fixture_that_does_not_exercise_nonzero_expiry_nanos(self) -> None:
+        fixture, verifier = _fixture()
+        state = _plain(fixture.baseline_image)
+        persistent = next(cookie for cookie in state["cookies"] if cookie["persistent"])
+        persistent["expiry"]["nanoseconds"] = 0
+        source = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        source_persistent = next(
+            cookie for cookie in source["baseline"]["cookies"] if cookie["persistent"]
+        )
+        source_persistent["expiry"]["nanoseconds"] = 0
+        zero_fixture = materialize_browser_fixture(
+            source,
+            resolved_origins={
+                "primary": "https://a.example",
+                "secondary": "https://b.example",
+            },
+            verifier=verifier,
+        )
+        harness = BrowserConformanceHarness(_Backend(), zero_fixture, verifier)
+        evaluator = BrowserCookieTCKEvaluator(
+            harness=harness,
+            fixture=zero_fixture,
+            verifier=verifier,
+            seed_partitioned_control=_seed_partitioned_control,
+            set_temporal_eligibility=_set_temporal_eligibility,
+        )
+
+        result = evaluator.evaluate(_case())
+
+        self.assertIs(TCKStatus.FAIL, result.status)
+        self.assertIn("nonzero nanoseconds", result.detail)
 
 
 if __name__ == "__main__":
