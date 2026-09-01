@@ -5,6 +5,10 @@ re-implementing snapshot/reset/restore semantics. Positive settlement is owned b
 the evaluator, and reset/restore success is accepted only after independent
 post-operation reprojection. Concrete provider completion signals are never
 sufficient settlement evidence here.
+
+Temporal ineligibility is induced through an explicitly injected private control
+callable. The portable evaluator therefore knows the required behavior, but not
+a provider-specific fixture-control method name or parameter shape.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from .browser_harness import (
     BrowserConformanceHarness,
     BrowserHarnessError,
     BrowserSettlementLedger,
+    BrowserSUT,
     BrowserVerificationError,
 )
 from .browser_tck_adapter import BROWSER_PROFILE
@@ -81,8 +86,16 @@ class BrowserSettlementLifecycleTCKEvaluator:
 
     case_id = CASE_ID
 
-    def __init__(self, harness: BrowserConformanceHarness) -> None:
+    def __init__(
+        self,
+        harness: BrowserConformanceHarness,
+        *,
+        set_temporal_eligibility: Callable[[BrowserSUT, bool], None],
+    ) -> None:
+        if not callable(set_temporal_eligibility):
+            raise TCKAdapterError("Browser temporal eligibility control must be callable")
         self._harness = harness
+        self._set_temporal_eligibility = set_temporal_eligibility
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         vector, expect = self._case_parts(case)
@@ -158,13 +171,12 @@ class BrowserSettlementLifecycleTCKEvaluator:
         if expect.get("successfulRestoreFidelity") != "STATE_EQUIVALENT":
             raise TCKAdapterError(f"{CASE_ID} successful restore fidelity changed")
 
-    def _execute_positive_path(self, sut: Any) -> None:
+    def _execute_positive_path(self, sut: BrowserSUT) -> None:
         baseline = self._harness.authoritative_projection(sut, _settled())
         snapshot = self._harness.verified_snapshot(sut, _settled())
         if snapshot.state_digest != baseline.digest:
             raise BrowserVerificationError("snapshot digest does not bind authoritative state")
 
-        # Reset and restore each receive distinct post-operation settlement ledgers.
         reset = self._harness.verified_reset(sut, _settled(), _settled())
         if not reset.equivalent_to_initial:
             raise BrowserVerificationError("reset did not re-establish baseline equivalence")
@@ -178,10 +190,7 @@ class BrowserSettlementLifecycleTCKEvaluator:
         if restore.equivalence is not RestoreEquivalence.STATE_EQUIVALENT:
             raise BrowserVerificationError("restore fidelity is not STATE_EQUIVALENT")
 
-    def _execute_negative_controls(self, sut: Any) -> None:
-        # Sleep/network-idle/provider completion are deliberately represented by
-        # absence of evaluator settlement evidence: unresolved work still blocks
-        # projection regardless of any provider-side completion notion.
+    def _execute_negative_controls(self, sut: BrowserSUT) -> None:
         _require_rejected(
             lambda: self._harness.authoritative_projection(sut, _unresolved()),
             "sleep-only-settlement",
@@ -228,9 +237,6 @@ class BrowserSettlementLifecycleTCKEvaluator:
             "foreign-or-stale-snapshotref",
         )
 
-        # The harness constructs successful Browser restore results itself and
-        # has exactly one permitted positive fidelity. A provider-returned EXACT
-        # claim is therefore never accepted as the verified result.
         restore = self._harness.verified_restore(
             sut,
             snapshot,
@@ -240,26 +246,16 @@ class BrowserSettlementLifecycleTCKEvaluator:
         if restore.equivalence is RestoreEquivalence.EXACT:
             raise BrowserVerificationError("EXACT Browser restore fidelity was accepted")
 
-        control = self._harness.fixture_control
-        setter = getattr(control, "set_restore_temporal_eligibility", None)
-        if setter is not None:
-            setter(sut, eligible=False)
-            try:
-                _require_rejected(
-                    lambda: self._harness.verified_restore(
-                        sut,
-                        snapshot,
-                        _settled(),
-                        _settled(),
-                    ),
-                    "temporally-ineligible-cookie-restore-success",
-                )
-            finally:
-                setter(sut, eligible=True)
-        else:
-            # Backends without this private test-control seam still have to prove
-            # the obligation in their executed-capability negative-control suite;
-            # portable lifecycle evaluation never assumes temporal eligibility.
-            raise BrowserVerificationError(
-                "backend lacks controlled temporal-ineligibility proof seam"
+        self._set_temporal_eligibility(sut, False)
+        try:
+            _require_rejected(
+                lambda: self._harness.verified_restore(
+                    sut,
+                    snapshot,
+                    _settled(),
+                    _settled(),
+                ),
+                "temporally-ineligible-cookie-restore-success",
             )
+        finally:
+            self._set_temporal_eligibility(sut, True)
