@@ -17,6 +17,7 @@ from .browser_harness import (
     BrowserCanonicalizationError,
     BrowserConformanceHarness,
     BrowserHarnessError,
+    BrowserIdentityVerifier,
     BrowserSettlementLedger,
     BrowserVerificationError,
     MaterializedBrowserFixture,
@@ -115,9 +116,11 @@ class BrowserCookieTCKEvaluator:
         *,
         harness: BrowserConformanceHarness,
         fixture: MaterializedBrowserFixture,
+        verifier: BrowserIdentityVerifier,
     ) -> None:
         self._harness = harness
         self._fixture = fixture
+        self._verifier = verifier
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         vector, expect = self._case_parts(case)
@@ -245,7 +248,11 @@ class BrowserCookieTCKEvaluator:
         erased_host_only = copy.deepcopy(baseline)
         target = next(cookie for cookie in erased_host_only["cookies"] if cookie["hostOnly"])
         target["hostOnly"] = False
-        self._require_digest_change(erased_host_only, baseline, "host-only-inferred-from-leading-dot")
+        self._require_digest_change(
+            erased_host_only,
+            baseline,
+            "host-only-inferred-from-leading-dot",
+        )
 
         default_cookie = next(
             (cookie for cookie in cookies if cookie["sameSite"] == "Default"),
@@ -286,7 +293,7 @@ class BrowserCookieTCKEvaluator:
             lambda: canonicalize_state_image(
                 lossy,
                 self._fixture.manifest,
-                self._harness._verifier,
+                self._verifier,
             ),
             "lossy-provider-export-treated-as-authoritative",
         )
@@ -297,16 +304,15 @@ class BrowserCookieTCKEvaluator:
         baseline: Mapping[str, Any],
         label: str,
     ) -> None:
-        verifier = self._harness._verifier
         candidate_digest = canonical_state_image_digest(
             candidate,
             self._fixture.manifest,
-            verifier,
+            self._verifier,
         )
         baseline_digest = canonical_state_image_digest(
             baseline,
             self._fixture.manifest,
-            verifier,
+            self._verifier,
         )
         if candidate_digest == baseline_digest:
             raise BrowserVerificationError(f"Browser cookie negative control collapsed: {label}")
@@ -336,7 +342,11 @@ class BrowserCookieTCKEvaluator:
 
     def _execute_temporal_control(self, sut: Any) -> None:
         snapshot = self._harness.verified_snapshot(sut, _settled())
-        setter = getattr(self._harness.fixture_control, "set_restore_temporal_eligibility", None)
+        setter = getattr(
+            self._harness.fixture_control,
+            "set_restore_temporal_eligibility",
+            None,
+        )
         if setter is None:
             raise BrowserVerificationError(
                 "backend lacks controlled temporal-ineligibility proof seam"
