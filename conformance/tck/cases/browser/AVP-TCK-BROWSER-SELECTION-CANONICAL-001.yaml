@@ -1,0 +1,44 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-SELECTION-CANONICAL-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-003, AVP-BROWSER-004, AVP-BROWSER-005, AVP-BROWSER-006, AVP-BROWSER-010, AVP-BROWSER-011]
+applicability: mandatory
+type: schema-and-semantic
+vector:
+  localStorageOrigins:
+    - https://b.example
+    - https://a.example
+  cookieDomains:
+    - b.example
+    - a.example
+  domStringControls:
+    asciiA: AGE
+    asciiAB: AGEAYg
+    unmatchedHighSurrogate: 2AA
+  permutationControls:
+    manifestOriginOrders: 2
+    manifestCookieDomainOrders: 2
+    imageCookieAndOriginOrders: multiple
+  invalidControls:
+    - duplicate-origin-selection
+    - duplicate-cookie-domain-selection
+    - duplicate-localstorage-key
+    - duplicate-cookie-identity
+    - odd-decoded-byte-length-localstorage-key
+    - noncanonical-base64url-pad-bits-localstorage-value
+    - padded-base64url-localstorage-value
+    - noncanonical-manifest-order-used-as-identity
+    - provider-enumeration-order-used-as-identity
+expect:
+  canonicalOriginOrder: [https://a.example, https://b.example]
+  canonicalCookieDomainOrder: [a.example, b.example]
+  unmatchedSurrogatePreserved: true
+  exactWholeUtf16CodeUnitEncodingRequired: true
+  canonicalUnpaddedBase64urlRequired: true
+  permutationInvariantCanonicalIdentity: true
+  rawNoncanonicalDigestRejectedAsBrowserIdentity: true
+  invalidControlsRejected: true

@@ -1,0 +1,38 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-SETTLEMENT-LIFECYCLE-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-015, AVP-BROWSER-016, AVP-BROWSER-017, AVP-BROWSER-018]
+applicability: mandatory
+type: semantic-and-execution-sensitive
+vector:
+  settlementWitness:
+    subjectAdmissionClosed: true
+    acceptedRelevantMutationsTerminal: true
+    unresolvedRelevantMutations: 0
+    projectionStartsAfterWitness: true
+  operations:
+    - snapshot
+    - reset
+    - restore
+  positiveRestoreFidelity: STATE_EQUIVALENT
+  negativeControls:
+    - sleep-only-settlement
+    - networkidle-only-settlement
+    - provider-command-success-only
+    - foreign-or-stale-snapshotref
+    - reset-without-independent-reprojection
+    - restore-without-independent-reprojection
+    - restore-reports-exact
+    - temporally-ineligible-cookie-restore-success
+expect:
+  positiveSettlementWitnessRequired: true
+  snapshotOwnershipRequired: true
+  resetBaselineReprojectionRequired: true
+  restoreSnapshotReprojectionRequired: true
+  successfulRestoreFidelity: STATE_EQUIVALENT
+  exactRestoreRejected: true
+  negativeControlsRejected: true
