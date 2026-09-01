@@ -136,9 +136,23 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
             "secondary": f"http://b.test:{self.port}",
         }
 
+        # One full-profile test owns one concrete Playwright runtime. Starting
+        # multiple Sync API runtimes concurrently in the same thread is not a
+        # supported Playwright lifecycle and would test the transport manager
+        # rather than AVP's Browser semantics. Distinct TCK fixtures/resources
+        # still remain independently materialized and isolated BrowserContexts.
         self.main_backend = PlaywrightBrowserBackendHarness(engine="chromium")
+
+        main_source = _load_json(_EXECUTION_FIXTURE)
+        security_source = _load_json(_SECURITY_FIXTURE)
+        shared_bindings = copy.deepcopy(main_source["executionBindings"])
+        shared_bindings["securityVisibilityPolicy"] = copy.deepcopy(
+            security_source["executionBindings"]["securityVisibilityPolicy"]
+        )
+        main_source["executionBindings"] = copy.deepcopy(shared_bindings)
+
         self.main_fixture = self.main_backend.materialize_fixture(
-            _load_json(_EXECUTION_FIXTURE),
+            main_source,
             resolved_origins=self.origins,
         )
         self.main_harness = BrowserConformanceHarness(
@@ -147,7 +161,7 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
             self.main_backend.identity_verifier,
         )
 
-        cookie_source = _load_json(_EXECUTION_FIXTURE)
+        cookie_source = copy.deepcopy(main_source)
         persistent = next(
             item for item in cookie_source["baseline"]["cookies"] if item["persistent"]
         )
@@ -163,13 +177,14 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
             self.main_backend.identity_verifier,
         )
 
-        self.security_backend = PlaywrightBrowserBackendHarness(engine="chromium")
+        self.security_backend = self.main_backend
         self.security_origins = {
             "subject": self.origins["primary"],
             "evaluatorPrivate": self.origins["secondary"],
         }
+        security_source["executionBindings"] = copy.deepcopy(shared_bindings)
         self.security_fixture = self.security_backend.materialize_fixture(
-            _load_json(_SECURITY_FIXTURE),
+            security_source,
             resolved_origins=self.security_origins,
         )
         self.security_harness = BrowserConformanceHarness(
@@ -185,9 +200,10 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
             authorized_value=_PUBLIC_OBSERVATION,
         )
 
-        self.executed_backend = PlaywrightBrowserBackendHarness(engine="chromium")
+        self.executed_backend = self.main_backend
+        executed_source = copy.deepcopy(main_source)
         self.executed_fixture = self.executed_backend.materialize_fixture(
-            _load_json(_EXECUTION_FIXTURE),
+            executed_source,
             resolved_origins=self.origins,
         )
         self.executed_harness = BrowserConformanceHarness(
@@ -200,15 +216,9 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         try:
-            self.executed_backend.close()
+            self.main_backend.close()
         finally:
-            try:
-                self.security_backend.close()
-            finally:
-                try:
-                    self.main_backend.close()
-                finally:
-                    self.server.__exit__(None, None, None)
+            self.server.__exit__(None, None, None)
 
     def _set_main_temporal_eligibility(self, sut: BrowserSUT, eligible: bool) -> None:
         self.main_backend.fixture_control.set_restore_temporal_eligibility(
