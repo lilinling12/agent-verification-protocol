@@ -5,6 +5,10 @@ projection, never from provider presentation syntax. The evaluator verifies the
 closed portable identity/state shape, preserves explicit SameSite=Default and
 persistent expiry exactly, excludes partitioned state from the unpartitioned
 profile, and fails closed when temporal restore eligibility cannot be proved.
+
+Provider-specific partition construction and temporal-control mechanics are
+injected as semantic callables. No partition-key shape, provider API, or private
+fixture-control method name becomes part of the portable evaluator.
 """
 
 from __future__ import annotations
@@ -14,11 +18,11 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from .browser_harness import (
-    BrowserCanonicalizationError,
     BrowserConformanceHarness,
     BrowserHarnessError,
     BrowserIdentityVerifier,
     BrowserSettlementLedger,
+    BrowserSUT,
     BrowserVerificationError,
     MaterializedBrowserFixture,
     canonical_state_image_digest,
@@ -117,10 +121,18 @@ class BrowserCookieTCKEvaluator:
         harness: BrowserConformanceHarness,
         fixture: MaterializedBrowserFixture,
         verifier: BrowserIdentityVerifier,
+        seed_partitioned_control: Callable[[BrowserSUT], None],
+        set_temporal_eligibility: Callable[[BrowserSUT, bool], None],
     ) -> None:
+        if not callable(seed_partitioned_control):
+            raise TCKAdapterError("Browser partitioned-state control must be callable")
+        if not callable(set_temporal_eligibility):
+            raise TCKAdapterError("Browser temporal eligibility control must be callable")
         self._harness = harness
         self._fixture = fixture
         self._verifier = verifier
+        self._seed_partitioned_control = seed_partitioned_control
+        self._set_temporal_eligibility = set_temporal_eligibility
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         vector, expect = self._case_parts(case)
@@ -143,7 +155,7 @@ class BrowserCookieTCKEvaluator:
         return TCKCaseResult(
             self.case_id,
             TCKStatus.PASS,
-            "portable cookie identity/state, explicit Default SameSite, lossless expiry, partition exclusion, and temporal restore eligibility verified",
+            "portable cookie identity/state, explicit Default SameSite, lossless nonzero-nanosecond expiry, partition exclusion, and temporal restore eligibility verified",
         )
 
     def _case_parts(
@@ -227,6 +239,7 @@ class BrowserCookieTCKEvaluator:
         if not session_cookies or any("expiry" in cookie for cookie in session_cookies):
             raise BrowserVerificationError("session cookie incorrectly carries expiry")
 
+        nonzero_nanos = False
         for cookie in persistent_cookies:
             expiry = _mapping(cookie.get("expiry"), "persistent cookie expiry")
             if set(expiry) != {"unixSeconds", "nanoseconds"}:
@@ -237,6 +250,11 @@ class BrowserCookieTCKEvaluator:
                 raise BrowserVerificationError("persistent cookie seconds are not exact text")
             if isinstance(nanos, bool) or not isinstance(nanos, int):
                 raise BrowserVerificationError("persistent cookie nanoseconds are not exact integer")
+            nonzero_nanos = nonzero_nanos or nanos != 0
+        if not nonzero_nanos:
+            raise BrowserVerificationError(
+                "cookie expiry fidelity fixture must exercise nonzero nanoseconds"
+            )
 
     def _execute_semantic_negative_controls(self, image: Any) -> None:
         baseline = _plain(_mapping(image, "authoritative Browser StateImage"))
@@ -271,22 +289,24 @@ class BrowserCookieTCKEvaluator:
             "default-samesite-normalized-to-lax",
         )
 
-        persistent = next((cookie for cookie in cookies if cookie["persistent"]), None)
-        if persistent is None:
-            raise BrowserVerificationError("persistent expiry control is unavailable")
-        nanos = persistent["expiry"]["nanoseconds"]
-        if nanos:
-            rounded = copy.deepcopy(baseline)
-            target = next(cookie for cookie in rounded["cookies"] if cookie["persistent"])
-            target["expiry"]["nanoseconds"] = 0
-            self._require_digest_change(
-                rounded,
-                baseline,
-                "persistent-expiry-rounded-or-truncated",
-            )
+        persistent = next(
+            cookie
+            for cookie in cookies
+            if cookie["persistent"] and cookie["expiry"]["nanoseconds"] != 0
+        )
+        rounded = copy.deepcopy(baseline)
+        target = next(
+            cookie
+            for cookie in rounded["cookies"]
+            if cookie["persistent"] and cookie["expiry"]["nanoseconds"] != 0
+        )
+        target["expiry"]["nanoseconds"] = 0
+        self._require_digest_change(
+            rounded,
+            baseline,
+            "persistent-expiry-rounded-or-truncated",
+        )
 
-        # A provider export that omits any required field is not authoritative
-        # Browser state. Canonicalization must reject the lossy projection.
         lossy = copy.deepcopy(baseline)
         lossy["cookies"][0].pop("hostOnly")
         _require_rejected(
@@ -317,41 +337,17 @@ class BrowserCookieTCKEvaluator:
         if candidate_digest == baseline_digest:
             raise BrowserVerificationError(f"Browser cookie negative control collapsed: {label}")
 
-    def _execute_partitioned_control(self, sut: Any, before_digest: str) -> None:
-        origins = self._fixture.manifest.get("localStorageOrigins")
-        domains = self._fixture.manifest.get("cookieDomains")
-        if not isinstance(origins, (list, tuple)) or not origins:
-            raise BrowserVerificationError("partitioned control needs a selected origin")
-        if not isinstance(domains, (list, tuple)) or not domains:
-            raise BrowserVerificationError("partitioned control needs a selected cookie domain")
-        self._harness.fixture_control.seed_partitioned_cookie(
-            sut,
-            {
-                "name": "avp_partitioned_control",
-                "value": "1",
-                "domain": str(domains[0]),
-                "path": "/",
-                "topLevelSite": str(origins[0]),
-            },
-        )
+    def _execute_partitioned_control(self, sut: BrowserSUT, before_digest: str) -> None:
+        self._seed_partitioned_control(sut)
         after = self._harness.authoritative_projection(sut, _settled())
         if after.digest != before_digest:
             raise BrowserVerificationError(
                 "partitioned cookie was admitted into unpartitioned Browser identity"
             )
 
-    def _execute_temporal_control(self, sut: Any) -> None:
+    def _execute_temporal_control(self, sut: BrowserSUT) -> None:
         snapshot = self._harness.verified_snapshot(sut, _settled())
-        setter = getattr(
-            self._harness.fixture_control,
-            "set_restore_temporal_eligibility",
-            None,
-        )
-        if setter is None:
-            raise BrowserVerificationError(
-                "backend lacks controlled temporal-ineligibility proof seam"
-            )
-        setter(sut, eligible=False)
+        self._set_temporal_eligibility(sut, False)
         try:
             _require_rejected(
                 lambda: self._harness.verified_restore(
@@ -363,4 +359,4 @@ class BrowserCookieTCKEvaluator:
                 "temporally-ineligible-cookie-restored-as-equivalent",
             )
         finally:
-            setter(sut, eligible=True)
+            self._set_temporal_eligibility(sut, True)
