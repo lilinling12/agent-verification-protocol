@@ -178,7 +178,7 @@ def _load_yaml_case(name: str) -> dict[str, Any]:
 def _fixture() -> tuple[MaterializedBrowserFixture, _Verifier]:
     source = json.loads(FIXTURE.read_text(encoding="utf-8"))
     origins = ("https://a.example", "https://b.example")
-    verifier = _Verifier(origins, ("a.example", "b.example"))
+    verifier = _Verifier(origins, ("a.test", "a.example", "b.example"))
     fixture = materialize_browser_fixture(
         source,
         resolved_origins={"primary": origins[0], "secondary": origins[1]},
