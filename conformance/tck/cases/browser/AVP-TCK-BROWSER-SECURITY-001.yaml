@@ -1,0 +1,31 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-SECURITY-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-019]
+applicability: mandatory
+type: semantic-and-execution-sensitive
+vector:
+  evaluatorPrivateState:
+    cookie: synthetic-secret-cookie
+    localStorage: synthetic-secret-value
+  privilegedControl:
+    - browser-launch-handle
+    - browser-debugging-handle
+    - snapshot-restore-control
+  subjectVisibleSurface:
+    authorizedValues: [public-observation]
+  negativeControls:
+    - evaluator-private-cookie-leaked-to-subject
+    - evaluator-private-localstorage-leaked-to-subject
+    - privileged-control-handle-exposed-to-subject
+    - artifact-digest-treated-as-retrieval-authority
+    - redacted-bytes-reuse-unredacted-digest
+expect:
+  subjectEvaluatorControlSeparated: true
+  privateStateMayRemainAuthoritative: true
+  artifactIdentityNotAuthorization: true
+  negativeControlsRejected: true

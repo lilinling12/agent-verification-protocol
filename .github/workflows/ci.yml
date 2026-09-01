@@ -143,24 +143,48 @@ jobs:
           python -m venv .conformance-venv
           .conformance-venv/bin/python -m pip install "${wheels[0]}[conformance]"
           .conformance-venv/bin/python -m pip check
-      - name: Installed-wheel full TCK conformance
+      - name: Installed-wheel governed TCK conformance
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          profiles=(conformance/tck/profiles/*.yaml)
-          if (( ${#profiles[@]} == 0 )); then
-            echo "no TCK profiles found" >&2
-            exit 1
-          fi
-          printf 'running %d installed-wheel TCK profiles\n' "${#profiles[@]}"
-          for profile_path in "${profiles[@]}"; do
-            profile="$(basename "${profile_path}" .yaml)"
+          plan=.reference-tck-plan.json
+          .conformance-venv/bin/python scripts/plan_reference_tck_profiles.py \
+            --repository-root . \
+            --output "${plan}"
+          .conformance-venv/bin/python - "${plan}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          run_profiles = document["runProfiles"]
+          pending = document["pendingCandidateProfiles"]
+          print(f"running {len(run_profiles)} installed-wheel TCK profiles")
+          if pending:
+              print(
+                  "reference implementation pending for active normative candidates "
+                  f"(no conformance claim): {', '.join(pending)}"
+              )
+          for profile in run_profiles:
+              print(profile)
+          PY
+          while IFS= read -r profile; do
+            [[ -n "${profile}" ]] || continue
             echo "==> ${profile}"
             .conformance-venv/bin/avp tck run \
               --repository-root . \
               --profile "${profile}"
-          done
+          done < <(
+            .conformance-venv/bin/python - "${plan}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          for profile in document["runProfiles"]:
+              print(profile)
+          PY
+          )
       - name: Build release evidence
         run: |
           python scripts/release_evidence.py build \
