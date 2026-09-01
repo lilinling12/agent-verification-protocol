@@ -16,8 +16,10 @@ from avp_ref.tck_adapter.browser_harness import (
 )
 from avp_ref.tck_adapter.browser_tck_foundation import (
     BrowserIdentityTCKEvaluator,
-    BrowserSelectionCanonicalTCKEvaluator,
     BrowserStateImageTCKEvaluator,
+)
+from avp_ref.tck_adapter.browser_tck_selection import (
+    BrowserSelectionCanonicalTCKEvaluator,
 )
 from avp_ref.tck_adapter.models import TCKStatus
 
@@ -206,7 +208,7 @@ class BrowserTCKFoundationTest(unittest.TestCase):
 
         result = evaluator.evaluate(case)
 
-        self.assertIs(TCKStatus.PASS, result.status)
+        self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_identity_rejects_vector_binding_drift(self) -> None:
         fixture, verifier = _fixture()
@@ -237,7 +239,7 @@ class BrowserTCKFoundationTest(unittest.TestCase):
 
         result = evaluator.evaluate(case)
 
-        self.assertIs(TCKStatus.PASS, result.status)
+        self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_selection_rejects_governed_control_set_drift(self) -> None:
         fixture, verifier = _fixture()
@@ -261,7 +263,7 @@ class BrowserTCKFoundationTest(unittest.TestCase):
 
         result = evaluator.evaluate(case)
 
-        self.assertIs(TCKStatus.PASS, result.status)
+        self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_state_image_rejects_expectation_drift_before_execution(self) -> None:
         fixture, verifier = _fixture()
