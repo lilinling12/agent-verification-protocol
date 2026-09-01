@@ -1,0 +1,34 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-EXECUTION-RESIDUAL-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-013, AVP-BROWSER-014]
+applicability: mandatory
+type: semantic-and-execution-sensitive
+vector:
+  materialExecutionInputs:
+    - browser-build-artifact
+    - storage-partition-isolation-policy
+    - cookie-temporal-policy
+  excludedStateControls:
+    - service-worker-state
+    - cache-storage-state
+    - indexeddb-state
+    - extension-or-preload-state
+  acceptedDispositions:
+    - noninterfering-by-isolation
+    - immutable-policy-or-identity-bound
+    - fail-closed-insufficient
+  negativeControls:
+    - product-label-only-as-execution-identity
+    - material-execution-input-unbound
+    - bound-execution-input-drift-ignored
+    - excluded-state-interference-silently-ignored
+expect:
+  immutableExecutionIdentityRequired: true
+  excludedStateDispositionRequired: true
+  providerLabelInsufficient: true
+  negativeControlsRejected: true

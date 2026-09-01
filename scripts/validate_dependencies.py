@@ -10,12 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = ROOT / "pyproject.toml"
 CONSTRAINTS = ROOT / "constraints" / "ci.txt"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+BROWSER_WORKFLOW = ROOT / ".github" / "workflows" / "browser-reference.yml"
 
 _REQUIREMENT_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
 _EXACT_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
 _INTEGRATION_EXTRAS = {
-    "postgresql": "AVP_POSTGRESQL_DSN",
-    "mysql": "AVP_MYSQL_DSN",
+    "postgresql": (CI_WORKFLOW, "AVP_POSTGRESQL_DSN"),
+    "mysql": (CI_WORKFLOW, "AVP_MYSQL_DSN"),
+    "browser": (BROWSER_WORKFLOW, "AVP_PLAYWRIGHT_BROWSER"),
 }
 
 
@@ -80,12 +82,15 @@ def _load_constraints() -> dict[str, str]:
     return pins
 
 
-def _require_integration_paths(workflow: str) -> None:
-    for extra, dsn_variable in _INTEGRATION_EXTRAS.items():
-        if f"[{extra}]" not in workflow or dsn_variable not in workflow:
+def _require_integration_paths() -> None:
+    for extra, (workflow_path, marker) in _INTEGRATION_EXTRAS.items():
+        if not workflow_path.is_file():
+            _fail(f"CI workflow is required for {extra} optional integration: {workflow_path}")
+        workflow = workflow_path.read_text(encoding="utf-8")
+        if f"[{extra}]" not in workflow or marker not in workflow:
             _fail(
                 f"CI must retain a {extra} optional-wheel integration path "
-                f"with {dsn_variable}"
+                f"with {marker}"
             )
 
 
@@ -141,7 +146,7 @@ def main() -> None:
         _fail("CI must retain an unconstrained clean-wheel consumer installation")
     if "-c constraints/ci.txt dist/*.whl" in workflow:
         _fail("clean-wheel consumer installation must not use repository constraints")
-    _require_integration_paths(workflow)
+    _require_integration_paths()
 
     print(
         "dependency policy OK: "

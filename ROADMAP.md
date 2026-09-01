@@ -104,14 +104,14 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [x] complete formal Proposed protocol review
 - [x] resolve BPR-001..BPR-010 acceptance blockers and required focused acceptance evidence on the reviewed candidate stack
 - [x] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker on the reviewed candidate stack
-- [ ] record explicit protocol-maintainer AEP-0011 Proposed → Accepted decision
+- [x] record explicit protocol-maintainer AEP-0011 Proposed → Accepted decision
 - [ ] browser normative specification and requirement index
 - [ ] browser schema(s) for serialized state/projection resources where required
 - [ ] execution-sensitive browser resource TCK
 - [ ] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by reviewed protocol semantics
 - [ ] Playwright browser runtime against the portable TCK
 
-AEP-0011 is **Proposed on `main`, not Accepted**. PR #106 was explicitly authorized for the `Draft → Proposed` lifecycle transition and adopted by squash merge at exact `main` commit `ccd05b71635b46218dfa14043320a60376339dc2`. Exact-main CI #637 (`33215011917`) and Relational Parity (`33215011884`) both passed on that merge commit. Proposed status authorizes formal protocol review only; it does not authorize Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, or attestation.
+AEP-0011 is **Accepted, not Final**, by explicit protocol-maintainer decision on 2026-08-31, recorded in `docs/acceptance/alpha3-aep-0011-accepted-decision.md`. The lifecycle decision is carried by stacked Draft PR #112 on top of exact BPR-010 closure head `cb1ab87bb6904b2468bae6e6df659cd7db9b0b60`. Acceptance authorizes Browser normative closure through `Spec -> requirement index -> Schema -> provider-neutral execution-sensitive TCK -> backend-neutral harness`; it does not authorize AEP Final, provider-native semantics as protocol authority, backend-first Playwright/reference-runtime implementation before that authority slice is reviewable, release selection, publication, signing, attestation, or merge of the active stacked PR chain.
 
 Its initial problem/scope and standards-analysis baseline was adopted into `main` by authorized squash merge of PR #100 at exact commit `8f0c37e34202066ed79cc5d1`. Exact-main CI #622 (`33116957396`) and Relational Parity #15 (`33116957406`) both passed on that merge commit, and `docs/acceptance/alpha3-browser-draft-main-adoption.md` records that baseline adoption.
 
@@ -123,9 +123,7 @@ PR #105 then reconciled the readiness baseline into ROADMAP/main-adoption eviden
 
 The formal Proposed protocol review is recorded by PR #107 against exact baseline `main@ccd05b71635b46218dfa14043320a60376339dc2`. It identified BPR-001..BPR-009. PR #108 incorporated those protocol decisions; stacked PR #109 built and review-closed the required Chromium/Gecko/WebKit acceptance-evidence matrix, including shipping partition, residual-state, cookie-fidelity, and evaluator/control provenance evidence. The first acceptance-oriented re-review at exact head `66eb158952ff0b90e388f43ee3bae38bd750efbf` found one new semantic blocker, BPR-010, because Browser Manifest/Image collection ordering was not yet fixed before content-addressed identity.
 
-Stacked Draft PR #110 resolves BPR-010 protocol-first and adds provider-neutral BAE-013 permutation evidence. Exact evidence head `38f7110e5da0c4a8abf04578b25b90e30aa83ed4` passed all 13 applicable workflows; BAE-013 proved permutation-invariant canonical Manifest/Image identity and fail-closed duplicate identity handling. `docs/acceptance/alpha3-aep-0011-bpr010-closure-review.md` records the repeated semantic re-review and finds no remaining semantic blocker. These checks describe the **reviewed candidate stack**, not `main` adoption and not lifecycle promotion.
-
-AEP-0011 therefore remains **Proposed** until a separate explicit protocol-maintainer decision. Browser normative Spec/Schema/TCK, backend-neutral harness, Playwright/reference-runtime implementation, release selection, publication, signing, and attestation remain unauthorized. The next lifecycle step is the explicit `Proposed → Accepted` decision only after the metadata-only closure head is exact-head green; merge authorization remains separate.
+Stacked Draft PR #110 resolves BPR-010 protocol-first and adds provider-neutral BAE-013 permutation evidence. Exact evidence head `38f7110e5da0c4a8abf04578b25b90e30aa83ed4` passed all 13 applicable workflows; BAE-013 proved permutation-invariant canonical Manifest/Image identity and fail-closed duplicate identity handling. `docs/acceptance/alpha3-aep-0011-bpr010-closure-review.md` records the repeated semantic re-review and finds no remaining semantic blocker. Final pre-decision exact head `cb1ab87bb6904b2468bae6e6df659cd7db9b0b60` then passed all 14 applicable workflow families, with duplicate Governance #766 also successful on the unchanged SHA. The protocol-maintainer lifecycle authorization therefore advances AEP-0011 to Accepted while keeping repository merge and downstream implementation sequencing separately governed.
 
 ### Other resource implementations
 - [ ] network fault proxy
