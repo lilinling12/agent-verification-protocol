@@ -162,9 +162,6 @@ class _Control:
     def seed_evaluator_private_state(self, sut: _SUT) -> None:
         del sut
 
-    def set_restore_temporal_eligibility(self, sut: _SUT, *, eligible: bool) -> None:
-        sut.restore_eligible = eligible
-
 
 class _Backend:
     def __init__(self, expected_bindings: Mapping[str, Any]) -> None:
@@ -217,45 +214,46 @@ def _plan() -> BrowserExecutionResidualPlan:
     )
 
 
+def _set_temporal_eligibility(sut: _SUT, eligible: bool) -> None:
+    sut.restore_eligible = eligible
+
+
+def _evaluator(
+    fixture: MaterializedBrowserFixture,
+    verifier: _Verifier,
+    plan: BrowserExecutionResidualPlan,
+) -> BrowserExecutionResidualTCKEvaluator:
+    expected = fixture.manifest["executionBindings"]
+    harness = BrowserConformanceHarness(_Backend(expected), fixture, verifier)
+    return BrowserExecutionResidualTCKEvaluator(
+        harness=harness,
+        fixture=fixture,
+        expected_execution_bindings=expected,
+        plan=plan,
+        set_temporal_eligibility=_set_temporal_eligibility,
+    )
+
+
 class BrowserExecutionResidualTCKEvaluatorTest(unittest.TestCase):
     def test_executes_binding_drift_interference_and_temporal_controls(self) -> None:
         fixture, verifier = _fixture()
-        expected = fixture.manifest["executionBindings"]
-        harness = BrowserConformanceHarness(_Backend(expected), fixture, verifier)
-        evaluator = BrowserExecutionResidualTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            expected_execution_bindings=expected,
-            plan=_plan(),
-        )
-
-        result = evaluator.evaluate(_case())
+        result = _evaluator(fixture, verifier, _plan()).evaluate(_case())
 
         self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_rejects_unbound_material_execution_input_before_execution(self) -> None:
         fixture, verifier = _fixture()
-        expected = fixture.manifest["executionBindings"]
-        harness = BrowserConformanceHarness(_Backend(expected), fixture, verifier)
         plan = BrowserExecutionResidualPlan(
             binding_references={"browser-build-artifact": "browserBuild"},
             cookie_temporal_policy="fail-closed-restore-eligibility",
             excluded_state_dispositions=_plan().excluded_state_dispositions,
         )
-        evaluator = BrowserExecutionResidualTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            expected_execution_bindings=expected,
-            plan=plan,
-        )
 
         with self.assertRaisesRegex(TCKAdapterError, "binding plan is incomplete"):
-            evaluator.evaluate(_case())
+            _evaluator(fixture, verifier, plan).evaluate(_case())
 
     def test_rejects_missing_excluded_state_disposition(self) -> None:
         fixture, verifier = _fixture()
-        expected = fixture.manifest["executionBindings"]
-        harness = BrowserConformanceHarness(_Backend(expected), fixture, verifier)
         dispositions = dict(_plan().excluded_state_dispositions)
         dispositions.pop("indexeddb-state")
         plan = BrowserExecutionResidualPlan(
@@ -263,15 +261,9 @@ class BrowserExecutionResidualTCKEvaluatorTest(unittest.TestCase):
             cookie_temporal_policy="fail-closed-restore-eligibility",
             excluded_state_dispositions=dispositions,
         )
-        evaluator = BrowserExecutionResidualTCKEvaluator(
-            harness=harness,
-            fixture=fixture,
-            expected_execution_bindings=expected,
-            plan=plan,
-        )
 
         with self.assertRaisesRegex(TCKAdapterError, "disposition plan is incomplete"):
-            evaluator.evaluate(_case())
+            _evaluator(fixture, verifier, plan).evaluate(_case())
 
 
 if __name__ == "__main__":
