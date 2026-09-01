@@ -1,0 +1,63 @@
+{
+  "fixtureRevision": "browser-state-excluded-state-execution-v0.1",
+  "originSlots": [
+    "primary"
+  ],
+  "selectedLocalStorageOriginSlots": [
+    "primary"
+  ],
+  "cookieDomains": [
+    "localhost"
+  ],
+  "executionBindings": {
+    "browserBuild": {
+      "identity": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "identityType": "content"
+    },
+    "storageIsolationPolicy": {
+      "identity": "fresh-context-excluded-state-proof-v1",
+      "identityType": "version"
+    }
+  },
+  "baseline": {
+    "localStorageByOriginSlot": {
+      "primary": [
+        {
+          "keyCodeUnits": [
+            115,
+            101,
+            108,
+            101,
+            99,
+            116,
+            101,
+            100
+          ],
+          "valueCodeUnits": [
+            98,
+            97,
+            115,
+            101,
+            108,
+            105,
+            110,
+            101
+          ]
+        }
+      ]
+    },
+    "cookies": [
+      {
+        "name": "selected",
+        "value": "baseline",
+        "domain": "localhost",
+        "hostOnly": true,
+        "path": "/",
+        "persistent": false,
+        "secure": false,
+        "httpOnly": false,
+        "sameSite": "Lax"
+      }
+    ]
+  }
+}

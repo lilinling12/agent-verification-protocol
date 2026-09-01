@@ -8,12 +8,42 @@ from .backend import (
     PlaywrightBrowserObserver,
     PlaywrightBrowserResource,
 )
+from .excluded_state import (
+    ExcludedStateInterferenceEvidence,
+    PlaywrightBrowserExcludedStateControl,
+    ServiceWorkerCacheObservation,
+)
+from .indexeddb import (
+    IndexedDBInterferenceEvidence,
+    IndexedDBObservation,
+    PlaywrightBrowserIndexedDBControl,
+)
+from .security import (
+    BrowserArtifactAuthorization,
+    BrowserArtifactLocator,
+    BrowserRetainedArtifact,
+    BrowserSubjectObservation,
+    PlaywrightBrowserSecurityControl,
+)
+from .settlement import PlaywrightBrowserMutationControl
 
 __all__ = [
+    "BrowserArtifactAuthorization",
+    "BrowserArtifactLocator",
+    "BrowserRetainedArtifact",
+    "BrowserSubjectObservation",
     "CookieProvenance",
+    "ExcludedStateInterferenceEvidence",
+    "IndexedDBInterferenceEvidence",
+    "IndexedDBObservation",
     "PlaywrightBrowserBackendHarness",
+    "PlaywrightBrowserExcludedStateControl",
     "PlaywrightBrowserFixtureControl",
     "PlaywrightBrowserIdentityVerifier",
+    "PlaywrightBrowserIndexedDBControl",
+    "PlaywrightBrowserMutationControl",
     "PlaywrightBrowserObserver",
     "PlaywrightBrowserResource",
+    "PlaywrightBrowserSecurityControl",
+    "ServiceWorkerCacheObservation",
 ]
