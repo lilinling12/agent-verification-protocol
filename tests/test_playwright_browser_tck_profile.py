@@ -517,24 +517,33 @@ class PlaywrightBrowserTCKProfileTest(unittest.TestCase):
             )
         )
 
-    def test_complete_eight_case_profile_executes_before_atomic_activation(self) -> None:
-        adapter = self._adapter()
-        self.assertEqual(BROWSER_MANDATORY_CASE_IDS, adapter.supported_case_ids)
-        self.assertEqual(8, len(adapter.supported_case_ids))
+    def test_complete_eight_case_profile_executes_through_composite_activation(self) -> None:
+        browser_adapter = self._adapter()
+        self.assertEqual(BROWSER_MANDATORY_CASE_IDS, browser_adapter.supported_case_ids)
+        self.assertEqual(8, len(browser_adapter.supported_case_ids))
+
+        default_case_ids = ReferenceConformanceAdapter().supported_case_ids
+        composite = ReferenceConformanceAdapter(browser_adapter=browser_adapter)
+        activated_case_ids = composite.supported_case_ids
+
+        self.assertEqual(
+            BROWSER_MANDATORY_CASE_IDS,
+            activated_case_ids - default_case_ids,
+            "real Browser activation must add exactly the mandatory eight cases",
+        )
+        self.assertEqual(
+            default_case_ids,
+            activated_case_ids - BROWSER_MANDATORY_CASE_IDS,
+            "real Browser activation must preserve every non-Browser owner",
+        )
 
         results = []
         for case_id in sorted(BROWSER_MANDATORY_CASE_IDS):
-            result = adapter.evaluate(_load_case(case_id))
+            result = composite.evaluate(_load_case(case_id))
             results.append(result)
             self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
         self.assertEqual(BROWSER_MANDATORY_CASE_IDS, {item.case_id for item in results})
-        self.assertTrue(
-            BROWSER_MANDATORY_CASE_IDS.isdisjoint(
-                ReferenceConformanceAdapter().supported_case_ids
-            ),
-            "complete Browser execution evidence must precede composite ownership activation",
-        )
 
 
 if __name__ == "__main__":
