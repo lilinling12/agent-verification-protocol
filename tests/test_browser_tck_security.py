@@ -117,35 +117,35 @@ def _case() -> dict[str, Any]:
     return yaml.safe_load(CASE.read_text(encoding="utf-8"))
 
 
-class BrowserSecurityTCKEvaluatorTest(unittest.TestCase):
-    def test_executes_visibility_and_artifact_authority_separation(self) -> None:
-        evaluator = BrowserSecurityTCKEvaluator(
-            sut=_SUT(),
-            evidence_control=_SecurityControl(),
+def _verify_private_authoritative(sut: _SUT) -> None:
+    if sut.private_cookie is None or sut.private_storage is None:
+        raise BrowserVerificationError(
+            "evaluator-private state was omitted from authoritative memory state"
         )
 
-        result = evaluator.evaluate(_case())
+
+def _evaluator(control: _SecurityControl) -> BrowserSecurityTCKEvaluator:
+    return BrowserSecurityTCKEvaluator(
+        sut=_SUT(),
+        evidence_control=control,
+        verify_private_state_authoritative=_verify_private_authoritative,
+    )
+
+
+class BrowserSecurityTCKEvaluatorTest(unittest.TestCase):
+    def test_executes_visibility_and_artifact_authority_separation(self) -> None:
+        result = _evaluator(_SecurityControl()).evaluate(_case())
 
         self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_rejects_actual_subject_private_state_leak(self) -> None:
-        evaluator = BrowserSecurityTCKEvaluator(
-            sut=_SUT(),
-            evidence_control=_LeakingControl(),
-        )
-
-        result = evaluator.evaluate(_case())
+        result = _evaluator(_LeakingControl()).evaluate(_case())
 
         self.assertIs(TCKStatus.FAIL, result.status)
         self.assertIn("Subject-visible Browser surface", result.detail)
 
     def test_rejects_locator_used_as_retrieval_authority(self) -> None:
-        evaluator = BrowserSecurityTCKEvaluator(
-            sut=_SUT(),
-            evidence_control=_DigestAuthorizesControl(),
-        )
-
-        result = evaluator.evaluate(_case())
+        result = _evaluator(_DigestAuthorizesControl()).evaluate(_case())
 
         self.assertIs(TCKStatus.FAIL, result.status)
         self.assertIn("retrieval authorization", result.detail)
@@ -153,13 +153,25 @@ class BrowserSecurityTCKEvaluatorTest(unittest.TestCase):
     def test_rejects_privileged_control_vector_drift(self) -> None:
         case = _case()
         case["vector"]["privilegedControl"].pop()
+
+        with self.assertRaisesRegex(TCKAdapterError, "privilegedControl changed"):
+            _evaluator(_SecurityControl()).evaluate(case)
+
+    def test_fails_if_private_state_is_not_authoritative(self) -> None:
+        def reject_authoritative(sut: _SUT) -> None:
+            del sut
+            raise BrowserVerificationError("private state is not authoritative")
+
         evaluator = BrowserSecurityTCKEvaluator(
             sut=_SUT(),
             evidence_control=_SecurityControl(),
+            verify_private_state_authoritative=reject_authoritative,
         )
 
-        with self.assertRaisesRegex(TCKAdapterError, "privilegedControl changed"):
-            evaluator.evaluate(case)
+        result = evaluator.evaluate(_case())
+
+        self.assertIs(TCKStatus.FAIL, result.status)
+        self.assertIn("not authoritative", result.detail)
 
 
 if __name__ == "__main__":
