@@ -5,11 +5,15 @@ new Subject automation API. Concrete implementations may use privileged browser
 controls internally, but the portable evaluator sees only an authorized Subject
 surface, independently observed evaluator-private values, and Artifact identity
 separated from retrieval authorization.
+
+A separate semantic probe verifies that evaluator-private state remains part of
+the authoritative Browser projection. Confidentiality therefore cannot be
+silently implemented by omitting selected state from authoritative identity.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
@@ -111,11 +115,15 @@ class BrowserSecurityTCKEvaluator:
         *,
         sut: BrowserSUT,
         evidence_control: BrowserSecurityEvidenceControl,
+        verify_private_state_authoritative: Callable[[BrowserSUT], None],
     ) -> None:
         if not isinstance(evidence_control, BrowserSecurityEvidenceControl):
             raise TCKAdapterError("Browser security evidence control contract is incomplete")
+        if not callable(verify_private_state_authoritative):
+            raise TCKAdapterError("Browser authoritative private-state probe must be callable")
         self._sut = sut
         self._control = evidence_control
+        self._verify_private_state_authoritative = verify_private_state_authoritative
         self._visibility = BrowserExecutedCapabilityEvaluator()
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
@@ -133,7 +141,7 @@ class BrowserSecurityTCKEvaluator:
         return TCKCaseResult(
             self.case_id,
             TCKStatus.PASS,
-            "Subject surface excludes evaluator-private state and privileged authority; Artifact identity remains distinct from retrieval authorization and redacted identity",
+            "evaluator-private state remains authoritative while Subject visibility and privileged authority stay separated; Artifact identity is not retrieval authorization",
         )
 
     def _case_parts(
@@ -217,6 +225,7 @@ class BrowserSecurityTCKEvaluator:
             raise BrowserVerificationError(
                 "evaluator-private Browser state is not independently observable"
             )
+        self._verify_private_state_authoritative(self._sut)
 
         subject = dict(self._control.observe_subject_surface(self._sut))
         self._visibility.require_subject_visibility(
@@ -224,9 +233,6 @@ class BrowserSecurityTCKEvaluator:
             authorized_surface={"value": authorized},
             evaluator_private_values=(private_cookie, private_storage),
         )
-        # Exact authorized-surface equality also rejects any extra launch/debug/
-        # lifecycle handle exposed by a broken implementation. The portable TCK
-        # need not know concrete handle classes or provider APIs.
 
     def _execute_artifact_authority(
         self,
