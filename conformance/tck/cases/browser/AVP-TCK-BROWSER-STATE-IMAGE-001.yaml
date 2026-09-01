@@ -28,7 +28,7 @@ vector:
         httpOnly: true
         sameSite: Default
       - name: remember
-        value: yes
+        value: "yes"
         domain: a.example
         hostOnly: false
         path: /

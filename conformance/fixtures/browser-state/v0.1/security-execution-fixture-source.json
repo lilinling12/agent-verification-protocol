@@ -1,0 +1,32 @@
+{
+  "fixtureRevision": "browser-state-security-execution-v0.1",
+  "originSlots": [
+    "subject",
+    "evaluatorPrivate"
+  ],
+  "selectedLocalStorageOriginSlots": [
+    "subject",
+    "evaluatorPrivate"
+  ],
+  "cookieDomains": [
+    "a.test",
+    "b.test"
+  ],
+  "executionBindings": {
+    "browserBuild": {
+      "identity": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "identityType": "content"
+    },
+    "securityVisibilityPolicy": {
+      "identity": "subject-public-observation-evaluator-private-state-v1",
+      "identityType": "version"
+    }
+  },
+  "baseline": {
+    "localStorageByOriginSlot": {
+      "subject": [],
+      "evaluatorPrivate": []
+    },
+    "cookies": []
+  }
+}
