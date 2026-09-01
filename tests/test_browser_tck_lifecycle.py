@@ -149,9 +149,6 @@ class _Control:
     def seed_evaluator_private_state(self, sut: _SUT) -> None:
         del sut
 
-    def set_restore_temporal_eligibility(self, sut: _SUT, *, eligible: bool) -> None:
-        sut.restore_eligible = eligible
-
 
 class _Backend:
     def __init__(self) -> None:
@@ -190,20 +187,26 @@ def _case() -> dict[str, Any]:
     return yaml.safe_load(CASE.read_text(encoding="utf-8"))
 
 
+def _set_temporal_eligibility(sut: _SUT, eligible: bool) -> None:
+    sut.restore_eligible = eligible
+
+
 class BrowserSettlementLifecycleTCKEvaluatorTest(unittest.TestCase):
-    def test_executes_positive_settlement_and_lifecycle_negative_controls(self) -> None:
+    def _evaluator(self) -> BrowserSettlementLifecycleTCKEvaluator:
         fixture, verifier = _fixture()
         harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserSettlementLifecycleTCKEvaluator(harness)
+        return BrowserSettlementLifecycleTCKEvaluator(
+            harness,
+            set_temporal_eligibility=_set_temporal_eligibility,
+        )
 
-        result = evaluator.evaluate(_case())
+    def test_executes_positive_settlement_and_lifecycle_negative_controls(self) -> None:
+        result = self._evaluator().evaluate(_case())
 
         self.assertIs(TCKStatus.PASS, result.status, result.detail)
 
     def test_rejects_restore_fidelity_contract_drift_before_execution(self) -> None:
-        fixture, verifier = _fixture()
-        harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserSettlementLifecycleTCKEvaluator(harness)
+        evaluator = self._evaluator()
         case = _case()
         case["expect"]["successfulRestoreFidelity"] = "EXACT"
 
@@ -211,9 +214,7 @@ class BrowserSettlementLifecycleTCKEvaluatorTest(unittest.TestCase):
             evaluator.evaluate(case)
 
     def test_rejects_missing_negative_control_before_execution(self) -> None:
-        fixture, verifier = _fixture()
-        harness = BrowserConformanceHarness(_Backend(), fixture, verifier)
-        evaluator = BrowserSettlementLifecycleTCKEvaluator(harness)
+        evaluator = self._evaluator()
         case = _case()
         case["vector"]["negativeControls"].pop()
 
