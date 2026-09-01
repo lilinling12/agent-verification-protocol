@@ -1,0 +1,72 @@
+name: Browser Reference
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-reference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright-chromium:
+    name: Playwright Chromium / Browser Provider / Python 3.13
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AVP_PLAYWRIGHT_BROWSER: chromium
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/ci.txt
+      - name: Install constrained build tooling
+        run: python -m pip install -c constraints/ci.txt build==1.5.0
+      - name: Build Browser-capable wheel
+        run: python -m build --wheel --outdir dist-browser
+      - name: Install wheel with optional Browser implementation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(dist-browser/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "expected exactly one Browser test wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          python -m venv .browser-venv
+          .browser-venv/bin/python -m pip install -c constraints/ci.txt "${wheels[0]}[browser]"
+          .browser-venv/bin/python -m pip check
+      - name: Install controlled Chromium build
+        run: .browser-venv/bin/python -m playwright install chromium
+      - name: Bind reserved fixture hosts to local test server
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '127.0.0.1 a.test b.test sub.a.test' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts a.test b.test sub.a.test
+      - name: Verify Playwright implementation dependency
+        run: |
+          .browser-venv/bin/python - <<'PY'
+          from importlib.metadata import version
+          assert version("playwright") == "1.62.0"
+          print("Playwright integration dependency OK: 1.62.0")
+          PY
+      - name: Execute real Playwright Browser provider foundation suite
+        shell: bash
+        run: >-
+          timeout --signal=TERM --kill-after=10s 180s
+          .browser-venv/bin/python -m unittest discover
+          -s tests -p 'test_playwright_browser*.py' -v
