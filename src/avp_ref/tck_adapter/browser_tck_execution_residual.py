@@ -10,7 +10,9 @@ behaviorally tested through the privileged fixture-control seam.
 
 The plan is not conformance evidence by itself: execution-binding drift,
 excluded-state interference, and temporal ineligibility are all induced and must
-be rejected by the actual Browser harness path.
+be rejected by the actual Browser harness path. Temporal test-driver mechanics
+are injected as a semantic callable so portable code never names a private
+provider-control API.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from .browser_harness import (
     BrowserConformanceHarness,
     BrowserHarnessError,
     BrowserSettlementLedger,
+    BrowserSUT,
     BrowserVerificationError,
     MaterializedBrowserFixture,
 )
@@ -71,14 +74,7 @@ def _freeze_mapping(value: Mapping[str, str]) -> Mapping[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class BrowserExecutionResidualPlan:
-    """Materialized wiring from normative input classes to execution evidence.
-
-    ``binding_references`` maps material input classes to references already
-    present in BrowserStateManifest.executionBindings. Cookie temporal behavior
-    is intentionally not forced into a portable Manifest key: when its material
-    effect cannot be reconstructed, the mandatory profile uses fail-closed
-    restore eligibility instead.
-    """
+    """Materialized wiring from normative input classes to execution evidence."""
 
     binding_references: Mapping[str, str]
     cookie_temporal_policy: str
@@ -175,11 +171,15 @@ class BrowserExecutionResidualTCKEvaluator:
         fixture: MaterializedBrowserFixture,
         expected_execution_bindings: Mapping[str, Any],
         plan: BrowserExecutionResidualPlan,
+        set_temporal_eligibility: Callable[[BrowserSUT, bool], None],
     ) -> None:
+        if not callable(set_temporal_eligibility):
+            raise TCKAdapterError("Browser temporal eligibility control must be callable")
         self._harness = harness
         self._fixture = fixture
         self._expected_bindings = _plain_bindings(expected_execution_bindings)
         self._plan = plan
+        self._set_temporal_eligibility = set_temporal_eligibility
 
     def evaluate(self, case: Mapping[str, Any]) -> TCKCaseResult:
         vector, expect = self._case_parts(case)
@@ -311,11 +311,7 @@ class BrowserExecutionResidualTCKEvaluator:
                     f"material input {material_input} is not bound to exact upstream execution identity"
                 )
 
-    def _execute_binding_drift_controls(self, sut: Any) -> None:
-        # Both "product-label-only" substitution and arbitrary runtime drift are
-        # behaviorally the same security property: a value that differs from the
-        # immutable upstream binding must be detected before authoritative state
-        # can be accepted. No provider/product names are needed in portable code.
+    def _execute_binding_drift_controls(self, sut: BrowserSUT) -> None:
         reference = self._plan.binding_references["browser-build-artifact"]
         original = self._expected_bindings[reference]["identity"]
         self._harness.fixture_control.set_execution_binding(
@@ -338,13 +334,13 @@ class BrowserExecutionResidualTCKEvaluator:
                 reference,
                 original,
             )
-
-        # A missing material binding is rejected by plan validation before
-        # execution. Reconfirm the restored binding is accepted after the drift
-        # control so fail-closed behavior is not merely permanent poisoning.
         self._harness.authoritative_projection(sut, _settled())
 
-    def _execute_excluded_state_control(self, sut: Any, baseline_digest: str) -> None:
+    def _execute_excluded_state_control(
+        self,
+        sut: BrowserSUT,
+        baseline_digest: str,
+    ) -> None:
         self._harness.fixture_control.set_excluded_state_interference(
             sut,
             interfering=True,
@@ -365,18 +361,9 @@ class BrowserExecutionResidualTCKEvaluator:
                 "excluded-state control unexpectedly changed selected Browser identity"
             )
 
-    def _execute_temporal_policy_control(self, sut: Any) -> None:
+    def _execute_temporal_policy_control(self, sut: BrowserSUT) -> None:
         snapshot = self._harness.verified_snapshot(sut, _settled())
-        setter = getattr(
-            self._harness.fixture_control,
-            "set_restore_temporal_eligibility",
-            None,
-        )
-        if setter is None:
-            raise BrowserVerificationError(
-                "backend lacks controlled temporal-ineligibility proof seam"
-            )
-        setter(sut, eligible=False)
+        self._set_temporal_eligibility(sut, False)
         try:
             _require_rejected(
                 lambda: self._harness.verified_restore(
@@ -388,4 +375,4 @@ class BrowserExecutionResidualTCKEvaluator:
                 "cookie-temporal-policy-fail-closed",
             )
         finally:
-            setter(sut, eligible=True)
+            self._set_temporal_eligibility(sut, True)
