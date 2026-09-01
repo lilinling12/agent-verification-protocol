@@ -34,6 +34,9 @@ conformance = [
   "opentelemetry-api>=1.30,<2",
   "opentelemetry-sdk>=1.30,<2",
 ]
+browser = [
+  "playwright>=1.62,<1.63",
+]
 postgresql = [
   "psycopg[binary]>=3.3,<4",
 ]
