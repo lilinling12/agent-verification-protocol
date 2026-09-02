@@ -131,9 +131,9 @@ These checked Browser items therefore record that the reviewed authority, confor
 
 ### Network Control resource profile
 - [x] AEP-0012 Draft problem/scope and standards analysis
-- [ ] network-control portability and Proposed-readiness audit
-- [ ] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
-- [ ] reconcile AEP-0012 and complete Draft → Proposed readiness audit
+- [x] network-control portability and Proposed-readiness audit
+- [x] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
+- [x] reconcile AEP-0012 and complete Draft → Proposed readiness audit
 - [ ] AEP-0012 status advanced to Proposed for formal protocol review
 - [ ] complete formal Proposed protocol review
 - [ ] resolve acceptance blockers and record explicit AEP-0012 Proposed → Accepted decision
@@ -144,7 +144,15 @@ These checked Browser items therefore record that the reviewed authority, confor
 - [ ] controlled network-fault reference implementation against the portable TCK
 - [ ] cross-mechanism portability acceptance evidence if required by reviewed protocol semantics
 
-The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. PR #130 adopted the reviewed AEP-0012 Draft problem/scope and standards/interoperability baseline into `main` at exact commit `7f7f613c50520efb2b553d65d4bb85c0e777dc40`; exact-main CI #823 (`33609386257`), Relational Parity #216 (`33609386265`), and Browser Reference #89 (`33609386244`) all passed. This closes only the first Draft-baseline roadmap item: AEP-0012 remains **Draft**, NC-BR-001..NC-BR-012 remain open, and no Network Control Spec/Schema/TCK/runtime/provider/release authority is implied. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel facilities, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
+The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. PR #130 adopted the reviewed AEP-0012 Draft problem/scope and standards/interoperability baseline into `main` at exact commit `7f7f613c50520efb2b553d65d4bb85c0e777dc40`; exact-main CI #823 (`33609386257`), Relational Parity #216 (`33609386265`), and Browser Reference #89 (`33609386244`) all passed.
+
+PR #132 then adopted the implementation-independent Network Control portability audit into `main` at exact commit `74b442a0ffd22f4da79b5d4abfd339d694fc2843`. The audit resolved NC-BR-001..NC-BR-012 as explicit Draft design decisions for Proposed-readiness while preserving AEP-0009/Environment authority, provider neutrality, Subject/Evaluator/Control separation, deterministic fresh-connection semantics, and the prohibition on provider-first protocol design.
+
+PR #133 reconciled those portability decisions into AEP-0012 and added the Draft → Proposed readiness audit. Focused review `5088528789` / `PRR_kwDOT09qic8AAAABL0zJlQ` at exact PR head `fe7e356ae64faa0b8b69e9b0ef64c345f3793916` concluded `REVIEW-CLOSED — PROPOSED-ELIGIBILITY EVIDENCE IS COHERENT FOR THIS EXACT HEAD`. CI #829 (`33619765040`), Governance #966/#967/#968/#969, Relational Parity #222 (`33619765006`), and Browser Reference #95 (`33619765014`) succeeded, with zero unresolved review threads. After explicit squash authorization, PR #133 was adopted into `main` at exact commit `2632935bef065b4d38e88f6df6b8cf0d620bfb3b`.
+
+Exact-main validation on `2632935bef065b4d38e88f6df6b8cf0d620bfb3b` then passed CI #830 (`33667291305`), Relational Parity #223 (`33667290799`), and Browser Reference #96 (`33667291258`). `docs/acceptance/alpha3-network-control-readiness-main-adoption.md` records the reviewed and main-adopted evidence.
+
+These checked readiness items record only that the portability audit, NC-BR design-blocker closure, and reconciled Proposed-readiness evidence are now present and validated on `main`. AEP-0012 remains **Draft, not Proposed**. The next lifecycle item requires a separate explicit protocol-maintainer Draft → Proposed decision. No Network Control normative Spec/Schema/TCK/harness/provider/reference implementation or release/publication authority is implied. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel/firewall/routing facilities, cloud controls, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
 
 ### Other resource implementations
 - [ ] virtual clock service
