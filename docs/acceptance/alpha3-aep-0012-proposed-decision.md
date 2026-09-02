@@ -1,48 +1,41 @@
-# AEP-0012 Draft → Proposed Lifecycle Decision Preparation
+# AEP-0012 Draft → Proposed Lifecycle Decision
 
-Status: **DECISION PENDING — PROPOSED ELIGIBLE, NOT YET AUTHORIZED**
+Status: **AUTHORIZED — PROPOSED LIFECYCLE CANDIDATE, MAIN ADOPTION PENDING**
 
 Decision target: `rfcs/AEP-0012-network-control-resource-profile.md`
 
-Decision-preparation baseline: `main@48d1bae70ec95c9208fc4e71786823b64a1e7495`
+Decision baseline: `main@48d1bae70ec95c9208fc4e71786823b64a1e7495`
 
-Prepared: 2026-09-03
+Authorized: 2026-09-03
 
-## Purpose
+Preparation review: `5094125418`
 
-This record prepares the separately governed protocol-maintainer decision on whether
-AEP-0012 — Network Control Resource Profile v0.1 should advance from `Draft` to
-`Proposed`.
+## Decision
 
-It exists to make the lifecycle decision auditable before any status mutation is
-performed. It does **not** itself change AEP-0012's lifecycle state. Until an
-explicit protocol-maintainer authorization is recorded and the corresponding
-status change is separately reviewed and adopted into `main`, AEP-0012 remains
-**Draft**.
+The protocol maintainer explicitly authorized:
 
-The decision under consideration is intentionally narrow:
+> **AEP-0012 Draft → Proposed**
 
-> **Advance AEP-0012 from `Draft` to `Proposed` so the reconciled Network Control
-> Resource design can enter formal protocol review.**
+The authorization permits the lifecycle-only mutation required to place AEP-0012
+into `Proposed` for formal protocol review.
 
-`Proposed` means only that the design is sufficiently complete for formal protocol
-review. It does not mean the design is Accepted, normative, released, assigned to a
-release, or approved for provider/reference-runtime implementation.
+It does **not** authorize this PR's merge. `main` remains at the pre-transition
+baseline until PR #135 is separately reviewed, made merge-eligible under repository
+governance, and receives a separate explicit squash-merge authorization.
+
+`Proposed` means that the reconciled Network Control design is sufficiently complete
+for formal protocol review. It does not mean the design is Accepted, Final,
+normative, released, or approved for downstream provider/reference implementation.
 
 ## Governance basis
 
-`GOVERNANCE.md` defines the relevant lifecycle states:
+`GOVERNANCE.md` defines:
 
 - `Draft` — active design work; not normative;
 - `Proposed` — sufficiently complete for protocol review;
 - `Accepted` — approved direction; implementation may proceed;
 - `Final` — normative text and required conformance coverage are merged and
   released.
-
-`GOVERNANCE.md` also requires a normative decision to have a recorded maintainer
-decision in proposal/PR history. The current Network Control ROADMAP is more
-specific: after the main-adopted readiness baseline, the next lifecycle item
-requires a **separate explicit protocol-maintainer Draft → Proposed decision**.
 
 The repository authority direction remains:
 
@@ -54,121 +47,87 @@ AEP lifecycle decision
   -> Reference implementation
 ```
 
-A lifecycle transition must not invert that direction. In particular, Linux
-`tc/netem`, Toxiproxy, firewall/routing rules, Envoy, Istio/service-mesh objects,
-cloud network-control APIs, native socket errors, provider object identifiers, or a
-reference-runtime adapter cannot establish portable Network Control semantics by
-precedent.
+The lifecycle transition must not invert that authority. Linux `tc/netem`,
+Toxiproxy, firewall/routing mechanisms, Envoy, Istio/service-mesh objects, cloud
+network-control APIs, native socket errors, provider handles, and future reference
+adapters remain implementation/conformance evidence only.
 
-## Main-adopted evidence chain
+## Main-adopted readiness evidence
 
-### 1. Draft problem/scope and standards baseline
+The decision rests on the already adopted Network Control evidence chain.
 
-PR #130 established AEP-0012's Network Control problem/scope and
-standards/interoperability-analysis baseline.
+### PR #130 — Draft problem/scope baseline
 
-Authorized squash merge:
+Main adoption:
 
 `7f7f613c50520efb2b553d65d4bb85c0e777dc40`
 
 Exact-main validation:
 
-- CI #823 / run `33609386257` — **SUCCESS**;
-- Relational Parity #216 / run `33609386265` — **SUCCESS**;
-- Browser Reference #89 / run `33609386244` — **SUCCESS**.
+- CI #823 / `33609386257` — **SUCCESS**;
+- Relational Parity #216 / `33609386265` — **SUCCESS**;
+- Browser Reference #89 / `33609386244` — **SUCCESS**.
 
-That work deliberately left NC-BR-001..NC-BR-012 open and AEP-0012 in `Draft`.
+### PR #132 — portability audit
 
-### 2. Implementation-independent portability audit
-
-PR #132 adopted the Network Control portability audit without changing AEP
-lifecycle, ROADMAP status, normative Spec/Schema/TCK, or implementation code.
-
-Authorized squash merge:
+Main adoption:
 
 `74b442a0ffd22f4da79b5d4abfd339d694fc2843`
 
 Exact-main validation:
 
-- CI #828 / run `33618394305` — **SUCCESS**;
-- Relational Parity #221 / run `33618394375` — **SUCCESS**;
-- Browser Reference #94 / run `33618394321` — **SUCCESS**.
+- CI #828 / `33618394305` — **SUCCESS**;
+- Relational Parity #221 / `33618394375` — **SUCCESS**;
+- Browser Reference #94 / `33618394321` — **SUCCESS**.
 
-The audit resolved NC-BR-001..NC-BR-012 into explicit reconciliation decisions,
-including the controlled-TCP-path boundary, deterministic fresh-connection exchange,
-Environment-owned activation authority, independent data-plane settlement,
-mechanism-neutral transport cut, clear/recovery semantics, conservative reset,
-provider-neutral identity, security boundaries, and provider/language-neutral
-execution-sensitive conformance direction.
+The audit resolved NC-BR-001..NC-BR-012 into explicit implementation-independent
+Draft design choices while preserving AEP-0009/Environment authority and rejecting
+provider-first protocol design.
 
-The audit intentionally did not make those decisions normative or advance the AEP.
-
-### 3. AEP reconciliation and Proposed-readiness audit
-
-PR #133 reconciled the portability decisions into AEP-0012 and added the dedicated
-Draft → Proposed readiness audit while keeping `Status: Draft`.
+### PR #133 — AEP reconciliation and Proposed-readiness
 
 Reviewed exact head:
 
 `fe7e356ae64faa0b8b69e9b0ef64c345f3793916`
 
-Focused review `5088528789` / `PRR_kwDOT09qic8AAAABL0zJlQ` concluded:
+Focused review `5088528789` /
+`PRR_kwDOT09qic8AAAABL0zJlQ` concluded:
 
 **REVIEW-CLOSED — PROPOSED-ELIGIBILITY EVIDENCE IS COHERENT FOR THIS EXACT HEAD.**
 
-Exact-head validation included:
+Exact-head gates included:
 
-- Governance #966 / run `33619764986` — **SUCCESS**;
-- CI #829 / run `33619765040` — **SUCCESS**;
-- Relational Parity #222 / run `33619765006` — **SUCCESS**;
-- Browser Reference #95 / run `33619765014` — **SUCCESS**;
-- Ready/metadata Governance #967 / run `33620341311` — **SUCCESS**;
-- Ready-state Governance #968 / run `33666655550` — **SUCCESS**;
-- final metadata Governance #969 / run `33667247699` — **SUCCESS**;
-- unresolved inline review threads — none.
+- Governance #966 / `33619764986` — **SUCCESS**;
+- CI #829 / `33619765040` — **SUCCESS**;
+- Relational Parity #222 / `33619765006` — **SUCCESS**;
+- Browser Reference #95 / `33619765014` — **SUCCESS**;
+- Governance #967/#968/#969 — **SUCCESS**;
+- unresolved review threads — zero.
 
 After explicit squash authorization, PR #133 was adopted into `main` at:
 
 `2632935bef065b4d38e88f6df6b8cf0d620bfb3b`
 
-Exact-main validation:
+Exact-main CI #830, Relational Parity #223, and Browser Reference #96 all passed.
 
-- CI #830 / run `33667291305` — **SUCCESS**;
-- Relational Parity #223 / run `33667290799` — **SUCCESS**;
-- Browser Reference #96 / run `33667291258` — **SUCCESS**.
-
-The dedicated readiness audit concludes:
+The readiness audit concluded:
 
 **AEP-0012 IS READY TO MOVE FROM Draft TO Proposed FOR FORMAL PROTOCOL REVIEW.**
 
-That audit explicitly states that the conclusion is eligibility evidence only and
-that AEP-0012 remains Draft until a separate explicit protocol-maintainer lifecycle
-decision records the transition.
-
-### 4. Proposed-readiness main-adoption reconciliation
-
-PR #134 recorded the main-adopted readiness baseline and reconciled ROADMAP evidence
-without changing AEP-0012 or any downstream normative/runtime surface.
+### PR #134 — readiness main-adoption reconciliation
 
 Reviewed exact head:
 
 `6f770aff64d4f7ef48f385ba04efc0bb4d723aeb`
 
-Focused review `5093728530` / `PRR_kwDOT09qic8AAAABL5whEg` concluded:
+Focused review `5093728530` /
+`PRR_kwDOT09qic8AAAABL5whEg` concluded:
 
 **REVIEW-CLOSED — NETWORK CONTROL READINESS MAIN-ADOPTION RECONCILIATION IS COHERENT FOR THIS EXACT HEAD.**
 
-Exact-head validation:
-
-- Governance #970 / run `33668554914` — **SUCCESS**;
-- CI #831 / run `33668554918` — **SUCCESS**;
-- Release Validation #114 / run `33668554915` — **SUCCESS**;
-- Relational Parity #224 / run `33668554913` — **SUCCESS**;
-- Browser Reference #97 / run `33668554907` — **SUCCESS**;
-- metadata Governance #971 / run `33669317437` — **SUCCESS**;
-- Ready-state Governance #972 / run `33669977869` — **SUCCESS**;
-- final metadata Governance #973 / run `33670361166` — **SUCCESS**;
-- unresolved inline review threads — none.
+Exact-head gates included Governance #970/#971/#972/#973, CI #831, Release
+Validation #114, Relational Parity #224, and Browser Reference #97 — all
+**SUCCESS**, with zero unresolved threads.
 
 After explicit squash authorization, PR #134 was adopted into `main` at:
 
@@ -176,154 +135,104 @@ After explicit squash authorization, PR #134 was adopted into `main` at:
 
 Exact-main validation:
 
-- CI #832 / run `33670402185` — **SUCCESS**;
-- Relational Parity #225 / run `33670402249` — **SUCCESS**;
-- Browser Reference #98 / run `33670402306` — **SUCCESS**.
+- CI #832 / `33670402185` — **SUCCESS**;
+- Relational Parity #225 / `33670402249` — **SUCCESS**;
+- Browser Reference #98 / `33670402306` — **SUCCESS**.
 
-The current `main` baseline therefore contains the complete reviewed
-Proposed-readiness evidence while AEP-0012 still remains `Draft`.
+## Lifecycle-decision preparation closure
 
-## Draft → Proposed eligibility assessment
+PR #135 first created a preparation-only candidate that changed exactly this
+decision record and left AEP-0012/ROADMAP untouched.
 
-| Criterion | Result | Evidence |
-|---|---|---|
-| Written interoperability problem and bounded scope | PASS | AEP-0012 + PR #130 |
-| Parent Environment/Fabric authority composition is explicit | PASS | AEP-0012 + AEP-0009 / `AVP-ENVIRONMENT-010` reuse |
-| Portable controlled-path resource boundary is reviewable | PASS | PR #132 portability audit + reconciled AEP |
-| Mandatory base behavior is deliberately narrow | PASS | baseline forwarding + activation + transport cut + clear/recovery |
-| Pre-trigger/no-early-activation semantics are explicit | PASS | Environment-governed occurrence composition |
-| Activation settlement cannot self-certify | PASS | independent privileged data-plane fresh-attempt predicate |
-| Transport-cut outcome is provider-neutral | PASS | no required RST/refusal/timeout/error/packet manifestation |
-| Established connections are bounded conservatively | PASS | no base disposition guarantee |
-| Clear/recovery/no-later-reactivation semantics are explicit | PASS | independent fresh-exchange recovery evidence |
-| Latency and probabilistic loss are not under-specified in base | PASS | explicitly deferred to separately governed profiles |
-| DNS/TLS/HTTP/application/UDP layering is separated | PASS | AEP-0012 deferred/separated semantics |
-| Reset avoids false live-network snapshot claims | PASS | independently verified fault-free baseline only |
-| Execution identity is provider-neutral | PASS | provider-native handles excluded from portable identity |
-| Subject / Evaluator / privileged Control separation is explicit | PASS | schedule secrecy + credential/control isolation |
-| Failure/Validity and Task Verdict remain separated | PASS | infrastructure/control failures do not become task failure by default |
-| Executable implementation-independent conformance strategy exists | PASS | deterministic fixture + real behavior + negative adapters |
-| Draft blockers NC-BR-001..NC-BR-012 are resolved | PASS | readiness audit blocker-disposition table |
-| Cross-mechanism evidence burden is bounded | PASS | AVP acceptance/reference evidence, not universal third-party requirement |
-| Alternatives and compatibility impact are documented | PASS | AEP alternatives + additive profile boundary |
-| Transitional provider-first architecture is rejected | PASS | AEP/readiness audit + OSS engineering policy |
-| Release/version assignment is intentionally deferred | PASS | release state remains `development` / `0.3.1.dev0` |
+Final preparation exact head:
 
-No remaining Draft finding requires downstream Schema, TCK, harness, or provider
-code to invent portable semantics merely to make AEP-0012 reviewable.
+`a85fb6b7e040f456936f1401d13416ef1845c649`
 
-## Semantics carried into formal Proposed review
+Preparation exact-head gates:
 
-If the lifecycle transition is later explicitly authorized and adopted, formal
-protocol review should challenge — not silently assume — the following reviewed
-Draft choices:
+- Governance #975 / `33672894491` — **SUCCESS**;
+- CI #834 / `33672894494` — **SUCCESS**;
+- Relational Parity #227 / `33672894496` — **SUCCESS**;
+- Browser Reference #100 / `33672894502` — **SUCCESS**.
 
-1. one independently owned controlled TCP path between declared Subject-side and
-   upstream-side endpoint boundaries as the smallest mandatory resource boundary;
-2. behavioral path-coverage proof rather than provider configuration presence;
-3. deterministic fresh-connection request/response exchange as the base observable;
-4. Environment ownership of fault identity, target, activation condition,
-   occurrence counting, clear behavior, and future-schedule secrecy;
-5. qualifying pre-trigger Subject traffic remaining admissible and unfaulted before
-   the declared occurrence;
-6. independent privileged data-plane activation settlement after the Environment
-   condition, with provider API success/metadata/self-report/sleep insufficient;
-7. `transport cut` as the mechanism-neutral mandatory active behavior;
-8. no mandatory base disposition for connections established before activation;
-9. privileged clear plus independently observed fresh-connection recovery, with no
-   silent reactivation of the cleared occurrence;
-10. deferral of exact latency and probabilistic packet loss until portable timing
-    and statistical models exist;
-11. strict separation of DNS, TLS, HTTP/application, UDP, and transport semantics;
-12. reset as verified fault-free baseline rather than snapshot/restore of live TCP,
-    kernel queues, proxy buffers, NAT/conntrack, resolver caches, or provider state;
-13. provider-neutral execution identity with provider-native handles remaining
-    diagnostics/evidence only;
-14. execution-sensitive negative conformance including bypass, early activation,
-    false settlement, false recovery, schedule leakage, stale/released use, and
-    leaked-fault cleanup detection;
-15. cross-mechanism AVP evidence as a portability protection where needed, without
-    requiring every third-party conforming implementation to support multiple
-    mechanisms.
+Focused preparation review `5094125418` concluded:
 
-These items are **review inputs**, not Accepted conclusions. Formal Proposed review
-may retain, narrow, amend, or reject them.
+**PREPARATION REVIEW CLOSED — AEP-0012 DRAFT → PROPOSED DECISION PREPARATION IS COHERENT FOR THIS EXACT HEAD.**
 
-## Open questions for formal Proposed review
+Unresolved inline review threads at preparation closure: zero.
 
-The readiness audit intentionally carries the following challenge questions into
-formal review:
+Only after that closure did the protocol maintainer provide the explicit
+`AEP-0012 Draft → Proposed` authorization recorded by this document.
 
-1. Is controlled TCP plus fresh-connection exchange the correct smallest mandatory
-   v0.1 boundary?
-2. Is `transport cut` the best provider-neutral vocabulary?
-3. Is excluding established-connection disposition appropriately conservative?
-4. Is the independent fresh-attempt activation-settlement predicate strong enough
-   without standardizing native timeout/error behavior?
-5. Should recovery require a normative bounded count of successful exchanges, or
-   may the TCK encode the already-defined behavioral recovery predicate?
-6. Is deferring latency and probabilistic loss the correct first-profile tradeoff?
-7. Is DNS/TLS/HTTP/UDP layer separation sufficiently strict?
-8. What is the smallest endpoint/path declaration grammar that proves coverage
-   without leaking private topology?
-9. At which later lifecycle gate should cross-mechanism evidence become mandatory
-   when the portability claim depends on mechanism independence?
-10. Does Core `QUIESCING` / Environment activation / cleanup composition require
-    additional normative constraints during formal review?
+## Authorized lifecycle-only mutation
 
-A question becoming a semantic blocker during Proposed review must be resolved in
-AEP-0012 before any later `Proposed -> Accepted` decision.
+The authorization permits only the following candidate changes:
 
-## Decision proposition
+1. `rfcs/AEP-0012-network-control-resource-profile.md`
+   - `Status: Draft` → `Status: Proposed`;
+   - add this lifecycle-decision link;
+   - update stale Draft-only lifecycle wording required to make the document
+     internally consistent;
+   - do **not** change reviewed Network Control portable semantics.
+2. `ROADMAP.md`
+   - mark only `AEP-0012 status advanced to Proposed for formal protocol review`
+     complete;
+   - replace the now-stale statement that a Draft → Proposed decision is still
+     pending with the recorded lifecycle authorization and candidate boundary;
+   - keep formal Proposed review and every downstream milestone incomplete.
+3. this decision record
+   - record the explicit authorization, preparation evidence, and non-authorization
+     boundary.
 
-The lifecycle proposition awaiting explicit protocol-maintainer authorization is:
+No other file or authority surface belongs in this lifecycle work unit.
 
-> **Advance AEP-0012 from `Draft` to `Proposed` for formal protocol review.**
+## Semantic boundary retained for Proposed review
 
-If explicitly authorized, the status-mutation work must remain limited to:
+The lifecycle transition does not silently accept the reviewed Draft choices.
+Formal Proposed review must still challenge the candidate semantics, including:
 
-1. changing AEP-0012 lifecycle metadata and stale Draft-only lifecycle wording to
-   `Proposed` without altering the reviewed portable design semantics;
-2. updating `ROADMAP.md` to mark only
-   `AEP-0012 status advanced to Proposed for formal protocol review` complete and
-   to record exact decision evidence;
-3. making this decision record effective, with the exact authorization and reviewed
-   status-mutation head attributable in PR history;
-4. running all applicable exact-head CI/Governance/Release Validation/Relational
-   Parity/Browser Reference gates;
-5. performing a focused exact-head lifecycle review proving the delta is
-   lifecycle/evidence-only and does not smuggle semantic changes into the status
-   transition;
-6. requiring a **separate explicit squash-merge authorization** before the status
-   transition is adopted into `main`;
-7. requiring exact-main post-merge validation before the lifecycle work unit is
-   considered fully closed.
+- controlled TCP path and fresh-connection exchange as the smallest mandatory base
+  boundary;
+- behavioral path-coverage proof rather than provider configuration presence;
+- Environment ownership of fault identity/target/activation condition/clear;
+- no-early-activation behavior for qualifying pre-trigger traffic;
+- independent privileged data-plane activation settlement;
+- mechanism-neutral `transport cut`;
+- no base guarantee for pre-existing connections;
+- independent clear/recovery settlement and no silent reactivation;
+- deferral of exact latency and probabilistic loss;
+- separation of DNS/TLS/HTTP/application/UDP semantics;
+- reset as verified fault-free baseline rather than live-network snapshot/restore;
+- provider-neutral execution identity;
+- schedule secrecy and Subject/Evaluator/privileged-Control separation;
+- execution-sensitive provider/language-neutral negative conformance;
+- cross-mechanism AVP evidence where portability depends on mechanism independence.
 
-No semantic rewrite should be bundled into the lifecycle status mutation. If
-review discovers a semantic change is necessary, that change belongs to the later
-formal Proposed-review work and invalidates any assumption that the transition is
-metadata-only.
+Formal review may retain, narrow, amend, or reject these choices. A semantic change
+found necessary there must be reviewed as an AEP semantic amendment; it cannot be
+smuggled into the lifecycle-only transition.
 
-## Security, implementation, and release boundary
+## Security and provider boundary
 
-Preparing or later authorizing Draft → Proposed does not grant Subject authority or
-provider-control authority and does not weaken existing security boundaries.
+This lifecycle decision does not weaken existing trust boundaries:
 
-In particular:
-
-- future fault schedules remain Evaluator/Control-private unless a separately
-  governed contract exposes them;
-- provider/admin credentials and privileged fault controls remain outside Subject
+- future fault schedules remain Evaluator/Control-private unless separately
+  governed;
+- provider/admin credentials and privileged controls remain outside Subject
   context;
-- payload interception or TLS interception is not implied by Network Control;
-- provider-native topology/handles/errors remain non-portable diagnostics;
-- a speculative `BaseNetworkBackend`, catch-all adapter, provider/plugin registry,
-  or broad `supports_*` capability bag remains unjustified;
+- payload/TLS interception is not implied by Network Control;
+- provider-native topology, handles, errors, and object IDs remain non-portable
+  diagnostics/evidence;
 - portable TCK expectations must not branch on provider/platform names;
-- provider dependencies must remain optional if/when reference implementations are
-  later authorized.
+- speculative `BaseNetworkBackend`, catch-all adapter, provider/plugin registry, or
+  broad `supports_*` capability bags remain unjustified.
 
-Release provenance at the preparation baseline remains:
+Failure of Network Control infrastructure/control remains infrastructure/Validity
+information rather than Agent Task Verdict failure by default.
+
+## Release boundary
+
+Release provenance remains unchanged:
 
 ```text
 mode: development
@@ -332,36 +241,39 @@ sourceVersion: 0.3.1.dev0
 nextRelease: 0.3.1 / v0.3.1
 ```
 
-No release is selected for Network Control by this decision preparation.
+The lifecycle decision does not assign Network Control to `0.3.1` and does not
+authorize release-mode changes, tags, GitHub Releases, package-index publication,
+signing, or attestation.
 
 ## Non-authorization boundary
 
-This preparation record does **not** authorize or perform:
+This decision does **not** authorize:
 
-- AEP-0012 `Draft -> Proposed`;
+- merge of PR #135;
 - AEP-0012 `Proposed -> Accepted` or `Accepted -> Final`;
-- Network Control normative specification or requirement-index adoption;
-- Network Control JSON Schema adoption;
+- completion of formal Proposed protocol review;
+- Network Control normative Spec or requirement index;
+- Network Control schema adoption;
 - Network Control TCK/profile registration;
-- backend-neutral Network Control conformance harness implementation;
+- backend-neutral Network Control conformance harness;
 - Toxiproxy, Linux `tc/netem`, firewall/routing, Envoy, Istio/service-mesh, cloud
-  network control, or another provider as official AVP protocol behavior;
-- controlled network-fault reference implementation work;
+  network control, or another provider as protocol authority/reference behavior;
+- controlled network-fault reference implementation;
 - cross-mechanism implementation/acceptance work;
 - AEP-0009, AEP-0010, or AEP-0011 lifecycle changes;
 - release-development-state changes;
-- assignment of Network Control to `0.3.1`;
-- tag, GitHub Release, package-index publication, signing, or attestation;
-- physical repository split or plugin-framework introduction;
-- merge of the current preparation PR.
-
-No lifecycle decision may be inferred merely from the existence of this file, a
-successful CI run, GitHub Ready state, or a generic instruction to continue work.
+- tag/GitHub Release/package publication/signing/attestation;
+- Gate/Evidence weakening;
+- physical repository split or plugin-framework introduction.
 
 ## Current gate
 
-**DECISION PENDING — EXPLICIT AEP-0012 `Draft -> Proposed` AUTHORIZATION REQUIRED.**
+**LIFECYCLE AUTHORIZED — EXACT-HEAD GATES AND FOCUSED LIFECYCLE REVIEW REQUIRED; MERGE AUTHORIZATION REMAINS SEPARATE.**
 
-The next action after review-closing this preparation artifact is a separate,
-explicit protocol-maintainer authorization of the lifecycle proposition. Only then
-may this branch mutate AEP-0012/ROADMAP to the Proposed candidate state.
+The lifecycle candidate must now pass all applicable exact-head gates and a focused
+review that proves the delta is lifecycle/evidence-only. Any head mutation after
+that review invalidates the review closure and requires revalidation.
+
+Only after GitHub Ready-state/metadata governance is satisfied may PR #135 reach the
+next hard boundary: a separate explicit squash-merge authorization for the exact
+reviewed head.
