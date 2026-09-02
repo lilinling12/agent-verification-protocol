@@ -235,20 +235,24 @@ The profile must not pretend a cached resolution, literal IP address, browser DN
 
 Provider API completion is not sufficient evidence that a fault is active or cleared.
 
-A future normative profile must define observable lifecycle transitions at least conceptually equivalent to:
+AEP-0012 does not replace the Environment v0.1 fault contract. Every scheduled fault remains governed by `AVP-ENVIRONMENT-010`: it has evaluator-controlled identity, target, and activation condition; occurrence-based activation MUST NOT happen before the declared occurrence; and clearing prevents later activation unless a separately selected governed profile explicitly defines another lifecycle. Network Control may define subordinate implementation-observable activation and clearing states only to prove that an already-triggered fault effect has settled. Those subordinate states are not a second top-level fault lifecycle.
+
+A future normative profile may therefore define operational states conceptually equivalent to:
 
 ```text
 BASELINE -> ACTIVATING -> ACTIVE/SETTLED -> CLEARING -> BASELINE/SETTLED
 ```
 
-The exact serialized vocabulary is downstream work.
+The exact serialized vocabulary is downstream work, and these states remain subordinate to the Environment fault identity/target/activation-condition lifecycle.
+
+For an occurrence-based activation condition, pre-trigger Subject traffic required to reach the declared occurrence remains admissible and MUST NOT be faulted early. Activation settlement gates acceptance of post-trigger/post-activation fault-sensitive observations; it does not gate or suppress the qualifying Subject traffic needed to satisfy the Environment activation condition.
 
 Key requirements to resolve before `Proposed`:
 
-1. the Evaluator/Control Plane can request a selected fault through privileged authority;
-2. Subject traffic is not admitted into a fault-sensitive test window until activation settlement is established where the Scenario requires deterministic ordering;
+1. the Evaluator/Control Plane can request a selected fault through privileged authority while preserving the Environment fault identity, target, and activation-condition contract;
+2. where a Scenario requires deterministic post-trigger ordering, post-activation fault-sensitive observations are not accepted until activation settlement is established, while occurrence-counting pre-trigger Subject traffic remains admissible and unfaulted until the declared occurrence;
 3. activation settlement is proven by an implementation-independent observation, not a provider metadata flag alone;
-4. clearing settlement is independently verified before a subsequent baseline/recovery claim is accepted;
+4. clearing settlement is independently verified before a subsequent baseline/recovery claim is accepted, and clearing preserves the Environment rule preventing later activation unless a separately governed selected profile explicitly defines otherwise;
 5. failure to establish settlement is infrastructure/Validity information, not Agent Task Verdict failure by itself;
 6. cleanup failure cannot retroactively rewrite the primary fault/conformance outcome;
 7. future scheduled faults remain evaluator-private.
@@ -259,7 +263,7 @@ The profile must not require arbitrary sleep intervals as correctness evidence. 
 
 AEP-0012 must not conflate Environment logical time with host wall time or packet scheduler time.
 
-A network fault schedule may be expressed relative to Environment lifecycle or another governed ordering primitive without claiming that kernel timers, proxy event loops, remote services, or TCP retransmission clocks are virtualized.
+A network fault schedule may use the activation condition already governed by Environment v0.1, including occurrence-based activation, or may compose with another separately governed ordering primitive. Network Control MUST NOT reinterpret occurrence counting, activate a fault before the declared occurrence, or claim that kernel timers, proxy event loops, remote services, or TCP retransmission clocks are virtualized.
 
 If exact time-triggered fault activation becomes a portable claim, it requires explicit composition with a Time Control Resource profile or another reviewed timing contract. The network profile alone must not invent global deterministic time.
 
@@ -349,9 +353,10 @@ Portable SUT obligations are expected to include observable equivalents of:
 
 - provision/bind a controlled path;
 - prove a known-good baseline exchange;
-- activate one selected portable fault;
-- establish and observe fault settlement;
-- exercise Subject-side traffic through the real path;
+- bind a selected fault to the Environment-governed fault identity, target, and activation condition;
+- for occurrence-based activation, admit and count the required pre-trigger Subject traffic without activating the fault early;
+- after the activation condition is satisfied, establish and observe settlement of one selected portable fault;
+- exercise post-activation Subject-side traffic through the real path;
 - clear the fault;
 - establish and observe recovery settlement;
 - prove a fresh baseline exchange succeeds again;
@@ -366,6 +371,7 @@ Executable conformance requires a privileged local fixture-control seam that may
 
 - run a deterministic upstream echo/application fixture;
 - originate Subject-side connections/exchanges through the selected path;
+- coordinate occurrence-counting pre-trigger traffic where the Environment activation condition requires it;
 - coordinate an established connection before fault activation where the selected semantic requires it;
 - test fresh connections during and after faults;
 - activate negative implementation behavior;
@@ -380,21 +386,23 @@ Before normative closure, the design must settle at least:
 1. controlled-path ownership and stale references;
 2. baseline forwarding and path-coverage proof;
 3. exact portable v0.1 fault vocabulary;
-4. activation settlement semantics;
-5. established-connection disposition where applicable;
-6. clearing/recovery settlement semantics;
-7. lifecycle ordering and `QUIESCING` interaction;
-8. evaluator-private future schedule non-disclosure;
-9. Subject/Evaluator/Control authority separation;
-10. reset/snapshot participation semantics;
-11. cleanup and leaked-fault detection;
-12. execution-sensitive capability honesty.
+4. Environment fault identity/target/activation-condition composition, including occurrence-based no-early-activation behavior;
+5. activation settlement semantics after the Environment activation condition is satisfied;
+6. established-connection disposition where applicable;
+7. clearing/recovery settlement semantics and no-later-reactivation after clear;
+8. lifecycle ordering and `QUIESCING` interaction;
+9. evaluator-private future schedule non-disclosure;
+10. Subject/Evaluator/Control authority separation;
+11. reset/snapshot participation semantics;
+12. cleanup and leaked-fault detection;
+13. execution-sensitive capability honesty.
 
 ### Negative implementations
 
 At minimum, the TCK must be capable of rejecting metadata-identical broken implementations such as:
 
 - `BypassFaultAdapter` — advertises the capability and reports fault activation while the TCK traffic bypasses the controlled path;
+- `EarlyActivationAdapter` — activates an occurrence-based fault before the declared Environment occurrence is reached;
 - `FalseSettledFaultAdapter` — reports a fault active/settled before the observable fault property is established;
 - `FalseRecoveryAdapter` — reports recovery settled while a fresh baseline exchange still cannot succeed;
 - `ScheduleLeakAdapter` — exposes evaluator-private future fault scheduling information to the Subject.
@@ -417,6 +425,7 @@ The audit must explicitly decide:
 
 - resource/path identity and coverage proof;
 - mandatory v0.1 fault family or families;
+- Environment fault identity/target/activation-condition composition and occurrence-based no-early-activation behavior;
 - whether latency is deterministic enough for portable mandatory conformance;
 - whether loss can be specified without probabilistic self-certification;
 - whether disconnect must distinguish new versus established connections;
@@ -434,9 +443,9 @@ AEP-0012 must not advance to `Proposed` until the following are resolved through
 
 - **NC-BR-001 — controlled-path boundary:** define the exact portable Subject-side/upstream-side path boundary and how path coverage is proven without provider-native identity becoming protocol identity.
 - **NC-BR-002 — fault vocabulary:** select the smallest mandatory v0.1 semantic fault set and reject false equivalence among packet, transport, DNS, TLS, HTTP, and provider-specific faults.
-- **NC-BR-003 — activation settlement:** define an observable, bounded settlement predicate that does not use provider configuration success or arbitrary sleep as conformance proof.
+- **NC-BR-003 — activation settlement and Environment activation authority:** preserve Environment v0.1 evaluator-controlled fault identity, target, and activation condition; for occurrence-based activation prove no early activation, keep qualifying pre-trigger Subject traffic admissible, and define an observable bounded post-trigger settlement predicate that does not use provider configuration success or arbitrary sleep as conformance proof.
 - **NC-BR-004 — established connections:** define what each selected fault does or does not promise for connections already established at activation time.
-- **NC-BR-005 — recovery settlement:** define what clearing means and require independent fresh-connection recovery evidence without promising repair of broken connections.
+- **NC-BR-005 — recovery settlement:** define what clearing means, preserve the Environment no-later-reactivation-after-clear rule unless separately governed otherwise, and require independent fresh-connection recovery evidence without promising repair of broken connections.
 - **NC-BR-006 — timing/latency:** determine whether latency can be mandatory and portable, including tolerance/error semantics and host scheduling limits.
 - **NC-BR-007 — loss semantics:** determine whether any loss claim can be tested portably without finite-run probabilistic self-certification or provider-specific packet patterns.
 - **NC-BR-008 — DNS/application layering:** decide whether name-resolution and HTTP-level faults are excluded, separate capabilities, or part of a reviewed profile without collapsing layers.
