@@ -91,7 +91,7 @@ Authorized squash merge:
 Exact-main validation:
 
 - CI #828 / run `33618394305` — **SUCCESS**;
-- Relational Parity #221 — **SUCCESS**;
+- Relational Parity #221 / run `33618394375` — **SUCCESS**;
 - Browser Reference #94 / run `33618394321` — **SUCCESS**.
 
 The audit resolved NC-BR-001..NC-BR-012 into explicit reconciliation decisions,
