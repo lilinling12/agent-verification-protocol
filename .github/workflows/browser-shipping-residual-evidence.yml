@@ -77,7 +77,10 @@ jobs:
             --engine '${{ matrix.engine }}' \
             --output 'browser-evidence/browser-shipping-residual-${{ matrix.engine }}.json'
 
+      # Failure evidence is still evidence. Verify/stamp the exact checked-out
+      # head even when the runner intentionally exits non-zero for a failed case.
       - name: Bind evidence to exact source head
+        if: always()
         run: |
           python tests/acceptance/browser/bind_evidence_source.py \
             'browser-evidence/browser-shipping-residual-${{ matrix.engine }}.json' \
@@ -160,7 +163,9 @@ jobs:
             --engine safari \
             --output browser-evidence/browser-shipping-residual-safari.json
 
+      # Preserve exact-head provenance for negative evidence as well as PASSes.
       - name: Bind evidence to exact source head
+        if: always()
         run: |
           python tests/acceptance/browser/bind_evidence_source.py \
             browser-evidence/browser-shipping-residual-safari.json \
