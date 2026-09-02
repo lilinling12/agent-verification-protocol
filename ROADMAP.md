@@ -129,8 +129,24 @@ Exact-main validation on `781268dd193dd6ad169ffac3a0fd18fab7b602a5` then passed 
 
 These checked Browser items therefore record that the reviewed authority, conformance harness, and reference implementation surfaces are now present and validated on `main`. They do **not** make AEP-0011 Final, make Playwright/Chromium normative, activate partial Browser ownership, establish universal multi-engine equivalence, select a release, or authorize publication/signing/attestation. Candidate/draft markers tied to Final/release promotion remain governed separately.
 
+### Network Control resource profile
+- [ ] AEP-0012 Draft problem/scope and standards analysis
+- [ ] network-control portability and Proposed-readiness audit
+- [ ] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
+- [ ] reconcile AEP-0012 and complete Draft → Proposed readiness audit
+- [ ] AEP-0012 status advanced to Proposed for formal protocol review
+- [ ] complete formal Proposed protocol review
+- [ ] resolve acceptance blockers and record explicit AEP-0012 Proposed → Accepted decision
+- [ ] network-control normative specification and requirement index
+- [ ] network-control schema(s) where required by reviewed semantics
+- [ ] execution-sensitive network-control resource TCK
+- [ ] backend-neutral network-control conformance harness + immutable local network fixture + privileged fixture-control seam if required by reviewed semantics
+- [ ] controlled network-fault reference implementation against the portable TCK
+- [ ] cross-mechanism portability acceptance evidence if required by reviewed protocol semantics
+
+The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. The AEP-0012 Draft and its first roadmap item remain incomplete until the reviewed Draft slice is adopted into `main`; Draft text on a topic branch is not protocol adoption. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel facilities, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
+
 ### Other resource implementations
-- [ ] network fault proxy
 - [ ] virtual clock service
 - [ ] container runtime
 - [ ] microVM experiment
