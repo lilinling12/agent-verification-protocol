@@ -1,10 +1,11 @@
 # AEP-0012 — Network Control Resource Profile v0.1
 
-- Status: Draft
+- Status: Proposed
 - Authors: AVP maintainers and contributors
 - Created: 2026-09-02
 - Portability audit: `docs/design/alpha3-network-control-resource-portability-audit.md`
 - Proposed-readiness evidence: `docs/design/alpha3-network-control-resource-proposed-readiness-audit.md`
+- Lifecycle decision: `docs/acceptance/alpha3-aep-0012-proposed-decision.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (`Accepted`)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Network Control Resource
@@ -21,7 +22,7 @@ The reconciled v0.1 design is deliberately narrow. One independently owned resou
 
 Established-connection termination, exact latency, probabilistic packet loss, DNS/name-resolution failure, TLS interception, HTTP/application faults, UDP behavior, packet counts, TCP segment boundaries, retransmission timing, and provider-native socket error identity are not mandatory base semantics.
 
-AEP-0012 remains **Draft**. This reconciliation closes the original Draft design blockers as explicit reviewable choices. It does not perform `Draft -> Proposed` and does not authorize Network Control Spec/Schema/TCK, a conformance harness, or a provider implementation.
+AEP-0012 is **Proposed** by explicit protocol-maintainer lifecycle authorization on 2026-09-03 so the reconciled design can enter formal protocol review. `Proposed` does not make these choices Accepted or normative and does not authorize Network Control Spec/Schema/TCK, a conformance harness, provider/reference implementation, release selection, publication, signing, or attestation.
 
 ## Problem
 
@@ -380,11 +381,11 @@ These are formal review questions, not unresolved Draft definitions.
 
 ## Governance boundary
 
-AEP-0012 remains **Draft** pending a separate explicit lifecycle decision.
+AEP-0012 is **Proposed** on this lifecycle candidate by explicit protocol-maintainer authorization on 2026-09-03. The authorization permits this lifecycle-only mutation and formal Proposed review after adoption; it is not merge authorization.
 
-This reconciliation does not authorize:
+This lifecycle transition does not authorize:
 
-- `Draft -> Proposed`, `Proposed -> Accepted`, or `Accepted -> Final` by itself;
+- `Proposed -> Accepted` or `Accepted -> Final`;
 - Network Control normative Spec, requirement index, schema, capability registration, or TCK adoption;
 - backend-neutral harness/fixture implementation;
 - any provider as protocol authority or an official reference implementation;
@@ -394,7 +395,7 @@ This reconciliation does not authorize:
 - Gate/Evidence weakening;
 - repository merge without separate authorization.
 
-If the accompanying Proposed-readiness audit is review-closed with no semantic blocker, the next governance act is a separately recorded protocol-maintainer decision on whether to advance AEP-0012 from Draft to Proposed for formal protocol review.
+After this lifecycle candidate is exact-head reviewed and separately authorized for squash merge into `main`, the next governed work unit is formal Proposed protocol review. Any semantic change discovered there must be reviewed as a semantic AEP amendment and cannot be smuggled into this lifecycle-only transition.
 
 ## References
 
