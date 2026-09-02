@@ -4,7 +4,7 @@
 # validating downstream wheel installation because consumers resolve against the
 # compatibility ranges declared in pyproject.toml.
 attrs==26.1.0
-build==1.5.0
+build==1.6.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 mysql-connector-python==26.7.0
