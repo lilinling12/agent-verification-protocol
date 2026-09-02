@@ -15,6 +15,13 @@ BPR-008 isolation strategy across independent WebDriver sessions:
 
 Browser/driver/session details are evidence identity only. They do not become
 portable AVP state or normative Browser semantics.
+
+For Safari, the transport deliberately separates SafariDriver service lifetime
+from WebDriver session lifetime. One long-lived safaridriver service hosts the
+three strictly sequential, independently verified WebDriver sessions. This
+avoids making driver-daemon restart behavior part of the BAE-011 oracle while
+preserving Safari's one-active-session-at-a-time constraint and the exact
+session-isolation assertions below.
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ import shutil
 import subprocess
 import threading
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version as package_version
 from pathlib import Path
@@ -42,6 +49,8 @@ _DB_STORE = "state"
 _DB_KEY = "probe"
 _DB_VALUE = "shipping-residual-value"
 _CACHE_NAME = "avp-shipping-residual-v1"
+_SAFARI_DRIVER = "/usr/bin/safaridriver"
+_DIAGNOSTIC_TAIL_LIMIT = 4096
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +71,48 @@ class BrowserIdentity:
     runner_arch: str | None
     runner_image_os: str | None
     runner_image_version: str | None
+
+
+@dataclass(slots=True)
+class _ExecutionProgress:
+    """Retain transport/session progress without changing the BAE-011 oracle."""
+
+    current_stage: str = "initializing"
+    failure_stage: str | None = None
+    created_session_count: int = 0
+    completed_session_count: int = 0
+    browser_identity: BrowserIdentity | None = None
+    cleanup_errors: list[dict[str, str]] = field(default_factory=list)
+    safari_service_reused: bool = False
+    safari_service_started: bool = False
+    safari_service_stopped: bool = False
+    safari_diagnostic_log: Path | None = None
+
+    def enter(self, stage: str) -> None:
+        self.current_stage = stage
+
+    def capture_failure(self) -> None:
+        if self.failure_stage is None:
+            self.failure_stage = self.current_stage
+
+    def record_cleanup_error(self, stage: str, exc: BaseException) -> None:
+        self.cleanup_errors.append(
+            {
+                "stage": stage,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }
+        )
+
+    def transport_evidence(self) -> dict[str, Any]:
+        return {
+            "createdSessionCount": self.created_session_count,
+            "completedSessionCount": self.completed_session_count,
+            "safariDriverServiceReuse": self.safari_service_reused,
+            "safariDriverServiceStarted": self.safari_service_started,
+            "safariDriverServiceStopped": self.safari_service_stopped,
+            "cleanupErrors": list(self.cleanup_errors),
+        }
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
@@ -169,7 +220,24 @@ def _command_version(*command: str) -> str | None:
     return value or None
 
 
-def _create_driver(engine: str) -> Any:
+def _new_safari_service(diagnostic_log: Path) -> Any:
+    """Create one explicitly caller-owned SafariDriver service for this case."""
+
+    from selenium.webdriver.safari.service import Service
+
+    if not Path(_SAFARI_DRIVER).exists():
+        raise RuntimeError(f"{_SAFARI_DRIVER} is unavailable on this runner")
+
+    diagnostic_log.parent.mkdir(parents=True, exist_ok=True)
+    return Service(
+        executable_path=_SAFARI_DRIVER,
+        reuse_service=True,
+        enable_logging=True,
+        log_output=str(diagnostic_log),
+    )
+
+
+def _create_driver(engine: str, *, safari_service: Any | None = None) -> Any:
     from selenium import webdriver
 
     if engine == "chrome":
@@ -191,14 +259,98 @@ def _create_driver(engine: str) -> Any:
         return webdriver.Firefox(service=Service(executable_path=executable), options=options)
 
     if engine == "safari":
-        from selenium.webdriver.safari.service import Service
-
-        executable = "/usr/bin/safaridriver"
-        if not Path(executable).exists():
-            raise RuntimeError("/usr/bin/safaridriver is unavailable on this runner")
-        return webdriver.Safari(service=Service(executable_path=executable))
+        if safari_service is None:
+            raise RuntimeError("Safari shipping evidence requires a caller-owned SafariDriver service")
+        return webdriver.Safari(service=safari_service)
 
     raise ValueError(f"unsupported engine: {engine}")
+
+
+class _DriverTransport:
+    """Own provider transport lifetime without owning Browser protocol semantics."""
+
+    def __init__(
+        self,
+        engine: str,
+        progress: _ExecutionProgress,
+        *,
+        safari_diagnostic_log: Path,
+    ) -> None:
+        self._engine = engine
+        self._progress = progress
+        self._safari_diagnostic_log = safari_diagnostic_log
+        self._safari_service: Any | None = None
+
+    def __enter__(self) -> "_DriverTransport":
+        if self._engine != "safari":
+            return self
+
+        self._progress.enter("transport:safari-driver-service-create")
+        self._progress.safari_diagnostic_log = self._safari_diagnostic_log
+        self._safari_service = _new_safari_service(self._safari_diagnostic_log)
+        self._progress.safari_service_reused = True
+        self._progress.enter("transport:safari-driver-service-start")
+        self._safari_service.start()
+        self._progress.safari_service_started = True
+        self._progress.enter("transport:safari-driver-service-ready")
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+        if self._safari_service is None:
+            return False
+
+        if exc_type is not None:
+            self._progress.capture_failure()
+
+        self._progress.enter("transport:safari-driver-service-stop")
+        try:
+            self._safari_service.stop()
+        except Exception as cleanup_exc:
+            self._progress.record_cleanup_error(
+                "transport:safari-driver-service-stop",
+                cleanup_exc,
+            )
+            if exc_type is None:
+                self._progress.capture_failure()
+                raise
+        else:
+            self._progress.safari_service_stopped = True
+        return False
+
+    def create(self, role: str) -> Any:
+        self._progress.enter(f"{role}:session-create")
+        driver = _create_driver(
+            self._engine,
+            safari_service=self._safari_service if self._engine == "safari" else None,
+        )
+        self._progress.created_session_count += 1
+        return driver
+
+
+@contextmanager
+def _browser_session(
+    transport: _DriverTransport,
+    role: str,
+    progress: _ExecutionProgress,
+) -> Iterator[Any]:
+    """Create one session and preserve the primary failure across cleanup."""
+
+    driver = transport.create(role)
+    try:
+        yield driver
+    except BaseException:
+        progress.capture_failure()
+        cleanup_stage = f"{role}:session-quit-after-failure"
+        progress.enter(cleanup_stage)
+        try:
+            driver.quit()
+        except Exception as cleanup_exc:
+            progress.record_cleanup_error(cleanup_stage, cleanup_exc)
+        raise
+    else:
+        progress.enter(f"{role}:session-quit")
+        driver.quit()
+        progress.completed_session_count += 1
 
 
 def _engine_family(engine: str) -> str:
@@ -220,7 +372,7 @@ def _driver_version(engine: str) -> str | None:
     if engine == "firefox":
         executable = _resolve_driver_binary("geckodriver", "GECKOWEBDRIVER")
         return _command_version(executable, "--version") if executable else None
-    return _command_version("/usr/bin/safaridriver", "--version")
+    return _command_version(_SAFARI_DRIVER, "--version")
 
 
 def _browser_identity(engine: str, driver: Any) -> BrowserIdentity:
@@ -437,7 +589,11 @@ def _assert_clean_excluded_state(driver: Any, port: int) -> dict[str, Any]:
         raise AssertionError(f"fresh session unexpectedly had Cache residue: {caches!r}")
     if indexed_db is not None:
         raise AssertionError(f"fresh session unexpectedly had IndexedDB residue: {indexed_db!r}")
-    return {"serviceWorkerRegistrations": registrations, "cacheNames": caches, "indexedDb": indexed_db}
+    return {
+        "serviceWorkerRegistrations": registrations,
+        "cacheNames": caches,
+        "indexedDb": indexed_db,
+    }
 
 
 def _session_profile_marker(engine: str, driver: Any) -> str | None:
@@ -447,50 +603,68 @@ def _session_profile_marker(engine: str, driver: Any) -> str | None:
     return str(profile) if profile else None
 
 
-def _run_case(engine: str, port: int) -> tuple[BrowserIdentity, CaseResult, dict[str, Any]]:
+def _run_case(
+    engine: str,
+    port: int,
+    transport: _DriverTransport,
+    progress: _ExecutionProgress,
+) -> tuple[BrowserIdentity, CaseResult, dict[str, Any]]:
     session_ids: list[str] = []
     firefox_profiles: list[str] = []
-    identity: BrowserIdentity | None = None
 
-    clean = _create_driver(engine)
-    try:
+    with _browser_session(transport, "clean", progress) as clean:
+        progress.enter("clean:configure")
         _configure_driver(clean)
+        progress.enter("clean:browser-identity")
         identity = _browser_identity(engine, clean)
+        progress.browser_identity = identity
         session_ids.append(str(clean.session_id))
         marker = _session_profile_marker(engine, clean)
         if marker:
             firefox_profiles.append(marker)
+        progress.enter("clean:set-selected-state")
         _set_selected_state(clean, port)
+        progress.enter("clean:project-selected-state")
         baseline = _project_selected_state(clean, port)
+        progress.enter("clean:assert-excluded-state")
         clean_excluded = _assert_clean_excluded_state(clean, port)
+        progress.enter("clean:read-controlled-resource")
         clean_resource = _read_controlled_resource(clean, port)
         if clean_resource != "network-origin":
             raise AssertionError(f"clean session resource unexpectedly changed: {clean_resource!r}")
-    finally:
-        clean.quit()
 
-    residual = _create_driver(engine)
-    try:
+    with _browser_session(transport, "residual", progress) as residual:
+        progress.enter("residual:configure")
         _configure_driver(residual)
         session_ids.append(str(residual.session_id))
         marker = _session_profile_marker(engine, residual)
         if marker:
             firefox_profiles.append(marker)
+        progress.enter("residual:set-selected-state")
         _set_selected_state(residual, port)
+        progress.enter("residual:project-selected-before")
         residual_selected_before = _project_selected_state(residual, port)
         if residual_selected_before != baseline:
             raise AssertionError("second session did not begin with identical selected state")
+        progress.enter("residual:assert-excluded-state-before")
         residual_clean_before = _assert_clean_excluded_state(residual, port)
 
+        progress.enter("residual:install-service-worker-cache")
         _install_service_worker_and_cache(residual, port)
+        progress.enter("residual:seed-indexeddb")
         _seed_indexed_db(residual, port)
 
+        progress.enter("residual:project-selected-after")
         residual_selected_after = _project_selected_state(residual, port)
         if residual_selected_after != baseline:
             raise AssertionError("excluded-state setup unexpectedly changed selected state")
+        progress.enter("residual:observe-service-worker")
         residual_registrations = _service_worker_registration_count(residual, port)
+        progress.enter("residual:observe-cache")
         residual_caches = _cache_names(residual, port)
+        progress.enter("residual:observe-indexeddb")
         residual_idb = _read_indexed_db(residual, port)
+        progress.enter("residual:read-controlled-resource")
         residual_resource = _read_controlled_resource(residual, port)
 
         if residual_registrations < 1:
@@ -504,37 +678,40 @@ def _run_case(engine: str, port: int) -> tuple[BrowserIdentity, CaseResult, dict
                 "shipping Service Worker/Cache residue did not materially affect behavior: "
                 f"{residual_resource!r}"
             )
-    finally:
-        residual.quit()
 
-    recreated = _create_driver(engine)
-    try:
+    with _browser_session(transport, "recreated", progress) as recreated:
+        progress.enter("recreated:configure")
         _configure_driver(recreated)
         session_ids.append(str(recreated.session_id))
         marker = _session_profile_marker(engine, recreated)
         if marker:
             firefox_profiles.append(marker)
+        progress.enter("recreated:set-selected-state")
         _set_selected_state(recreated, port)
+        progress.enter("recreated:project-selected-state")
         recreated_selected = _project_selected_state(recreated, port)
         if recreated_selected != baseline:
             raise AssertionError("recreated session changed selected baseline")
+        progress.enter("recreated:assert-excluded-state")
         recreated_excluded = _assert_clean_excluded_state(recreated, port)
+        progress.enter("recreated:read-controlled-resource")
         recreated_resource = _read_controlled_resource(recreated, port)
         if recreated_resource != "network-origin":
             raise AssertionError("Service Worker/Cache residue crossed the fresh session boundary")
-    finally:
-        recreated.quit()
 
+    progress.enter("verify:distinct-webdriver-sessions")
     distinct_sessions = len(set(session_ids)) == 3
     if not distinct_sessions:
         raise AssertionError(f"expected three distinct WebDriver sessions, got {session_ids!r}")
 
     firefox_profiles_distinct: bool | None = None
     if engine == "firefox":
+        progress.enter("verify:distinct-firefox-profiles")
         firefox_profiles_distinct = len(firefox_profiles) == 3 and len(set(firefox_profiles)) == 3
         if not firefox_profiles_distinct:
             raise AssertionError("geckodriver did not expose three distinct temporary profile paths")
 
+    progress.enter("complete")
     details = {
         "evidenceScope": "shipping-product-native-webdriver",
         "selectedStateBaseline": baseline,
@@ -569,6 +746,30 @@ def _run_case(engine: str, port: int) -> tuple[BrowserIdentity, CaseResult, dict
     }
 
 
+def _fallback_identity(engine: str) -> BrowserIdentity:
+    return BrowserIdentity(
+        engine_family=_engine_family(engine),
+        product=_product_name(engine),
+        browser_version="unknown",
+        driver_version=_driver_version(engine),
+        platform_name=None,
+        runner_os=os.environ.get("RUNNER_OS"),
+        runner_arch=os.environ.get("RUNNER_ARCH"),
+        runner_image_os=os.environ.get("ImageOS"),
+        runner_image_version=os.environ.get("ImageVersion"),
+    )
+
+
+def _diagnostic_tail(path: Path | None) -> str | None:
+    if path is None or not path.exists():
+        return None
+    try:
+        value = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    return value[-_DIAGNOSTIC_TAIL_LIMIT:] or None
+
+
 def run(engine: str, output: Path) -> int:
     try:
         import selenium  # noqa: F401 - dependency availability check
@@ -577,29 +778,44 @@ def run(engine: str, output: Path) -> int:
             "Selenium is required only for shipping/native Browser acceptance evidence"
         ) from exc
 
+    progress = _ExecutionProgress()
+    safari_diagnostic_log = output.with_suffix(".safaridriver.log")
+
     with _fixture_server() as port:
         try:
-            identity, case, session_evidence = _run_case(engine, port)
+            with _DriverTransport(
+                engine,
+                progress,
+                safari_diagnostic_log=safari_diagnostic_log,
+            ) as transport:
+                identity, case, semantic_session_evidence = _run_case(
+                    engine,
+                    port,
+                    transport,
+                    progress,
+                )
+            session_evidence = {
+                **semantic_session_evidence,
+                **progress.transport_evidence(),
+            }
         except Exception as exc:
-            # Capture a product identity if possible without masking the original
-            # failure. A failed case remains a hard workflow failure.
-            identity = BrowserIdentity(
-                engine_family=_engine_family(engine),
-                product=_product_name(engine),
-                browser_version="unknown",
-                driver_version=_driver_version(engine),
-                platform_name=None,
-                runner_os=os.environ.get("RUNNER_OS"),
-                runner_arch=os.environ.get("RUNNER_ARCH"),
-                runner_image_os=os.environ.get("ImageOS"),
-                runner_image_version=os.environ.get("ImageVersion"),
-            )
+            progress.capture_failure()
+            identity = progress.browser_identity or _fallback_identity(engine)
+            details: dict[str, Any] = {
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "failureStage": progress.failure_stage or progress.current_stage,
+                **progress.transport_evidence(),
+            }
+            diagnostic_tail = _diagnostic_tail(progress.safari_diagnostic_log)
+            if diagnostic_tail:
+                details["safariDriverDiagnosticTail"] = diagnostic_tail
             case = CaseResult(
                 case_id="BAE-011",
                 status="fail",
-                details={"error_type": type(exc).__name__, "error": str(exc)},
+                details=details,
             )
-            session_evidence = {}
+            session_evidence = progress.transport_evidence()
 
     document = {
         "schema": "avp-browser-shipping-residual-evidence-v0.1",
@@ -621,6 +837,9 @@ def run(engine: str, output: Path) -> int:
             "headlessRequestedByAvp": False,
             "sessionIsolation": session_evidence,
             "safariNativeAutomationIsolation": engine == "safari",
+            "safariDriverServiceStrategy": (
+                "single-service-sequential-sessions" if engine == "safari" else None
+            ),
         },
         "cases": [asdict(case)],
     }
