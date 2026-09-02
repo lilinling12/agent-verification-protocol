@@ -119,7 +119,7 @@ The implementation-independent portability audit was then adopted by PR #103 at 
 
 PR #104 reconciled those decisions into AEP-0011 and added the Draft → Proposed readiness audit. Formal review `5048566230` at exact PR head `ae2cc0dfa42a476b1949611fbd201e9ce36f69a4` concluded `REVIEW-CLOSED — PROPOSED-ELIGIBILITY EVIDENCE IS COHERENT FOR THIS EXACT HEAD`; CI #629 (`33148952559`), Governance #695 (`33148952556`), Relational Parity #22 (`33148952557`), and Ready-state Governance #696 (`33149074249`) succeeded. After explicit squash authorization, PR #104 was adopted into `main` at exact commit `69f3d91a9197f159eb0b5d77418f01b956aa17ff`; exact-main CI #630 (`33149341398`) and Relational Parity #23 (`33149341383`) both passed. `docs/acceptance/alpha3-browser-readiness-main-adoption.md` records the reviewed and main-adopted evidence.
 
-PR #105 then reconciled the readiness baseline into ROADMAP/main-adoption evidence. Its exact reviewed head `19bfaaccd52d6be0a61ba916eb3029ba84493e63` passed CI #631 (`33150653985`), Governance #698 (`33150653980`), Release Validation #96 (`33150653969`), Relational Parity #24 (`33150654000`), focused review `5048751200`, and Ready-state Governance #699 (`33150761945`). After explicit squash authorization, PR #105 was adopted into `main` at exact commit `e2159b1daba4dc214b5dc05c233df28afa328a99`; exact-main CI #632 (`33212353304`) and Relational Parity #25 (`33212353330`) both passed.
+PR #105 then reconciled the readiness baseline into ROADMAP/main-adoption evidence. Its exact reviewed head `19bfaaccd52d6be0a61ba916eb3029ba84493e63` passed CI #631 (`33150653985`), Governance #698 (`33150653980`), Release Validation #96 (`33214148762`), Relational Parity #24 (`33150654000`), focused review `5048751200`, and Ready-state Governance #699 (`33150761945`). After explicit squash authorization, PR #105 was adopted into `main` at exact commit `e2159b1daba4dc214b5dc05c233df28afa328a99`; exact-main CI #632 (`33212353304`) and Relational Parity #25 (`33212353330`) both passed.
 
 The formal Proposed protocol review is recorded by PR #107 against exact baseline `main@ccd05b71635b46218dfa14043320a60376339dc2`. It identified BPR-001..BPR-009. PR #108 incorporated those protocol decisions; stacked review/evidence work through PRs #109–#127 closed the required Chromium/Gecko/WebKit acceptance matrix, BPR-010 canonical ordering, the backend-neutral Browser harness, the real Playwright/Chromium reference path, the complete provider-neutral eight-case evaluator assembly, and atomic composite activation without allowing provider behavior to define protocol semantics.
 
@@ -134,7 +134,7 @@ These checked Browser items therefore record that the reviewed authority, confor
 - [x] network-control portability and Proposed-readiness audit
 - [x] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
 - [x] reconcile AEP-0012 and complete Draft → Proposed readiness audit
-- [ ] AEP-0012 status advanced to Proposed for formal protocol review
+- [x] AEP-0012 status advanced to Proposed for formal protocol review
 - [ ] complete formal Proposed protocol review
 - [ ] resolve acceptance blockers and record explicit AEP-0012 Proposed → Accepted decision
 - [ ] network-control normative specification and requirement index
@@ -152,7 +152,7 @@ PR #133 reconciled those portability decisions into AEP-0012 and added the Draft
 
 Exact-main validation on `2632935bef065b4d38e88f6df6b8cf0d620bfb3b` then passed CI #830 (`33667291305`), Relational Parity #223 (`33667290799`), and Browser Reference #96 (`33667291258`). `docs/acceptance/alpha3-network-control-readiness-main-adoption.md` records the reviewed and main-adopted evidence.
 
-These checked readiness items record only that the portability audit, NC-BR design-blocker closure, and reconciled Proposed-readiness evidence are now present and validated on `main`. AEP-0012 remains **Draft, not Proposed**. The next lifecycle item requires a separate explicit protocol-maintainer Draft → Proposed decision. No Network Control normative Spec/Schema/TCK/harness/provider/reference implementation or release/publication authority is implied. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel/firewall/routing facilities, cloud controls, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
+The protocol maintainer explicitly authorized AEP-0012 `Draft → Proposed` on 2026-09-03 after preparation review closure. PR #135 carries the lifecycle candidate and decision record. This checked lifecycle item means the branch is eligible for formal Proposed review after separate exact-head review and separately authorized squash adoption into `main`; it does **not** complete formal Proposed review, make AEP-0012 Accepted or normative, authorize Network Control Spec/Schema/TCK/harness/provider/reference implementation, or select/publish a release. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel/firewall/routing facilities, cloud controls, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
 
 ### Other resource implementations
 - [ ] virtual clock service
