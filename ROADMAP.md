@@ -130,7 +130,7 @@ Exact-main validation on `781268dd193dd6ad169ffac3a0fd18fab7b602a5` then passed 
 These checked Browser items therefore record that the reviewed authority, conformance harness, and reference implementation surfaces are now present and validated on `main`. They do **not** make AEP-0011 Final, make Playwright/Chromium normative, activate partial Browser ownership, establish universal multi-engine equivalence, select a release, or authorize publication/signing/attestation. Candidate/draft markers tied to Final/release promotion remain governed separately.
 
 ### Network Control resource profile
-- [ ] AEP-0012 Draft problem/scope and standards analysis
+- [x] AEP-0012 Draft problem/scope and standards analysis
 - [ ] network-control portability and Proposed-readiness audit
 - [ ] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
 - [ ] reconcile AEP-0012 and complete Draft → Proposed readiness audit
@@ -144,7 +144,7 @@ These checked Browser items therefore record that the reviewed authority, confor
 - [ ] controlled network-fault reference implementation against the portable TCK
 - [ ] cross-mechanism portability acceptance evidence if required by reviewed protocol semantics
 
-The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. The AEP-0012 Draft and its first roadmap item remain incomplete until the reviewed Draft slice is adopted into `main`; Draft text on a topic branch is not protocol adoption. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel facilities, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
+The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. PR #130 adopted the reviewed AEP-0012 Draft problem/scope and standards/interoperability baseline into `main` at exact commit `7f7f613c50520efb2b553d65d4bb85c0e777dc40`; exact-main CI #823 (`33609386257`), Relational Parity #216 (`33609386265`), and Browser Reference #89 (`33609386244`) all passed. This closes only the first Draft-baseline roadmap item: AEP-0012 remains **Draft**, NC-BR-001..NC-BR-012 remain open, and no Network Control Spec/Schema/TCK/runtime/provider/release authority is implied. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel facilities, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
 
 ### Other resource implementations
 - [ ] virtual clock service
