@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Iterable
 
+from .browser_tck_adapter import BROWSER_MANDATORY_CASE_IDS, BrowserTCKAdapter
 from .models import TCKAdapterError, TCKCaseResult
 from .reference_aligned import AlignedReferenceTCKAdapter
 from .reference_environment import ReferenceEnvironmentTCKAdapter
@@ -42,9 +43,22 @@ def _optional_opentelemetry_adapter() -> object | None:
 
 
 class ReferenceConformanceAdapter:
-    """Compose independent reference-domain adapters without overlapping case IDs."""
+    """Compose independent reference-domain adapters without overlapping case IDs.
 
-    def __init__(self, *, capabilities: Iterable[str] = ()) -> None:
+    Browser ownership is opt-in because the base reference wheel must remain
+    usable without a concrete browser implementation. A caller may inject only
+    a fully constructed :class:`BrowserTCKAdapter`; that Browser-specific
+    assembly boundary already enforces the governed 0/8 -> 8/8 invariant.
+    Provider selection and Browser runtime construction therefore remain outside
+    this provider-neutral composite.
+    """
+
+    def __init__(
+        self,
+        *,
+        capabilities: Iterable[str] = (),
+        browser_adapter: BrowserTCKAdapter | None = None,
+    ) -> None:
         capability_set = frozenset(capabilities)
         relational_backend = InMemoryRelationalBackendHarness()
         delegates: list[object] = [
@@ -60,6 +74,17 @@ class ReferenceConformanceAdapter:
             ReferenceSubjectTCKAdapter(),
             ReferenceArtifactTrustTCKAdapter(capabilities=capability_set),
         ]
+        if browser_adapter is not None:
+            if not isinstance(browser_adapter, BrowserTCKAdapter):
+                raise TCKAdapterError(
+                    "Browser composite ownership requires a complete BrowserTCKAdapter"
+                )
+            if browser_adapter.supported_case_ids != BROWSER_MANDATORY_CASE_IDS:
+                raise TCKAdapterError(
+                    "Browser composite ownership must activate exactly all mandatory cases"
+                )
+            delegates.append(browser_adapter)
+
         opentelemetry_adapter = _optional_opentelemetry_adapter()
         if opentelemetry_adapter is not None:
             delegates.append(opentelemetry_adapter)
