@@ -11,48 +11,85 @@ from tests.acceptance.browser import shipping_residual_evidence_runner as runner
 class ShippingResidualTransportTest(unittest.TestCase):
     """Verify transport lifecycle without requiring a locally installed browser."""
 
-    def test_safari_reuses_one_service_across_multiple_session_creations(self) -> None:
+    def test_safari_uses_one_stopped_service_generation_per_session(self) -> None:
         progress = runner._ExecutionProgress()
-        service = Mock()
+        services = [Mock(), Mock(), Mock()]
         drivers = [Mock(), Mock(), Mock()]
+        for service in services:
+            service.process.poll.return_value = 0
 
         with (
-            patch.object(runner, "_new_safari_service", return_value=service) as new_service,
+            patch.object(runner, "_new_safari_service", side_effect=services) as new_service,
             patch.object(runner, "_create_driver", side_effect=drivers) as create_driver,
         ):
-            with runner._DriverTransport(
+            transport = runner._DriverTransport(
                 "safari",
                 progress,
-                safari_diagnostic_log=Path("browser-evidence/safaridriver.log"),
-            ) as transport:
-                created = [
-                    transport.create("clean"),
-                    transport.create("residual"),
-                    transport.create("recreated"),
-                ]
+                safari_diagnostic_dir=Path("browser-evidence/diagnostics"),
+            )
+            for role, expected_driver, expected_service in zip(
+                ("clean", "residual", "recreated"),
+                drivers,
+                services,
+                strict=True,
+            ):
+                with runner._browser_session(transport, role, progress) as driver:
+                    self.assertIs(expected_driver, driver)
+                expected_driver.quit.assert_called_once_with()
+                expected_service.start.assert_called_once_with()
+                expected_service.stop.assert_called_once_with()
 
-        self.assertEqual(drivers, created)
-        new_service.assert_called_once_with(Path("browser-evidence/safaridriver.log"))
-        service.start.assert_called_once_with()
-        service.stop.assert_called_once_with()
-        self.assertEqual(3, progress.created_session_count)
-        self.assertTrue(progress.safari_service_reused)
-        self.assertTrue(progress.safari_service_started)
-        self.assertTrue(progress.safari_service_stopped)
+        self.assertEqual(3, new_service.call_count)
         self.assertEqual(3, create_driver.call_count)
-        for call in create_driver.call_args_list:
+        self.assertEqual(3, progress.created_session_count)
+        self.assertEqual(3, progress.completed_session_count)
+        self.assertEqual(3, progress.safari_service_generations_started)
+        self.assertEqual(3, progress.safari_service_generations_stopped)
+        for call, service in zip(create_driver.call_args_list, services, strict=True):
             self.assertEqual("safari", call.args[0])
             self.assertIs(service, call.kwargs["safari_service"])
+
+    def test_safari_service_is_stopped_when_session_creation_fails(self) -> None:
+        progress = runner._ExecutionProgress()
+        service = Mock()
+        service.process.poll.return_value = 0
+
+        with (
+            patch.object(runner, "_new_safari_service", return_value=service),
+            patch.object(runner, "_create_driver", side_effect=RuntimeError("create failed")),
+        ):
+            transport = runner._DriverTransport(
+                "safari",
+                progress,
+                safari_diagnostic_dir=Path("browser-evidence/diagnostics"),
+            )
+            with self.assertRaisesRegex(RuntimeError, "create failed"):
+                with runner._browser_session(transport, "residual", progress):
+                    self.fail("session body must not execute")
+
+        self.assertEqual("residual:session-create", progress.failure_stage)
+        service.stop.assert_called_once_with()
+        self.assertEqual(1, progress.safari_service_generations_started)
+        self.assertEqual(1, progress.safari_service_generations_stopped)
+        self.assertEqual(0, progress.created_session_count)
 
     def test_session_cleanup_does_not_mask_primary_failure(self) -> None:
         progress = runner._ExecutionProgress()
         driver = Mock()
         driver.quit.side_effect = RuntimeError("quit failed")
         transport = Mock()
-        transport.create.return_value = driver
+        transport.create.return_value = (driver, None)
+
+        # Use the real cleanup implementation while keeping driver creation mocked.
+        real_transport = runner._DriverTransport(
+            "chrome",
+            progress,
+            safari_diagnostic_dir=Path("browser-evidence/diagnostics"),
+        )
+        real_transport.create = transport.create
 
         with self.assertRaisesRegex(ValueError, "primary failure"):
-            with runner._browser_session(transport, "residual", progress):
+            with runner._browser_session(real_transport, "residual", progress):
                 progress.enter("residual:semantic-probe")
                 raise ValueError("primary failure")
 
@@ -63,38 +100,48 @@ class ShippingResidualTransportTest(unittest.TestCase):
         self.assertEqual("RuntimeError", cleanup["error_type"])
         self.assertEqual("quit failed", cleanup["error"])
 
-    def test_transport_cleanup_does_not_mask_primary_failure(self) -> None:
+    def test_service_cleanup_does_not_mask_primary_failure(self) -> None:
         progress = runner._ExecutionProgress()
+        driver = Mock()
         service = Mock()
         service.stop.side_effect = RuntimeError("service stop failed")
+        transport = runner._DriverTransport(
+            "safari",
+            progress,
+            safari_diagnostic_dir=Path("browser-evidence/diagnostics"),
+        )
+        transport.create = Mock(return_value=(driver, service))
 
-        with patch.object(runner, "_new_safari_service", return_value=service):
-            with self.assertRaisesRegex(ValueError, "primary failure"):
-                with runner._DriverTransport(
-                    "safari",
-                    progress,
-                    safari_diagnostic_log=Path("browser-evidence/safaridriver.log"),
-                ):
-                    progress.enter("recreated:semantic-probe")
-                    raise ValueError("primary failure")
+        with self.assertRaisesRegex(ValueError, "primary failure"):
+            with runner._browser_session(transport, "recreated", progress):
+                progress.enter("recreated:semantic-probe")
+                raise ValueError("primary failure")
 
         self.assertEqual("recreated:semantic-probe", progress.failure_stage)
         self.assertEqual(1, len(progress.cleanup_errors))
         self.assertEqual(
-            "transport:safari-driver-service-stop",
+            "recreated:safaridriver-service-stop",
             progress.cleanup_errors[0]["stage"],
         )
 
-    def test_diagnostic_tail_is_bounded_to_failure_context(self) -> None:
+    def test_diagnostic_tails_are_bounded_and_role_scoped(self) -> None:
+        progress = runner._ExecutionProgress()
         with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "safaridriver.log"
-            log.write_text("a" * (runner._DIAGNOSTIC_TAIL_LIMIT + 17), encoding="utf-8")
+            root = Path(directory)
+            clean_log = root / "clean.log"
+            residual_log = root / "residual.log"
+            clean_log.write_text("a" * (runner._DIAGNOSTIC_TAIL_LIMIT + 17), encoding="utf-8")
+            residual_log.write_text("residual diagnostic", encoding="utf-8")
+            progress.safari_diagnostic_logs = {
+                "clean": clean_log,
+                "residual": residual_log,
+            }
 
-            tail = runner._diagnostic_tail(log)
+            tails = runner._safari_diagnostic_tails(progress)
 
-        self.assertIsNotNone(tail)
-        self.assertEqual(runner._DIAGNOSTIC_TAIL_LIMIT, len(tail or ""))
-        self.assertEqual("a" * runner._DIAGNOSTIC_TAIL_LIMIT, tail)
+        self.assertEqual(runner._DIAGNOSTIC_TAIL_LIMIT, len(tails["clean"]))
+        self.assertEqual("a" * runner._DIAGNOSTIC_TAIL_LIMIT, tails["clean"])
+        self.assertEqual("residual diagnostic", tails["residual"])
 
 
 if __name__ == "__main__":

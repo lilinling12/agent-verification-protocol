@@ -16,12 +16,11 @@ BPR-008 isolation strategy across independent WebDriver sessions:
 Browser/driver/session details are evidence identity only. They do not become
 portable AVP state or normative Browser semantics.
 
-For Safari, the transport deliberately separates SafariDriver service lifetime
-from WebDriver session lifetime. One long-lived safaridriver service hosts the
-three strictly sequential, independently verified WebDriver sessions. This
-avoids making driver-daemon restart behavior part of the BAE-011 oracle while
-preserving Safari's one-active-session-at-a-time constraint and the exact
-session-isolation assertions below.
+For Safari, each WebDriver session owns one explicitly managed SafariDriver
+service generation. The runner starts the service, creates exactly one session,
+destroys that session, and then positively stops the service process before the
+next generation starts. This mirrors Safari's one-active-session-at-a-time
+constraint without treating provider-daemon lifetime as Browser protocol state.
 """
 
 from __future__ import annotations
@@ -83,10 +82,9 @@ class _ExecutionProgress:
     completed_session_count: int = 0
     browser_identity: BrowserIdentity | None = None
     cleanup_errors: list[dict[str, str]] = field(default_factory=list)
-    safari_service_reused: bool = False
-    safari_service_started: bool = False
-    safari_service_stopped: bool = False
-    safari_diagnostic_log: Path | None = None
+    safari_service_generations_started: int = 0
+    safari_service_generations_stopped: int = 0
+    safari_diagnostic_logs: dict[str, Path] = field(default_factory=dict)
 
     def enter(self, stage: str) -> None:
         self.current_stage = stage
@@ -108,9 +106,8 @@ class _ExecutionProgress:
         return {
             "createdSessionCount": self.created_session_count,
             "completedSessionCount": self.completed_session_count,
-            "safariDriverServiceReuse": self.safari_service_reused,
-            "safariDriverServiceStarted": self.safari_service_started,
-            "safariDriverServiceStopped": self.safari_service_stopped,
+            "safariDriverServiceGenerationsStarted": self.safari_service_generations_started,
+            "safariDriverServiceGenerationsStopped": self.safari_service_generations_stopped,
             "cleanupErrors": list(self.cleanup_errors),
         }
 
@@ -221,7 +218,7 @@ def _command_version(*command: str) -> str | None:
 
 
 def _new_safari_service(diagnostic_log: Path) -> Any:
-    """Create one explicitly caller-owned SafariDriver service for this case."""
+    """Create one explicitly caller-owned SafariDriver service generation."""
 
     from selenium.webdriver.safari.service import Service
 
@@ -267,64 +264,93 @@ def _create_driver(engine: str, *, safari_service: Any | None = None) -> Any:
 
 
 class _DriverTransport:
-    """Own provider transport lifetime without owning Browser protocol semantics."""
+    """Own provider transport generations without owning Browser semantics."""
 
     def __init__(
         self,
         engine: str,
         progress: _ExecutionProgress,
         *,
-        safari_diagnostic_log: Path,
+        safari_diagnostic_dir: Path,
     ) -> None:
         self._engine = engine
         self._progress = progress
-        self._safari_diagnostic_log = safari_diagnostic_log
-        self._safari_service: Any | None = None
+        self._safari_diagnostic_dir = safari_diagnostic_dir
 
-    def __enter__(self) -> "_DriverTransport":
-        if self._engine != "safari":
-            return self
+    def _safari_log(self, role: str) -> Path:
+        return self._safari_diagnostic_dir / f"safaridriver-{role}.log"
 
-        self._progress.enter("transport:safari-driver-service-create")
-        self._progress.safari_diagnostic_log = self._safari_diagnostic_log
-        self._safari_service = _new_safari_service(self._safari_diagnostic_log)
-        self._progress.safari_service_reused = True
-        self._progress.enter("transport:safari-driver-service-start")
-        self._safari_service.start()
-        self._progress.safari_service_started = True
-        self._progress.enter("transport:safari-driver-service-ready")
-        return self
+    def create(self, role: str) -> tuple[Any, Any | None]:
+        safari_service: Any | None = None
+        if self._engine == "safari":
+            diagnostic_log = self._safari_log(role)
+            self._progress.safari_diagnostic_logs[role] = diagnostic_log
+            self._progress.enter(f"{role}:safaridriver-service-create")
+            safari_service = _new_safari_service(diagnostic_log)
+            self._progress.enter(f"{role}:safaridriver-service-start")
+            safari_service.start()
+            self._progress.safari_service_generations_started += 1
+            self._progress.enter(f"{role}:safaridriver-service-ready")
 
-    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
-        if self._safari_service is None:
-            return False
-
-        if exc_type is not None:
-            self._progress.capture_failure()
-
-        self._progress.enter("transport:safari-driver-service-stop")
+        self._progress.enter(f"{role}:session-create")
         try:
-            self._safari_service.stop()
+            driver = _create_driver(self._engine, safari_service=safari_service)
+        except BaseException:
+            self._progress.capture_failure()
+            if safari_service is not None:
+                self._stop_safari_service(role, safari_service, primary_failure=True)
+            raise
+
+        self._progress.created_session_count += 1
+        return driver, safari_service
+
+    def cleanup(
+        self,
+        role: str,
+        driver: Any,
+        safari_service: Any | None,
+        *,
+        primary_failure: bool,
+    ) -> None:
+        session_stage = (
+            f"{role}:session-quit-after-failure" if primary_failure else f"{role}:session-quit"
+        )
+        self._progress.enter(session_stage)
+        try:
+            driver.quit()
         except Exception as cleanup_exc:
-            self._progress.record_cleanup_error(
-                "transport:safari-driver-service-stop",
-                cleanup_exc,
-            )
-            if exc_type is None:
+            self._progress.record_cleanup_error(session_stage, cleanup_exc)
+            if not primary_failure:
+                self._progress.capture_failure()
+                raise
+
+        if safari_service is not None:
+            self._stop_safari_service(role, safari_service, primary_failure=primary_failure)
+
+        if not primary_failure:
+            self._progress.completed_session_count += 1
+
+    def _stop_safari_service(
+        self,
+        role: str,
+        service: Any,
+        *,
+        primary_failure: bool,
+    ) -> None:
+        stage = f"{role}:safaridriver-service-stop"
+        self._progress.enter(stage)
+        try:
+            service.stop()
+            process = getattr(service, "process", None)
+            if process is not None and process.poll() is None:
+                raise RuntimeError("SafariDriver service process remained alive after stop()")
+        except Exception as cleanup_exc:
+            self._progress.record_cleanup_error(stage, cleanup_exc)
+            if not primary_failure:
                 self._progress.capture_failure()
                 raise
         else:
-            self._progress.safari_service_stopped = True
-        return False
-
-    def create(self, role: str) -> Any:
-        self._progress.enter(f"{role}:session-create")
-        driver = _create_driver(
-            self._engine,
-            safari_service=self._safari_service if self._engine == "safari" else None,
-        )
-        self._progress.created_session_count += 1
-        return driver
+            self._progress.safari_service_generations_stopped += 1
 
 
 @contextmanager
@@ -335,22 +361,25 @@ def _browser_session(
 ) -> Iterator[Any]:
     """Create one session and preserve the primary failure across cleanup."""
 
-    driver = transport.create(role)
+    driver, safari_service = transport.create(role)
     try:
         yield driver
     except BaseException:
         progress.capture_failure()
-        cleanup_stage = f"{role}:session-quit-after-failure"
-        progress.enter(cleanup_stage)
-        try:
-            driver.quit()
-        except Exception as cleanup_exc:
-            progress.record_cleanup_error(cleanup_stage, cleanup_exc)
+        transport.cleanup(
+            role,
+            driver,
+            safari_service,
+            primary_failure=True,
+        )
         raise
     else:
-        progress.enter(f"{role}:session-quit")
-        driver.quit()
-        progress.completed_session_count += 1
+        transport.cleanup(
+            role,
+            driver,
+            safari_service,
+            primary_failure=False,
+        )
 
 
 def _engine_family(engine: str) -> str:
@@ -770,6 +799,15 @@ def _diagnostic_tail(path: Path | None) -> str | None:
     return value[-_DIAGNOSTIC_TAIL_LIMIT:] or None
 
 
+def _safari_diagnostic_tails(progress: _ExecutionProgress) -> dict[str, str]:
+    tails: dict[str, str] = {}
+    for role, path in progress.safari_diagnostic_logs.items():
+        tail = _diagnostic_tail(path)
+        if tail:
+            tails[role] = tail
+    return tails
+
+
 def run(engine: str, output: Path) -> int:
     try:
         import selenium  # noqa: F401 - dependency availability check
@@ -779,21 +817,21 @@ def run(engine: str, output: Path) -> int:
         ) from exc
 
     progress = _ExecutionProgress()
-    safari_diagnostic_log = output.with_suffix(".safaridriver.log")
+    safari_diagnostic_dir = output.parent / f"{output.stem}-safaridriver"
 
     with _fixture_server() as port:
         try:
-            with _DriverTransport(
+            transport = _DriverTransport(
                 engine,
                 progress,
-                safari_diagnostic_log=safari_diagnostic_log,
-            ) as transport:
-                identity, case, semantic_session_evidence = _run_case(
-                    engine,
-                    port,
-                    transport,
-                    progress,
-                )
+                safari_diagnostic_dir=safari_diagnostic_dir,
+            )
+            identity, case, semantic_session_evidence = _run_case(
+                engine,
+                port,
+                transport,
+                progress,
+            )
             session_evidence = {
                 **semantic_session_evidence,
                 **progress.transport_evidence(),
@@ -807,9 +845,9 @@ def run(engine: str, output: Path) -> int:
                 "failureStage": progress.failure_stage or progress.current_stage,
                 **progress.transport_evidence(),
             }
-            diagnostic_tail = _diagnostic_tail(progress.safari_diagnostic_log)
-            if diagnostic_tail:
-                details["safariDriverDiagnosticTail"] = diagnostic_tail
+            diagnostic_tails = _safari_diagnostic_tails(progress)
+            if diagnostic_tails:
+                details["safariDriverDiagnosticTails"] = diagnostic_tails
             case = CaseResult(
                 case_id="BAE-011",
                 status="fail",
@@ -838,7 +876,7 @@ def run(engine: str, output: Path) -> int:
             "sessionIsolation": session_evidence,
             "safariNativeAutomationIsolation": engine == "safari",
             "safariDriverServiceStrategy": (
-                "single-service-sequential-sessions" if engine == "safari" else None
+                "one-service-generation-per-session" if engine == "safari" else None
             ),
         },
         "cases": [asdict(case)],
