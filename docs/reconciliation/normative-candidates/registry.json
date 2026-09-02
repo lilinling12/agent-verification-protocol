@@ -39,6 +39,23 @@
         "schemas/relational-state-manifest.schema.json",
         "schemas/relational-value.schema.json"
       ]
+    },
+    {
+      "domain": "browser",
+      "lineage": {
+        "type": "accepted-aep",
+        "path": "rfcs/AEP-0011-browser-resource-profile.md"
+      },
+      "spec": [
+        "spec/browser/browser-state-contract.md",
+        "spec/browser/browser-serialization-contract.md"
+      ],
+      "requirement_index": "spec/browser/requirement-index.yaml",
+      "profile": "avp-browser-unpartitioned-cookie-localstorage-v0.1",
+      "owned_schemas": [
+        "schemas/browser-state-image.schema.json",
+        "schemas/browser-state-manifest.schema.json"
+      ]
     }
   ]
 }

@@ -1,0 +1,54 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-STATE-IMAGE-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-012, AVP-BROWSER-023]
+applicability: mandatory
+type: schema-and-semantic
+vector:
+  manifestDigest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  selectedOrigins: [https://a.example]
+  selectedCookieDomains: [a.example]
+  image:
+    origins:
+      - origin: https://a.example
+        localStorage:
+          - {key: AGE, value: AGEAYg}
+    cookies:
+      - name: sid
+        value: abc
+        domain: a.example
+        hostOnly: true
+        path: /
+        persistent: false
+        secure: true
+        httpOnly: true
+        sameSite: Default
+      - name: remember
+        value: "yes"
+        domain: a.example
+        hostOnly: false
+        path: /
+        persistent: true
+        expiry: {unixSeconds: "1800000000", nanoseconds: 123456789}
+        secure: true
+        httpOnly: false
+        sameSite: Lax
+  negativeControls:
+    - missing-selected-origin
+    - extra-in-scope-cookie
+    - duplicate-origin
+    - duplicate-cookie-identity
+    - session-cookie-with-expiry
+    - persistent-cookie-without-expiry
+    - floating-point-expiry
+    - transformed-localstorage-value
+expect:
+  completeSelectedStateRequired: true
+  manifestBindingRequired: true
+  closedSerializedShape: true
+  persistentExpiryLossless: true
+  invalidControlsRejected: true

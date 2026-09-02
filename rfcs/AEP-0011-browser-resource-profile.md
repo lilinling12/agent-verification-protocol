@@ -1,13 +1,15 @@
 # AEP-0011 — Browser Resource Profile v0.1
 
-- Status: Proposed
+- Status: Accepted
 - Authors: AVP maintainers and contributors
 - Created: 2026-08-27
 - Portability audit: `docs/design/alpha3-browser-resource-portability-audit.md`
 - Proposed-readiness evidence: `docs/design/alpha3-browser-resource-proposed-readiness-audit.md`
 - Lifecycle decision: `docs/acceptance/alpha3-aep-0011-proposed-decision.md`
+- Accepted decision: `docs/acceptance/alpha3-aep-0011-accepted-decision.md`
 - Formal Proposed review: `docs/design/alpha3-browser-resource-formal-proposed-review.md`
 - Proposed-review blocker ledger: `docs/design/alpha3-browser-resource-proposed-review-blockers.md`
+- Acceptance-oriented review: `docs/acceptance/alpha3-aep-0011-acceptance-review.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (`Accepted`)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Browser Resource
@@ -32,7 +34,7 @@ revision: "0.1"
 
 The capability is a Browser **state** capability. It does not imply a complete browser-profile checkpoint and does not grant a universal Browser Agent action API. Partition-aware storage, richer browser state, actions, and observations require separately governed capabilities.
 
-AEP-0011 remains **Proposed**. Proposed status makes these decisions reviewable; it does not make the Browser profile Accepted, normative, released, or authorized for Browser Spec/Schema/TCK/runtime implementation.
+AEP-0011 is **Accepted, not Final**. Accepted status approves this portable Browser direction and authorizes downstream normative closure through the governed `Spec -> requirement index -> Schema -> TCK -> conformance harness` authority chain. It does not make the profile released or Final, does not make provider/runtime behavior protocol authority, and does not authorize backend-first Browser implementation before the portable authority slice is reviewable.
 
 ## Problem
 
@@ -236,6 +238,36 @@ Equality is byte-for-byte equality of the decoded UTF-16 code-unit sequence. Can
 
 The BrowserStateManifest binds the canonical representation revision so a future representation change cannot silently reinterpret existing state identity.
 
+### Canonical Browser collection ordering and JSON bytes
+
+Browser v0.1 content-addressed identity uses one deterministic canonical collection order **before** canonical JSON serialization. Backend/browser enumeration order, insertion order, object iteration order, and transport-return order are never authoritative.
+
+Canonical Browser v0.1 JSON bytes use RFC 8785 JCS after:
+
+1. exact Web Storage `DOMString` values have been converted to the code-unit/base64url representation above; and
+2. every profile-defined array has been ordered by the rules below.
+
+The canonical comparators are:
+
+- canonical tuple-origin strings compare lexicographically by the unsigned UTF-8 bytes of their WHATWG canonical serialization, shorter exact prefix first;
+- canonical stored-cookie domain strings compare lexicographically by unsigned UTF-8 bytes of the canonical stored-domain text, shorter exact prefix first;
+- cookie `name` and `path` identity components compare lexicographically by their exact RFC cookie octet sequence, shorter exact prefix first;
+- `hostOnly` orders `false` before `true`.
+
+The canonical collection orders are:
+
+1. Manifest selected localStorage origins: ascending canonical tuple-origin comparator;
+2. Manifest selected cookie stored domains: ascending canonical stored-domain comparator;
+3. `BrowserStateImage.origins[]`: ascending canonical tuple-origin comparator;
+4. each origin's localStorage entries: ascending unsigned UTF-16 key order already defined above;
+5. `BrowserStateImage.cookies[]`: lexicographic order over the portable identity tuple `(name, domain, hostOnly, path)` using the component comparators above.
+
+Collection membership remains the semantic selection/equality rule; input/list order does not add meaning. Duplicate selection values and duplicate BrowserStateImage entry identities remain invalid.
+
+A BrowserStateManifest or BrowserStateImage claiming this profile MUST be emitted in this profile-defined collection order before its Artifact/state digest is computed. A syntactically parseable document with noncanonical collection order is not valid canonical identity bytes for this profile. An implementation may parse such input and emit a new canonical document as distinct retained bytes, but it MUST NOT treat the raw noncanonical Artifact digest as the Browser v0.1 Manifest/Image identity.
+
+The canonical representation revision bound by BrowserStateManifest includes these ordering and JCS rules. A future change to any comparator or collection order is a representation revision change and cannot silently reinterpret existing identity.
+
 ## Closed state-selection grammar
 
 Browser v0.1 fixes one finite, vendor-neutral selection grammar. The schema may choose field spelling later, but MUST preserve these semantics.
@@ -250,7 +282,7 @@ The Manifest contains a finite, duplicate-free list of exact canonical stored-co
 
 ### Selection restrictions
 
-Selection lists are canonicalized and immutable for the materialized resource. The grammar has no regex, glob, suffix/subdomain matcher, vendor callback, backend-native query expression, runtime code, Playwright filter, CDP predicate, or partition selector.
+Selection membership is set-like and immutable for the materialized resource; serialized selection arrays MUST use the canonical order defined above before Manifest identity is computed. The grammar has no regex, glob, suffix/subdomain matcher, vendor callback, backend-native query expression, runtime code, Playwright filter, CDP predicate, or partition selector.
 
 Selection semantics are complete-set semantics. Missing selected state, extra in-scope state, transformed values, changed cookie scope, or state projected under a different storage identity is non-equivalent.
 
@@ -315,9 +347,11 @@ BrowserStateImage
     localStorage[]
 ```
 
-The exact schema field names remain downstream work; the selection and equality semantics do not.
+The exact schema field names remain downstream work; the selection, equality, canonical collection ordering, and canonical-byte semantics do not.
 
 The Manifest defines interpretation and selection rules and does not point to the baseline StateImage. The baseline StateImage binds the Manifest digest. Runtime snapshot StateImages are generated Environment/Evidence state bound through SnapshotRef and do not mutate immutable baseline identity inputs.
+
+Manifest and StateImage digests are computed over the profile-ordered RFC 8785 JCS exact UTF-8 bytes defined above. Browser/backend enumeration order cannot alter those bytes.
 
 No automation-library export format becomes canonical authority.
 
@@ -356,7 +390,7 @@ A snapshot captures the complete selected authoritative cookie + `localStorage` 
 
 Successful snapshot creation requires evaluator-authoritative lossless projection of the complete selected surface after the profile-relevant settlement witness. Backend command success or an automation-library export object alone is insufficient.
 
-A foreign, stale, corrupted, incompatible, or wrong-resource SnapshotRef fails closed under existing Environment semantics.
+A foreign, stale, corrupted, incompatible, wrong-resource, or noncanonical SnapshotRef/StateImage fails closed under existing Environment and Browser canonical-identity semantics.
 
 ## Restore fidelity
 
@@ -373,10 +407,10 @@ A successful restore means that, under the same immutable BrowserStateManifest/p
 1. the target selected state is restored by any conforming backend mechanism;
 2. every selected cookie satisfies the temporal restore-eligibility rule;
 3. the profile-relevant settlement witness is established;
-4. independent evaluator reprojection yields exactly the complete target selected authoritative state;
+4. independent evaluator reprojection yields exactly the complete target selected authoritative state in canonical profile order;
 5. required absence is preserved and no extra in-scope state exists.
 
-Missing, extra, scope-shifted, transformed, ambiguously projected, or temporally ineligible selected state fails closed.
+Missing, extra, scope-shifted, transformed, ambiguously projected, temporally ineligible, or noncanonically identified selected state fails closed.
 
 `STATE_EQUIVALENT` is intentionally scoped. It does not claim equality of DOM, page topology, `sessionStorage`, navigation history, browser-internal metadata, worker lifecycle, caches, excluded storage, process continuation, rendering, or other excluded surfaces.
 
@@ -388,7 +422,7 @@ Reset establishes the immutable bound baseline BrowserStateImage and then indepe
 
 An implementation may recreate an isolated session and reseed state, clear/repopulate state safely, or use another mechanism. The protocol tests the observable result rather than prescribing automation commands.
 
-Successful reset requires the same restore-eligibility, settlement, independent-reprojection, complete-set, and residual-noninterference rules as successful restore. An implementation cannot silently downgrade or drop an unsupported selected item.
+Successful reset requires the same restore-eligibility, settlement, independent-reprojection, complete-set, canonical-ordering, and residual-noninterference rules as successful restore. An implementation cannot silently downgrade or drop an unsupported selected item.
 
 ## Operation settling and observation consistency
 
@@ -491,7 +525,7 @@ No Alpha 2 semantics change. No release version is selected. The currently plann
 
 Browser-profile conformance must be language-neutral, backend-name-neutral, and execution-sensitive.
 
-Mandatory behavioral cases execute a real browser runtime through the implementation under test. Metadata declarations, mocks, or self-certification cannot substitute for behavior at the certified boundary.
+Mandatory behavioral cases execute a real browser runtime through the implementation under test where browser behavior is the certified boundary. Metadata declarations, mocks, or self-certification cannot substitute for behavior at that boundary. Protocol-owned canonicalization cases that do not depend on browser behavior remain provider-neutral and must not derive expected ordering from a browser/automation enumeration.
 
 Mandatory conformance families should cover at least:
 
@@ -503,17 +537,18 @@ Mandatory conformance families should cover at least:
 6. complete unpartitioned-cookie identity including host-only/domain differentiation;
 7. distinct `SameSite=Default` handling and temporal restore eligibility;
 8. closed complete-set selection semantics;
-9. SnapshotRef ownership/integrity and stale/foreign rejection;
-10. mutation -> snapshot -> restore -> independent reprojection;
-11. reset -> independent baseline reprojection;
-12. restore fidelity exactly `STATE_EQUIVALENT` and rejection of false `EXACT`;
-13. Resource Capability versus Subject Capability separation;
-14. evaluator-private credential non-disclosure;
-15. positive settlement-witness enforcement;
-16. residual-state noninterference/fail-closed behavior;
-17. released-resource and cleanup behavior;
-18. explicitly excluded required state failing closed;
-19. metadata-identical negative implementations that break real behavior.
+9. canonical collection permutation invariance for Manifest/Image identity;
+10. SnapshotRef ownership/integrity and stale/foreign rejection;
+11. mutation -> snapshot -> restore -> independent reprojection;
+12. reset -> independent baseline reprojection;
+13. restore fidelity exactly `STATE_EQUIVALENT` and rejection of false `EXACT`;
+14. Resource Capability versus Subject Capability separation;
+15. evaluator-private credential non-disclosure;
+16. positive settlement-witness enforcement;
+17. residual-state noninterference/fail-closed behavior;
+18. released-resource and cleanup behavior;
+19. explicitly excluded required state failing closed;
+20. metadata-identical negative implementations that break real behavior.
 
 Negative controls should include implementations that:
 
@@ -522,6 +557,7 @@ Negative controls should include implementations that:
 - collapse host-only and domain-scoped cookies with otherwise matching fields;
 - normalize `SameSite=Default` to explicit `Lax`;
 - recreate temporally ineligible cookies and falsely report equivalence;
+- preserve backend/browser enumeration order in canonical Manifest/Image arrays and therefore make equivalent state hash differently;
 - corrupt an unmatched-surrogate `DOMString` through host-language JSON handling;
 - report restore success without independent reprojection;
 - falsely report `EXACT`;
@@ -616,39 +652,46 @@ Rejected. A universal Subject automation API does not solve Environment state/re
 
 Rejected. Timing heuristics are not equivalent to a positive witness that accepted mutations affecting selected authoritative state are terminal.
 
+### Preserve provider enumeration order in canonical Browser state
+
+Rejected. Provider enumeration order is not portable state meaning. Array ordering that participates in content-addressed identity is fixed by the profile before JCS serialization.
+
 ## Proposed-review blocker disposition
 
-The formal Proposed review is authoritative over conflicting Draft-era design wording.
+The formal Proposed review and later acceptance-oriented re-review are authoritative over conflicting Draft-era design wording.
 
 - **BPR-001 — PROTOCOL DECISION INCORPORATED:** public identity is `state.browser` / `avp-browser-unpartitioned-cookie-localstorage-v0.1` / `0.1`.
 - **BPR-002 — PROTOCOL DECISION INCORPORATED:** localStorage is explicitly unpartitioned and tuple-origin identity is admitted only where that boundary is proven.
-- **BPR-003 — PROTOCOL DECISION INCORPORATED; ACCEPTANCE EVIDENCE REQUIRED:** cookie identity remains `(name, domain, hostOnly, path)` and lossy projection fails closed; three-engine evidence remains required before acceptance.
-- **BPR-004 — PROTOCOL DECISION INCORPORATED; ACCEPTANCE EVIDENCE REQUIRED:** `SameSite=Default` is distinct and successful restore is limited by temporal restore eligibility; unresolved creation-time-dependent behavior fails closed.
-- **BPR-005 — PROTOCOL DECISION INCORPORATED:** finite exact-origin/exact-stored-domain complete-set selection grammar is fixed here.
+- **BPR-003 — PROTOCOL DECISION INCORPORATED; ACCEPTANCE EVIDENCE SATISFIED:** cookie identity remains `(name, domain, hostOnly, path)`; lossy projection fails closed and the independently reviewable provenance path is evidenced across Chromium/Gecko/WebKit.
+- **BPR-004 — PROTOCOL DECISION INCORPORATED; ACCEPTANCE EVIDENCE SATISFIED:** `SameSite=Default` is distinct and successful restore is limited by temporal restore eligibility; both fail-closed and positive eligible classes are evidenced across Chromium/Gecko/WebKit.
+- **BPR-005 — PROTOCOL DECISION INCORPORATED:** finite exact-origin/exact-stored-domain complete-set selection membership grammar is fixed here.
 - **BPR-006 — PROTOCOL DECISION INCORPORATED:** accepted projection requires a positive evaluator/control settlement witness; timeouts and idle heuristics do not prove settlement.
 - **BPR-007 — PROTOCOL DECISION INCORPORATED:** exact `DOMString` values use protocol-owned UTF-16-code-unit/base64url representation and code-unit ordering.
 - **BPR-008 — PROTOCOL DECISION INCORPORATED:** materially relevant excluded state requires noninterference, immutable policy/identity binding, or fail-closed insufficiency.
-- **BPR-009 — OPEN ACCEPTANCE-EVIDENCE GATE:** Chromium/Gecko/WebKit evidence remains required before acceptance-oriented review can close.
+- **BPR-009 — ACCEPTANCE-EVIDENCE MATRIX SATISFIED:** required Chromium/Gecko/WebKit evidence is recorded by the acceptance-evidence disposition.
+- **BPR-010 — PROTOCOL DECISION INCORPORATED; FOCUSED ACCEPTANCE EVIDENCE SATISFIED:** Manifest/Image collection order is profile-defined before JCS so equivalent logical state cannot obtain different content identity from provider enumeration order; BAE-013 and the repeated exact-head acceptance review close this blocker.
 
-These dispositions do not self-approve AEP-0011 and do not close BPR-009 by assertion.
+BPR-001 through BPR-010 are closed for the Accepted AEP-0011 direction. Their evidence and review records remain acceptance provenance and do not make downstream Schema, TCK, harness, or reference implementation behavior protocol authority.
 
 ## Draft design-blocker disposition
 
 The prior Draft blockers BR-BR-001 through BR-BR-010 remain historical provenance. Where Draft-era audits or readiness documents conflict with this Proposed-review blocker resolution, this AEP supersedes those earlier design assumptions.
 
-In particular, earlier wording that described tuple-origin `localStorage` without an explicit unpartitioned boundary, deferred selection grammar/canonical string representation downstream, or treated two-engine evidence as sufficient is superseded.
+In particular, earlier wording that described tuple-origin `localStorage` without an explicit unpartitioned boundary, deferred selection grammar/canonical string representation downstream, treated two-engine evidence as sufficient, or left Browser Manifest/Image collection ordering to provider enumeration is superseded.
 
 ## Governance boundary
 
-AEP-0011 remains **Proposed**. This blocker-resolution edit does not authorize `Proposed -> Accepted` and does not authorize Browser normative Spec/requirement-index/schema/TCK, backend-neutral harness, Playwright/Selenium/WebDriver/CDP/BiDi reference implementation, release selection, publication, signing, attestation, repository split, or plugin-framework work.
+AEP-0011 is **Accepted, not Final**. The explicit protocol-maintainer decision is recorded in `docs/acceptance/alpha3-aep-0011-accepted-decision.md`.
 
-The next governed Browser work after adoption of these protocol edits is:
+Acceptance authorizes Browser normative closure in authority order:
 
-1. produce reviewable BPR-003/BPR-004/BPR-009 cross-engine acceptance evidence against Chromium, Gecko, and WebKit families without letting any provider API define the protocol;
-2. perform an acceptance-oriented exact-head protocol re-review against the blocker-resolution head and evidence;
-3. only if that review finds no remaining semantic blocker, request a separate explicit protocol-maintainer `Proposed -> Accepted` decision.
+1. derive the Browser normative specification and requirement index from this Accepted direction;
+2. define closed machine-readable schemas where serialized Browser protocol resources require them;
+3. create the provider-neutral, execution-sensitive Browser TCK from the normative requirements;
+4. close backend-neutral conformance-harness and privileged fixture-control prerequisites identified by readiness review;
+5. only after the portable authority slice is reviewable, implement a Browser provider/reference runtime against that authority.
 
-Generic continuation does not authorize item 3. Repository merge remains separately authorized.
+Acceptance does **not** authorize AEP-0011 `Final`, provider-native semantics as portable authority, backend-first Playwright/Selenium/WebDriver/CDP/BiDi implementation, release selection, publication, signing, attestation, repository split, plugin-framework work, speculative `BaseBrowserBackend` / `Base*Adapter` hierarchies, or merge of the active stacked PR chain. Repository merge remains a separate explicit authorization.
 
 ## References
 
@@ -656,6 +699,10 @@ Generic continuation does not authorize item 3. Repository merge remains separat
 - Environment Fabric contract — `spec/fabric/environment-fabric-contract.md`
 - Browser portability audit — `docs/design/alpha3-browser-resource-portability-audit.md`
 - Formal Proposed review — `docs/design/alpha3-browser-resource-formal-proposed-review.md`
+- Acceptance-oriented review — `docs/acceptance/alpha3-aep-0011-acceptance-review.md`
+- Acceptance-evidence disposition — `docs/acceptance/alpha3-browser-aep0011-acceptance-evidence-disposition.md`
+- BPR-010 closure review — `docs/acceptance/alpha3-aep-0011-bpr010-closure-review.md`
+- Accepted decision — `docs/acceptance/alpha3-aep-0011-accepted-decision.md`
 - Proposed-review blocker ledger — `docs/design/alpha3-browser-resource-proposed-review-blockers.md`
 - WHATWG HTML — <https://html.spec.whatwg.org/>
 - WHATWG Web IDL — <https://webidl.spec.whatwg.org/>

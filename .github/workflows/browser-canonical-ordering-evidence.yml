@@ -1,0 +1,81 @@
+name: Browser Canonical Ordering Evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-canonical-ordering-evidence.yml'
+      - 'tests/acceptance/browser/canonical_ordering_evidence_runner.py'
+      - 'tests/acceptance/browser/bind_evidence_source.py'
+      - 'rfcs/AEP-0011-browser-resource-profile.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-canonical-ordering-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVP_EVIDENCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  canonical-ordering:
+    name: BAE-013 — Provider-Neutral Canonical Ordering
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Compile focused evidence runner
+        run: python -m py_compile tests/acceptance/browser/canonical_ordering_evidence_runner.py
+
+      - name: Execute permutation and negative-control evidence
+        run: |
+          python tests/acceptance/browser/canonical_ordering_evidence_runner.py \
+            --output browser-evidence/browser-canonical-ordering-evidence.json
+
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-canonical-ordering-evidence.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+
+      - name: Show compact canonical-ordering disposition
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('browser-evidence/browser-canonical-ordering-evidence.json')
+          if path.exists():
+              document = json.loads(path.read_text())
+              print(f"source={document.get('repositorySha')} binding={document.get('sourceBinding')}")
+              for case in document.get('cases', []):
+                  details = case.get('details', {})
+                  print(
+                      f"{case['case_id']}={case['status']} "
+                      f"permutations={details.get('permutationsExercised')} "
+                      f"digest={details.get('canonicalDigest')} "
+                      f"negativeDigests={details.get('providerOrderNegativeDigestCount')}"
+                  )
+          PY
+
+      - name: Upload exact-head canonical-ordering evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-canonical-ordering-evidence-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-canonical-ordering-evidence.json
+          if-no-files-found: warn
+          retention-days: 30

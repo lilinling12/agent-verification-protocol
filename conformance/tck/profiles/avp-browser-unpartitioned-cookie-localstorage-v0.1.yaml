@@ -1,0 +1,33 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceProfile
+metadata:
+  name: avp-browser-unpartitioned-cookie-localstorage-v0.1
+  version: 0.1.0
+  status: draft
+specVersion: "0.1"
+requirements:
+  mandatory:
+    - AVP-BROWSER-001
+    - AVP-BROWSER-002
+    - AVP-BROWSER-003
+    - AVP-BROWSER-004
+    - AVP-BROWSER-005
+    - AVP-BROWSER-006
+    - AVP-BROWSER-007
+    - AVP-BROWSER-008
+    - AVP-BROWSER-009
+    - AVP-BROWSER-010
+    - AVP-BROWSER-011
+    - AVP-BROWSER-012
+    - AVP-BROWSER-013
+    - AVP-BROWSER-014
+    - AVP-BROWSER-015
+    - AVP-BROWSER-016
+    - AVP-BROWSER-017
+    - AVP-BROWSER-018
+    - AVP-BROWSER-019
+    - AVP-BROWSER-020
+    - AVP-BROWSER-021
+    - AVP-BROWSER-022
+    - AVP-BROWSER-023
+  conditional: []

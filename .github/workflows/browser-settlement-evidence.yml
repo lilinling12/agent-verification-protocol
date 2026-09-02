@@ -1,0 +1,98 @@
+name: Browser Settlement Evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-settlement-evidence.yml'
+      - 'tests/acceptance/browser/settlement_evidence_runner.py'
+      - 'tests/acceptance/browser/bind_evidence_source.py'
+      - 'docs/design/alpha3-browser-cross-engine-acceptance-evidence.md'
+      - 'rfcs/AEP-0011-browser-resource-profile.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-settlement-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVP_EVIDENCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  settlement-witness:
+    name: Settlement Witness — Pre-Acceptance Evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned evidence transport
+        run: python -m pip install 'playwright==1.62.0'
+
+      - name: Install exact Playwright engine builds and OS dependencies
+        run: python -m playwright install --with-deps chromium firefox webkit
+
+      - name: Record installed transport engine identities
+        run: python -m playwright install --list
+
+      - name: Configure controlled loopback test origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '127.0.0.1 a.test' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts a.test
+
+      - name: Execute settlement witness evidence
+        run: |
+          python tests/acceptance/browser/settlement_evidence_runner.py \
+            --output browser-evidence/browser-settlement-evidence.json
+
+      - name: Bind evidence to exact source head
+        run: |
+          python tests/acceptance/browser/bind_evidence_source.py \
+            browser-evidence/browser-settlement-evidence.json \
+            --expected-sha "${AVP_EVIDENCE_SOURCE_SHA}"
+
+      - name: Show compact settlement disposition
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f browser-evidence/browser-settlement-evidence.json ]]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+
+          document = json.loads(
+              Path('browser-evidence/browser-settlement-evidence.json').read_text()
+          )
+          print(f"source={document.get('repositorySha')} binding={document.get('sourceBinding')}")
+          for engine in document['engines']:
+              case = engine['cases'][0]
+              details = case['details']
+              print(
+                  f"{engine['engine_family']} {engine['browser_version']}: "
+                  f"{case['case_id']}={case['status']}, "
+                  f"networkIdleProvedSettlement={details.get('network_idle_proved_settlement')}"
+              )
+          PY
+          fi
+
+      - name: Upload exact-head settlement evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-settlement-evidence-${{ env.AVP_EVIDENCE_SOURCE_SHA }}
+          path: browser-evidence/browser-settlement-evidence.json
+          if-no-files-found: warn
+          retention-days: 30

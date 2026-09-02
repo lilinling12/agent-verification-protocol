@@ -1,0 +1,80 @@
+{
+  "fixtureRevision": "browser-state-execution-v0.1",
+  "originSlots": [
+    "primary",
+    "secondary"
+  ],
+  "selectedLocalStorageOriginSlots": [
+    "primary",
+    "secondary"
+  ],
+  "cookieDomains": [
+    "a.test"
+  ],
+  "executionBindings": {
+    "browserBuild": {
+      "identity": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "identityType": "content"
+    },
+    "storageIsolationPolicy": {
+      "identity": "unpartitioned-proof-policy-v1",
+      "identityType": "version"
+    }
+  },
+  "baseline": {
+    "localStorageByOriginSlot": {
+      "primary": [
+        {
+          "keyCodeUnits": [
+            97,
+            108,
+            112,
+            104,
+            97
+          ],
+          "valueCodeUnits": [
+            49
+          ]
+        },
+        {
+          "keyCodeUnits": [
+            55296
+          ],
+          "valueCodeUnits": [
+            111,
+            107
+          ]
+        }
+      ],
+      "secondary": []
+    },
+    "cookies": [
+      {
+        "name": "host_only",
+        "value": "1",
+        "domain": "a.test",
+        "hostOnly": true,
+        "path": "/",
+        "persistent": false,
+        "secure": false,
+        "httpOnly": false,
+        "sameSite": "Default"
+      },
+      {
+        "name": "domain_scoped",
+        "value": "1",
+        "domain": "a.test",
+        "hostOnly": false,
+        "path": "/",
+        "persistent": true,
+        "expiry": {
+          "unixSeconds": "1800000000",
+          "nanoseconds": 0
+        },
+        "secure": false,
+        "httpOnly": true,
+        "sameSite": "Lax"
+      }
+    ]
+  }
+}

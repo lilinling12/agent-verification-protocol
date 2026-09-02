@@ -1,0 +1,58 @@
+apiVersion: avp.tck/v0.1
+kind: ConformanceCase
+metadata:
+  id: AVP-TCK-BROWSER-IDENTITY-001
+  domain: browser
+  status: draft
+profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+requirements: [AVP-BROWSER-001, AVP-BROWSER-002, AVP-BROWSER-021, AVP-BROWSER-022]
+applicability: mandatory
+type: schema-and-semantic
+vector:
+  resourceKind: browser
+  capability:
+    capabilityId: state.browser
+    profile: avp-browser-unpartitioned-cookie-localstorage-v0.1
+    revision: "0.1"
+  identityResourceKinds:
+    - BrowserStateManifest
+    - BrowserStateImage
+  manifestContainsBaselineReference: false
+  manifestExecutionBindings:
+    browserBuild:
+      identity: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      identityType: content
+    storageIsolationPolicy:
+      identity: unpartitioned-proof-policy-v1
+      identityType: version
+  upstreamIdentityBindings:
+    browserBuild:
+      identity: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      identityType: content
+    storageIsolationPolicy:
+      identity: unpartitioned-proof-policy-v1
+      identityType: version
+  siblingResources:
+    - resourceId: browser-a
+      selectedCookieState: session-a
+      selectedLocalStorageState: origin-a
+    - resourceId: browser-b
+      selectedCookieState: session-b
+      selectedLocalStorageState: origin-b
+  negativeControls:
+    - resource-kind-state
+    - provider-native-handle-as-resource-id
+    - sibling-selected-state-sharing
+    - manifest-baseline-reference-cycle
+    - unresolved-manifest-execution-binding
+    - manifest-execution-binding-conflicts-with-upstream-identity
+    - provenance-only-execution-binding
+    - untyped-provider-property-in-execution-bindings
+expect:
+  compatible: true
+  resourceKindAccepted: browser
+  identityRolesByGovernedKind: true
+  acyclicIdentity: true
+  executionBindingsReuseUpstreamIdentity: true
+  siblingSelectedStateIsolated: true
+  negativeControlsRejected: true
