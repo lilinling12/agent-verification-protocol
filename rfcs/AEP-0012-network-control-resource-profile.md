@@ -3,512 +3,410 @@
 - Status: Draft
 - Authors: AVP maintainers and contributors
 - Created: 2026-09-02
+- Portability audit: `docs/design/alpha3-network-control-resource-portability-audit.md`
+- Proposed-readiness evidence: `docs/design/alpha3-network-control-resource-proposed-readiness-audit.md`
 - Parent: AEP-0009 — Environment Fabric Composition and Capability Contract (`Accepted`)
 - Target AVP version: Unselected future protocol version
 - Alpha phase: Alpha 3 — Environment Fabric / Network Control Resource
 
 ## Summary
 
-AEP-0012 starts the portable design for the network-control resource domain required by AVP Alpha 3 Environment Fabric.
+AEP-0012 defines the review-ready portable direction for the first Network Control Resource profile under AVP Environment Fabric.
 
-The core design constraint is inherited from AEP-0009:
+The core rule is:
 
-> AVP must define network-control semantics before a proxy, Linux traffic-control mechanism, service mesh, kernel facility, or user-space interceptor is treated as an official Alpha 3 implementation, and implementation behavior must never become protocol authority by precedent.
+> AVP standardizes an observable controlled-network-path verification boundary; proxy APIs, kernel queue disciplines, firewall/routing rules, service-mesh objects, native socket errors, and other provider mechanics remain implementation details and must not become protocol semantics by precedent.
 
-The base Environment Fabric contract already recognizes `network` as a coarse Resource Kind. That classification is not a Network Control Resource Profile. It does not define a controlled path boundary, portable fault vocabulary, fault activation/settlement semantics, recovery semantics, observation model, execution identity, Subject visibility, or conformance-bearing capability.
+The reconciled v0.1 design is deliberately narrow. One independently owned resource represents one declared **controlled TCP path** between a Subject-side endpoint boundary and an upstream-side endpoint boundary. Its mandatory base claim is limited to a deterministic fresh-connection baseline exchange, Environment-governed activation, independently observed transport-cut settlement, privileged clear, independently observed fresh-connection recovery, and behavioral proof that selected traffic traverses the controlled path.
 
-This Draft therefore does **not** select Toxiproxy, Linux `tc/netem`, Envoy, Istio, a service mesh, a kernel API, or another provider. It does not yet create a normative specification, schema, capability registration, TCK profile, or reference runtime. Its purpose is to establish the problem boundary, standards alignment, candidate scope, security constraints, and design blockers that must be resolved before AEP-0012 can advance to `Proposed`.
+Established-connection termination, exact latency, probabilistic packet loss, DNS/name-resolution failure, TLS interception, HTTP/application faults, UDP behavior, packet counts, TCP segment boundaries, retransmission timing, and provider-native socket error identity are not mandatory base semantics.
 
-A working capability/profile identity may be discussed during design, but no identifier in this Draft is an accepted protocol claim until the AEP lifecycle and downstream authority chain approve it.
+AEP-0012 remains **Draft**. This reconciliation closes the original Draft design blockers as explicit reviewable choices. It does not perform `Draft -> Proposed` and does not authorize Network Control Spec/Schema/TCK, a conformance harness, or a provider implementation.
 
 ## Problem
 
-A network fault is not one portable packet-level primitive.
+A network fault is not one portable packet-level primitive. Implementations inject effects at materially different layers:
 
-Real implementations inject perturbations at materially different layers and boundaries:
+- kernel traffic-control, firewall, routing, or namespace mechanisms affect packets/routes subject to host-kernel timing and queue behavior;
+- user-space TCP proxies can reject, stall, close, reset, or forward connections without reproducing kernel-identical mechanics;
+- HTTP proxies/service meshes can delay or abort requests while the underlying transport remains available;
+- DNS controls affect name resolution and caches rather than an already-resolved TCP path;
+- TLS interception/termination changes endpoint authentication and trust behavior;
+- browser, container, VM, host, and remote-network boundaries determine whether selected Subject traffic actually crosses a control point.
 
-- kernel queueing and traffic-control facilities can delay, drop, duplicate, reorder, corrupt, or rate-limit packets subject to host-kernel timing and queue behavior;
-- user-space TCP proxies can accept, reject, stall, close, reset, or forward connections but do not necessarily control every packet or preserve kernel-identical timing behavior;
-- HTTP proxies and service-mesh filters can inject request/response delay or abort semantics at the application protocol layer rather than the transport layer;
-- DNS resolvers and interceptors can alter name-resolution behavior without controlling an already-established transport connection;
-- TLS termination or interception can expose application-layer control but changes trust, endpoint, and certificate behavior;
-- browser, container, VM, and host-network boundaries determine which traffic actually traverses a selected control point;
-- remote dependencies can remain outside Environment authority even when a local client path is controlled.
-
-If AVP copied one implementation API into the protocol, independent implementations would be forced to emulate provider-specific mechanics rather than prove the same observable verification property.
-
-Examples of invalid backend-first standardization include:
-
-- declaring Linux `netem` delay distributions to be the AVP latency model;
-- declaring Toxiproxy toxic names or ordering rules to be AVP fault identity;
-- declaring Envoy HTTP fault-filter abort codes to be a generic network disconnect;
-- treating an Istio VirtualService fault rule as proof that all Subject traffic crossed the intended control point;
-- treating successful provider configuration as proof that the requested fault became active before Subject traffic was admitted;
-- treating removal of a provider rule as proof that pre-existing affected connections recovered;
-- claiming exact packet-level equivalence across kernels, TCP stacks, proxy implementations, and application protocols.
-
-The Network Control Resource Profile must instead define only portable, observable claims whose boundaries and failure semantics can be tested independently of implementation technology.
+AVP must therefore define observable verification properties rather than copy one provider API. Provider configuration success, packet traces, native error strings, qdisc/proxy IDs, or service-mesh objects cannot define portable conformance by themselves.
 
 ## Existing AVP authority reused
 
-AEP-0012 specializes existing contracts and must not create competing concepts.
+AEP-0012 specializes existing contracts and does not create competing lifecycle, identity, evidence, or security systems.
 
 ### Environment v0.1
 
 Reused unchanged:
 
 - authoritative Environment ownership and ScenarioInstance binding;
-- fault lifecycle semantics and evaluator-private future fault scheduling;
-- actor-scoped Subject observations;
-- evaluator-authoritative observations/projections where defined;
-- Environment logical time without implying host wall-clock or kernel-clock virtualization;
-- reset target honesty;
-- stale/foreign handle rejection;
-- lifecycle, Validity, infrastructure health, and Task Verdict separation;
+- evaluator-controlled fault identity, target, activation condition, and clear semantics;
+- occurrence-based no-early-activation semantics;
+- evaluator-private future fault schedules;
+- actor-scoped Subject observation;
+- evaluator-authoritative observation/projection where defined;
+- Environment logical time without implying wall-clock/kernel/network timer virtualization;
+- reset honesty and stale/foreign/released-handle failure;
+- lifecycle, infrastructure condition, Validity, and Task Verdict separation;
 - Artifact identity for retained exact Evidence bytes.
+
+`AVP-ENVIRONMENT-010` remains top-level authority for scheduled fault identity, target, activation condition, and clear semantics. Network Control adds subordinate data-plane settlement only after the Environment activation condition is satisfied.
 
 ### Environment Fabric
 
 Reused unchanged:
 
-- `resourceKind: network` as coarse resource classification only;
-- Resource Capability declaration and semantic-revision binding;
-- REQUIRED/OPTIONAL participation from the materialized execution contract;
-- Resource Capability versus Subject Capability authorization separation;
-- resource identity and profile-required immutable identity Artifacts;
-- per-resource/composite operation-result honesty;
-- no implicit cross-resource atomicity;
-- Security/Evidence composition;
-- execution-sensitive capability conformance;
-- retry-safe cleanup.
+- `resourceKind: network` as coarse classification only;
+- Resource Capability identity/revision and REQUIRED/OPTIONAL participation;
+- Resource Capability versus Subject Capability separation;
+- resource identity and immutable execution-input binding;
+- per-resource/composite result honesty and no implicit cross-resource atomicity;
+- Security/Evidence composition, execution-sensitive conformance, and retry-safe cleanup.
 
-`resourceKind: network` alone does not claim any fault-injection semantics.
+`resourceKind: network` alone does not claim transport-cut or recovery semantics.
 
-### Scenario and Core
+### Scenario, Core, Security, and Evidence
 
 Reused unchanged:
 
 - unresolved required execution inputs fail before Episode execution;
 - materialized execution semantics remain immutable during an Episode;
-- Subject capability exposure derives only from the materialized actor projection;
 - Core lifecycle remains the only Episode lifecycle;
-- `QUIESCING` closes admission of new Subject-requested side effects;
-- already accepted work may settle under the selected profile;
-- lifecycle, infrastructure condition, Validity, and Task Verdict remain separate.
-
-### Security and Evidence
-
-Reused unchanged:
-
+- `QUIESCING` closes admission of new Subject-requested side effects while already accepted work may settle;
 - Subject, Evaluator, and privileged Control authority remain separated;
-- future hidden fault schedules remain evaluator-private unless the Scenario explicitly exposes them;
-- evaluator/control credentials and native control handles do not enter Subject execution context;
-- retained traces/configuration/result bytes use AVP Artifact identity;
-- locators, socket descriptors, proxy IDs, qdisc handles, route names, mesh resource names, process IDs, and provider object IDs are not substitutes for Artifact content identity;
+- provider credentials/native control handles do not enter Subject execution context;
+- exact retained bytes use Artifact identity;
 - technology names do not inflate `SecurityAssurance`.
 
-## Why the base Fabric contract is not enough
-
-The base Fabric normative candidate deliberately defines composition-level semantics only. Its closed `network` Resource Kind means that a resource belongs to the network interoperability domain. It does not mean any of the following:
-
-- a particular Subject flow is guaranteed to traverse the resource;
-- the resource controls transport packets rather than HTTP requests;
-- latency, loss, disconnect, DNS failure, bandwidth, corruption, duplication, or reordering is supported;
-- a fault can be activated at an exact host-wall-clock instant;
-- an active fault applies retroactively to established connections;
-- clearing a fault repairs or recreates existing connections;
-- a successful provider API call proves a fault is active;
-- provider-native fault configuration is portable Evidence;
-- the Subject may inspect or mutate future fault schedules.
-
-A network adapter that claimed portable behavior from `resourceKind: network` alone would violate AEP-0009 capability honesty and backend-first implementation rules.
-
-## Standards and interoperability analysis
-
-The Network Control Resource Profile should reuse transport and application standards where they own wire semantics and add only the AVP verification-facing control boundary.
+## Standards and interoperability basis
 
 ### TCP
 
-TCP provides a reliable ordered byte-stream abstraction to applications. It does not preserve application write boundaries as portable protocol messages, and TCP implementations may differ in segmentation, retransmission timing, buffering, queueing, congestion behavior, reset presentation, and error timing.
+TCP exposes a reliable ordered byte stream, not portable application-write or packet boundaries. Implementations differ in segmentation, buffering, retransmission timing, congestion/queue behavior, reset presentation, and native errors.
 
-Therefore an AVP base network profile must not define conformance in terms of exact packet counts, exact TCP segment boundaries, exact retransmission schedules, or one operating system's socket error text.
+Therefore portable Network Control conformance is expressed through fresh connection attempts and deterministic end-to-end application exchanges. Exact packet counts, TCP segment boundaries, retransmission schedules, queue state, or native socket error strings are excluded from portable outcome identity.
 
-Where the profile eventually claims a transport-level connection cut or recovery property, the claim must be expressed through application-observable connection behavior at a controlled test boundary rather than provider-native packet traces alone.
+### Kernel and proxy mechanisms
 
-### IP, packet scheduling, and Linux traffic control
+Kernel traffic-control/routing/firewall mechanisms and user-space TCP proxies are useful independent implementation classes. Neither is protocol authority. Timer granularity, queueing, TCP Small Queues, offload, host scheduling, buffering, and provider event loops make exact timing/error equivalence non-portable.
 
-Operating-system traffic-control mechanisms are valuable implementation evidence for delay, loss, corruption, duplication, reordering, and rate behavior. They are not a portable semantic baseline by themselves.
+Provider API completion is control-plane evidence only; it cannot prove data-plane activation or recovery settlement.
 
-Timer granularity, queue discipline, TCP Small Queues, offload, host scheduling, virtualization, and kernel versions can materially change observed timing and packet behavior. AEP-0009 already rejects exact packet-level equivalence as a base assumption.
+### Application, DNS, and TLS layers
 
-A portability audit must determine whether any bounded latency/loss claim can be specified with tolerances and statistical/finite-run evidence strong enough for independent TCK execution without turning one kernel's mechanics into protocol authority.
+HTTP abort/status/delay is application-layer behavior and cannot satisfy a transport-cut requirement merely because a request failed. DNS/name-resolution behavior has resolver/cache/TTL semantics distinct from an already-resolved TCP path. TLS interception changes endpoint-authentication semantics and is not implied by Network Control support.
 
-### HTTP fault injection and service meshes
+## Portable resource boundary
 
-HTTP-aware proxies and service meshes commonly support request delay and abort/error injection. These mechanisms operate above the transport layer and can produce valid application-protocol responses rather than a network transport failure.
+One Network Control v0.1 resource represents one independently owned **controlled TCP path** between:
 
-AVP must not collapse these into one generic `disconnect` semantic. A future application-protocol fault capability may be useful, but it is distinct from a transport-path claim and requires separately reviewable semantics.
+1. a declared Subject-side endpoint boundary; and
+2. a declared upstream-side endpoint boundary.
 
-### DNS
+The resource is narrower than "the Environment network". Traffic outside the selected path may remain uncontrolled.
 
-Name resolution is its own control surface. DNS failure before connection establishment is not equivalent to transport failure after an endpoint address has already been resolved or a connection has already been established.
+Portable resource identity does not use Linux interface/qdisc/filter handles, proxy listener/toxic IDs, service-mesh resource names, cloud rule IDs, socket descriptors, process IDs, or equivalent mechanism-native objects.
 
-The base Draft therefore treats name-resolution faults as a separate candidate semantic family whose inclusion in v0.1 must be justified by portability evidence rather than convenience.
+### Behavioral path-coverage proof
 
-### TLS
+Configuration presence is insufficient. Conformance must behaviorally establish that selected traffic actually traverses the controlled path and must reject an implementation that advertises the capability while secretly bypassing the control point.
 
-TLS interception/termination can make higher-layer fault injection easier but changes endpoint authentication and certificate behavior. A network-control profile must not require transparent TLS interception as a universal implementation mechanism, and a deployment must not claim stronger security/isolation merely because a proxy terminates TLS.
+Provider-native packet traces may be useful diagnostics, but are not the sole portable proof.
 
-## Candidate portable resource boundary
+## Mandatory v0.1 semantics
 
-The preferred design direction is one independently owned **controlled network path resource** that mediates traffic between a declared Subject-side endpoint boundary and a declared upstream-side endpoint boundary.
+### Baseline forwarding
 
-This direction is intentionally narrower than "the Environment network". One resource may control one path while other network traffic remains outside its authority.
+Before the selected fault is active, a deterministic evaluator-controlled upstream fixture must complete the selected baseline request/response exchange over a **fresh TCP connection** through the declared path.
 
-The forthcoming portability audit must determine whether the path identity can be specified portably without depending on:
+If the baseline cannot be established, the fault claim is not validly testable.
 
-- Linux interface/qdisc identifiers;
-- proxy listener object IDs;
-- service-mesh route names;
-- container network namespace names;
-- cloud load-balancer identities;
-- provider-native socket or connection handles.
+### Environment-governed activation
 
-### Control-point coverage
+The Environment owns fault identity, target, and activation condition. For occurrence-based activation:
 
-A conforming claim requires evidence that the traffic selected by the materialized execution contract actually traverses the controlled path.
+- qualifying pre-trigger Subject traffic is admissible and may be required to reach the occurrence;
+- the fault MUST NOT affect that traffic before the declared occurrence;
+- preparing provider-private control state before the occurrence does not make the fault active;
+- Network Control does not reinterpret occurrence counting.
 
-Provider configuration alone is not enough. A TCK must be able to reject an implementation where the advertised fault is configured but test traffic bypasses the control point.
+After the Environment condition is satisfied, Network Control may enter a subordinate settling interval before post-activation fault-sensitive observations are accepted.
 
-The exact mechanism for binding Subject-side and upstream-side endpoints remains a Draft question. It must preserve execution identity and avoid making private deployment topology part of portable protocol semantics.
+### Activation settlement
 
-## Fault semantics must be narrower than implementation APIs
+Activation is settled only after a privileged independent data-plane observation proves the selected transport-cut property on a fresh attempt through the controlled path.
 
-The Draft distinguishes candidate semantic families from accepted v0.1 capability claims.
+Provider API success, rule/object existence, metadata flags, Subject self-report, or arbitrary sleep are insufficient by themselves.
 
-### Candidate family: baseline forwarding
+Failure to settle is infrastructure/Validity information, not Agent Task Verdict failure by itself.
 
-Before any selected fault is active, the controlled path should establish a known-good forwarding baseline for the TCK fixture.
+### Fresh-connection transport cut
 
-A profile cannot meaningfully certify a fault if the baseline path is already unavailable or ambiguous.
+After activation settlement, a selected fresh connection/exchange through the controlled path must not complete the deterministic baseline exchange while the cut remains active.
 
-### Candidate family: disconnect / connection cut
+The protocol does not prescribe refusal, RST, FIN/close, timeout/blackhole, unreachable behavior, route withdrawal, proxy termination, or another native mechanism. Exact exception classes, numeric OS error codes, localized error text, TCP flags, packet counts, or retransmission schedules are non-portable diagnostics.
 
-A portability-friendly candidate is an evaluator-controlled state where selected new transport attempts cannot successfully establish the baseline application exchange across the controlled path, and where affected established connections have a profile-defined terminal disposition before the fault is reported settled.
+### Established connections
 
-This wording deliberately avoids standardizing whether the implementation uses reject, reset, close, blackhole, proxy teardown, route withdrawal, or another mechanism.
+Base v0.1 makes **no guarantee** about a connection established before activation. It may be preserved, drained, reset, blackholed, partially progress, or fail according to implementation mechanics.
 
-The portability audit must resolve:
+A future use case that requires established-connection termination must define a separately reviewed capability/profile and TCK rather than hiding that requirement inside base `transport cut`.
 
-- whether established connections must be terminated or may only block new connections;
-- whether blackhole/time-out behavior is too timing-sensitive for mandatory v0.1;
-- what terminal observation proves the cut is settled;
-- whether one portable disconnect family should be split into explicit `connection-refused-like`, `reset-like`, or `unreachable-like` semantics rather than over-generalized.
+### Clear and recovery
 
-### Candidate family: recovery
+Clear is a privileged operation against the selected Environment-governed fault instance. Provider acknowledgement of rule removal does not prove recovery.
 
-Clearing a fault must not be defined as "provider rule removed". Recovery must be independently observed.
+Recovery settlement requires independent successful fresh baseline exchange(s) after clear through the same selected path. Base recovery does not promise repair of a connection already broken by the prior fault.
 
-A conservative candidate is that, after the network-control resource reports recovery settled, a **fresh** transport connection can again complete the known-good baseline exchange.
+After clear, the same governed occurrence must not silently reactivate. A later distinct occurrence/fault remains separately Environment-governed.
 
-A base profile should not promise that a connection already broken by a prior fault becomes usable again. TCP and application protocols generally do not provide such a portable repair semantic.
+## Deferred and separated semantics
 
-### Candidate family: bounded latency
+### Latency
 
-Bounded latency is useful but difficult to specify portably. Provider implementations may add delay at packet, connection, request, or response boundaries, and host scheduling contributes uncontrolled noise.
+Latency is not mandatory base v0.1. A future bounded-latency profile requires explicit measurement endpoints, monotonic clock requirements, baseline treatment, additive-versus-total definition, tolerance window, warm-up/sample policy, host-noise treatment, timeout interaction, and platform-independent acceptance statistics.
 
-The portability audit must determine whether v0.1 can define a deterministic lower-bound/tolerance window around a local fixture without requiring statistical heuristics that are too flaky for conformance. Until that is proven, latency remains a candidate rather than a mandatory base claim.
+### Probabilistic loss
 
-### Candidate family: loss
+Probabilistic packet loss is not mandatory base v0.1. A future loss profile requires an explicit observation unit, sample/confidence rule, and transport-retransmission interaction model. The deterministic base cut is named **transport cut**, not `100% packet loss`.
 
-Packet loss percentages and stochastic distributions are implementation-sensitive. A finite conformance run cannot prove a probabilistic distribution exactly, and a fixed deterministic drop pattern can accidentally standardize provider queue mechanics.
+### DNS, TLS, HTTP/application, and UDP
 
-The portability audit must determine whether the portable requirement should instead use a deterministic finite failure pattern at a higher observable boundary, or defer loss from mandatory v0.1.
-
-### Candidate family: name-resolution failure
-
-DNS/name-resolution failure is semantically distinct from transport path interruption and should remain separately claimable if adopted.
-
-The profile must not pretend a cached resolution, literal IP address, browser DNS cache, operating-system resolver cache, or already-established connection was affected when it was not.
-
-## Fault lifecycle and settlement
-
-Provider API completion is not sufficient evidence that a fault is active or cleared.
-
-AEP-0012 does not replace the Environment v0.1 fault contract. Every scheduled fault remains governed by `AVP-ENVIRONMENT-010`: it has evaluator-controlled identity, target, and activation condition; occurrence-based activation MUST NOT happen before the declared occurrence; and clearing prevents later activation unless a separately selected governed profile explicitly defines another lifecycle. Network Control may define subordinate implementation-observable activation and clearing states only to prove that an already-triggered fault effect has settled. Those subordinate states are not a second top-level fault lifecycle.
-
-A future normative profile may therefore define operational states conceptually equivalent to:
-
-```text
-BASELINE -> ACTIVATING -> ACTIVE/SETTLED -> CLEARING -> BASELINE/SETTLED
-```
-
-The exact serialized vocabulary is downstream work, and these states remain subordinate to the Environment fault identity/target/activation-condition lifecycle.
-
-For an occurrence-based activation condition, pre-trigger Subject traffic required to reach the declared occurrence remains admissible and MUST NOT be faulted early. Activation settlement gates acceptance of post-trigger/post-activation fault-sensitive observations; it does not gate or suppress the qualifying Subject traffic needed to satisfy the Environment activation condition.
-
-Key requirements to resolve before `Proposed`:
-
-1. the Evaluator/Control Plane can request a selected fault through privileged authority while preserving the Environment fault identity, target, and activation-condition contract;
-2. where a Scenario requires deterministic post-trigger ordering, post-activation fault-sensitive observations are not accepted until activation settlement is established, while occurrence-counting pre-trigger Subject traffic remains admissible and unfaulted until the declared occurrence;
-3. activation settlement is proven by an implementation-independent observation, not a provider metadata flag alone;
-4. clearing settlement is independently verified before a subsequent baseline/recovery claim is accepted, and clearing preserves the Environment rule preventing later activation unless a separately governed selected profile explicitly defines otherwise;
-5. failure to establish settlement is infrastructure/Validity information, not Agent Task Verdict failure by itself;
-6. cleanup failure cannot retroactively rewrite the primary fault/conformance outcome;
-7. future scheduled faults remain evaluator-private.
-
-The profile must not require arbitrary sleep intervals as correctness evidence. Waiting may be an implementation mechanism, but conformance requires a bounded observable settlement predicate.
+DNS/name-resolution faults, TLS interception/failure, HTTP/application abort/delay, and UDP/datagram behavior require separate reviewed semantics. None is silently inferred from base TCP transport cut.
 
 ## Time and ordering boundary
 
-AEP-0012 must not conflate Environment logical time with host wall time or packet scheduler time.
+Environment logical time is not host wall time, kernel timer time, proxy event-loop time, or TCP retransmission time. Network Control does not claim those clocks are virtualized.
 
-A network fault schedule may use the activation condition already governed by Environment v0.1, including occurrence-based activation, or may compose with another separately governed ordering primitive. Network Control MUST NOT reinterpret occurrence counting, activate a fault before the declared occurrence, or claim that kernel timers, proxy event loops, remote services, or TCP retransmission clocks are virtualized.
+Any future exact time-triggered activation or deterministic delay claim requires composition with a separately governed Time Control Resource or another reviewed timing contract.
 
-If exact time-triggered fault activation becomes a portable claim, it requires explicit composition with a Time Control Resource profile or another reviewed timing contract. The network profile alone must not invent global deterministic time.
+## State, control, observation, and Evidence
 
-## State, control, observation, and Evidence must remain separate
-
-A network-control resource is primarily a controlled behavior resource, not automatically a snapshot-able byte-state resource.
+Network Control is primarily a controlled-behavior resource, not automatically a snapshot-able byte-state resource.
 
 ### Privileged control
 
-Potential privileged controls include activating, clearing, scheduling, and releasing a fault. These controls are not Subject capabilities merely because the runtime implements them.
+Fault preparation/activation coordination, clear, reset, provider administration, and hidden fixture controls remain privileged Evaluator/Control operations unless a separately governed Subject contract grants narrower authority.
 
-### Evaluator observation
+### Evaluator and Subject observation
 
-Evaluator-visible observations may include:
+Evaluator observations may include baseline result, activation/recovery settlement, selected exchange outcomes, path-coverage/bypass evidence, sanitized diagnostics, fault transition traces, and cleanup diagnostics.
 
-- fault lifecycle state and settlement result;
-- baseline probe result;
-- selected connection/exchange outcomes;
-- sanitized provider diagnostics;
-- retained fault transition trace;
-- coverage/bypass evidence where needed to prove the selected path was controlled.
-
-Observation does not automatically become authoritative restorable state.
-
-### Subject observation
-
-The Subject may observe the consequence of a fault through its normal network/application operations. It must not automatically receive the hidden future schedule, privileged control API, evaluator diagnostics, or provider credentials.
+The Subject observes fault consequences only through its authorized ordinary operations. It does not automatically receive future schedules, privileged fault APIs, provider credentials, evaluator probes, native handles, or private topology diagnostics.
 
 ### Evidence
 
-Retained exact bytes use AVP Artifact identity. Provider-native configuration may be retained as implementation Evidence when useful, but it cannot replace the portable fault result or become portable identity merely because it exists.
+Retained exact bytes use Artifact identity. Provider-native configuration/traces may be implementation Evidence, but do not replace the portable behavioral result or become portable resource identity.
 
 ## Reset, snapshot, and restore boundary
 
-The Draft does not assume that a Network Control Resource supports Environment-style snapshot/restore of live connections or kernel/proxy internals.
+Base Network Control v0.1 participates in reset by establishing and independently verifying the profile-defined **fault-free baseline** on the selected controlled path.
 
-A likely v0.1 direction is:
+Base v0.1 does not define snapshot/restore of live sockets/connections, TCP sequence/retransmission state, kernel queues/qdisc/filter state, proxy buffers, NAT/conntrack state, resolver caches, or service-mesh/provider internals.
 
-- **reset** establishes the profile-defined baseline fault-free control state and independently verifies the baseline path;
-- **snapshot/restore** of live transport state is unsupported unless a separately governed capability defines it;
-- fault configuration/state may be represented in operation Evidence without claiming exact restoration of socket queues, TCP sequence state, timers, retransmissions, or provider-internal state.
+Those mechanisms are not one stable portable logical state image. Base v0.1 therefore makes no `EXACT` or `STATE_EQUIVALENT` restoration claim for them.
 
-The portability audit must verify that this composition is compatible with Environment/Fabric snapshot participation rules and decide whether a network resource is explicitly non-participating in snapshots for the base profile or requires a narrow configuration-state snapshot semantic.
+## Execution-relevant immutable identity
+
+Portable verification identity must bind enough provider-neutral input to interpret and reproduce the claim. Candidate downstream inputs include:
+
+- Network Control profile/revision;
+- selected controlled-path resource identity;
+- Subject-side and upstream-side endpoint declarations;
+- TCP transport declaration;
+- Environment fault identity/target/activation-condition references;
+- deterministic fixture/program identity where it affects the exchange;
+- execution-relevant immutable configuration outside logical state that may alter the result.
+
+Excluded from portable identity are qdisc/filter/firewall handles, proxy IDs, socket descriptors, process IDs, cloud rule IDs, mesh object names, and transient provider-generated control IDs. These may remain sanitized diagnostic Evidence.
+
+Missing, ambiguous, stale, foreign, or drifted required execution identity fails closed.
 
 ## Security considerations
 
-Network control expands privileged Environment authority and can accidentally become a traffic interception or exfiltration surface.
+Network Control expands privileged Environment authority and can become an interception/exfiltration surface if boundaries are weak.
 
-Required design direction:
+Required rules:
 
 1. Subject traffic operations remain distinct from Evaluator/Control fault operations.
-2. Future fault schedules remain evaluator-private unless explicitly exposed by Scenario semantics.
-3. Control credentials, proxy admin tokens, kernel-control authority, mesh credentials, cloud control credentials, packet-capture credentials, and equivalent privileged handles do not enter Subject execution context.
-4. A control point must not expose unrelated Environment traffic merely because its implementation can observe it.
-5. Packet/application payload capture is not implied by fault-control capability and requires separate Evidence/visibility justification.
-6. TLS interception is not implied by network-control capability.
-7. Endpoint locators and provider diagnostics exposed to the Subject must not leak private topology or control-plane authority.
-8. A proxy, container namespace, service mesh, VM, or kernel facility does not automatically establish `network`, `process`, `tenant`, or `sandbox` SecurityAssurance as `verified`.
-9. Control-plane failure is infrastructure/Validity information and must not be converted directly into Agent task failure.
-10. Cleanup must remove privileged fault effects without resurrecting stale resource authority.
+2. Future fault schedules remain evaluator-private unless explicitly exposed by governed Scenario semantics.
+3. Provider/control credentials and packet-capture authority do not enter Subject execution context.
+4. The control point must not expose unrelated Environment traffic merely because the implementation can observe it.
+5. Payload capture and TLS interception are not implied by fault-control capability.
+6. Subject-visible diagnostics must not leak private topology or control authority.
+7. Provider/container/mesh/kernel labels do not establish `SecurityAssurance` by themselves.
+8. Control/settlement failure remains infrastructure/Validity information rather than direct Task Verdict failure.
+9. Cleanup must remove privileged fault effects without resurrecting stale authority.
+
+A `ScheduleLeakAdapter`-style implementation must fail conformance.
 
 ## Failure and Validity semantics
 
-Candidate network infrastructure/Validity failures include, as applicable:
+Infrastructure/Validity failures include, where applicable:
 
-- required control point unavailable;
-- selected traffic bypasses the declared controlled path;
-- baseline forwarding cannot be established;
-- required fault semantic unsupported by the implementation;
-- activation cannot settle or cannot be independently observed;
-- clearing/recovery cannot settle or baseline cannot be re-established;
-- stale/foreign resource or control reference;
-- required execution identity missing or drifted;
+- unavailable control point or failed baseline;
+- selected traffic bypassing the declared path;
+- unsupported mandatory transport-cut semantic;
+- activation or recovery settlement failure;
+- stale/foreign resource/control reference;
+- missing/drifted required execution identity;
 - loss of Evaluator/Control authority;
-- hidden future schedule or privileged control information leaked to the Subject;
-- cleanup failure that leaves an untrustworthy network boundary.
+- hidden schedule/control leakage;
+- cleanup failure leaving an untrustworthy network state.
 
-Provider-specific status codes, socket error strings, qdisc handles, proxy toxic names, HTTP status codes, or mesh object statuses are diagnostics rather than portable AVP outcome identity unless a future profile explicitly standardizes an application-protocol semantic.
+Provider-native status/error strings and object IDs are diagnostics, not portable AVP outcome identity.
 
-These conditions must not be converted into Agent Task Verdict failure solely because they occurred.
+## Conformance strategy
 
-## Conformance strategy direction
+A future `avp-network-control-v0.1` TCK must be provider-neutral, language-neutral, and execution-sensitive. Mandatory cases execute real behavior at the controlled-path boundary; metadata, mocks, provider configuration, fixture inspection, or self-report cannot substitute for the behavior being certified.
 
-A future `avp-network-control-v0.1` TCK must execute real behavior at the selected network boundary.
+A deterministic local fixture should provide an evaluator-controlled upstream service, a Subject-side client, privileged control inaccessible to Subject code, evaluator-controlled ordering, independent settlement probes, and negative implementation modes.
 
-Portable SUT obligations are expected to include observable equivalents of:
+A minimal mandatory execution flow must prove:
 
-- provision/bind a controlled path;
-- prove a known-good baseline exchange;
-- bind a selected fault to the Environment-governed fault identity, target, and activation condition;
-- for occurrence-based activation, admit and count the required pre-trigger Subject traffic without activating the fault early;
-- after the activation condition is satisfied, establish and observe settlement of one selected portable fault;
-- exercise post-activation Subject-side traffic through the real path;
-- clear the fault;
-- establish and observe recovery settlement;
-- prove a fresh baseline exchange succeeds again;
-- preserve Subject/Evaluator/Control separation;
-- release and reject stale use.
+1. baseline fresh exchange succeeds;
+2. qualifying pre-trigger Subject traffic remains admissible/unfaulted;
+3. the Environment activation condition is reached;
+4. activation settles through independent data-plane observation;
+5. post-activation fresh exchange cannot complete;
+6. bypass is detected;
+7. clear is issued through privileged authority;
+8. recovery settles through successful fresh exchange(s);
+9. the cleared occurrence does not silently reactivate;
+10. future schedule/control material remains hidden;
+11. stale/released use fails closed;
+12. cleanup does not leave a hidden active fault.
 
-Exact programming-language methods, proxy commands, kernel configuration, service-mesh resources, and provider APIs are non-normative.
+Required negative directions include:
 
-### Privileged fixture controls
+- `BypassFaultAdapter`;
+- `EarlyActivationAdapter`;
+- `FalseSettledFaultAdapter`;
+- `FalseRecoveryAdapter`;
+- `ScheduleLeakAdapter`.
 
-Executable conformance requires a privileged local fixture-control seam that may:
+Portable TCK expectations MUST NOT branch on provider/platform names to define different protocol outcomes. Provider-specific setup belongs behind privileged implementation seams.
 
-- run a deterministic upstream echo/application fixture;
-- originate Subject-side connections/exchanges through the selected path;
-- coordinate occurrence-counting pre-trigger traffic where the Environment activation condition requires it;
-- coordinate an established connection before fault activation where the selected semantic requires it;
-- test fresh connections during and after faults;
-- activate negative implementation behavior;
-- prove bypass detection by deliberately routing a control flow outside the claimed control point.
+## Cross-mechanism portability evidence
 
-Fixture controls are TCK harness mechanics, not Resource Capabilities or Subject APIs.
+One provider passing the future TCK is not enough to prove that AVP's own semantic choices are protected from one-mechanism precedent where portability depends on mechanism independence.
 
-### Mandatory conformance families to resolve
+Project acceptance/reference evidence should therefore exercise materially independent implementation classes where practical, for example a user-space TCP proxy/interceptor and a kernel/routing/firewall-style path-control class.
 
-Before normative closure, the design must settle at least:
+This is an AVP reference/acceptance evidence expectation, not automatically a requirement that every third-party conforming implementation implement multiple providers.
 
-1. controlled-path ownership and stale references;
-2. baseline forwarding and path-coverage proof;
-3. exact portable v0.1 fault vocabulary;
-4. Environment fault identity/target/activation-condition composition, including occurrence-based no-early-activation behavior;
-5. activation settlement semantics after the Environment activation condition is satisfied;
-6. established-connection disposition where applicable;
-7. clearing/recovery settlement semantics and no-later-reactivation after clear;
-8. lifecycle ordering and `QUIESCING` interaction;
-9. evaluator-private future schedule non-disclosure;
-10. Subject/Evaluator/Control authority separation;
-11. reset/snapshot participation semantics;
-12. cleanup and leaked-fault detection;
-13. execution-sensitive capability honesty.
+Deferred latency/loss/DNS profiles require their own portability evidence.
 
-### Negative implementations
+## Reference implementation gate
 
-At minimum, the TCK must be capable of rejecting metadata-identical broken implementations such as:
+A controlled network-fault reference implementation may begin only after:
 
-- `BypassFaultAdapter` — advertises the capability and reports fault activation while the TCK traffic bypasses the controlled path;
-- `EarlyActivationAdapter` — activates an occurrence-based fault before the declared Environment occurrence is reached;
-- `FalseSettledFaultAdapter` — reports a fault active/settled before the observable fault property is established;
-- `FalseRecoveryAdapter` — reports recovery settled while a fresh baseline exchange still cannot succeed;
-- `ScheduleLeakAdapter` — exposes evaluator-private future fault scheduling information to the Subject.
+1. AEP-0012 reaches the lifecycle state required by governance;
+2. Network Control normative Spec and requirement index encode the reviewed semantics;
+3. serialized portable resources receive schemas where required;
+4. the provider/language-neutral execution-sensitive TCK is reviewable;
+5. any backend-neutral fixture/control prerequisites identified by review are closed.
 
-TCK PASS must derive from observed runtime behavior, not capability metadata, provider configuration, fixture inspection, backend product labels, or implementation self-report alone.
+No generic `BaseNetworkBackend`, provider/plugin framework, or broad `supports_*` capability bag is justified before stable reviewed semantics and real consumers exist.
 
-## Portability evidence required before Proposed
+## Alternatives rejected
 
-The next governed step after this Draft is an implementation-independent portability and Proposed-readiness audit.
+The reconciled design rejects:
 
-That audit must compare at least distinct implementation classes rather than two wrappers around the same mechanism, including evidence from:
+- provider-first implementation followed by retroactive generalization;
+- Linux `tc/netem` or Toxiproxy APIs as protocol authority;
+- HTTP abort as transport cut;
+- DNS failure as generic network loss;
+- established-connection termination as an implicit base guarantee;
+- mandatory v0.1 latency without a portable timing model;
+- mandatory probabilistic loss without a statistical conformance model;
+- arbitrary sleeps or provider API success as settlement proof;
+- snapshot/restore of live network/provider internals;
+- exposing future schedules/control through Subject-visible interfaces;
+- generic provider/plugin architecture before a stable extension contract exists.
 
-- an operating-system traffic-control mechanism such as Linux `tc/netem` where applicable;
-- a user-space transport proxy such as Toxiproxy or an equivalent controlled proxy;
-- an application/service-mesh fault mechanism such as Envoy/Istio where useful to prove layer differences and prevent false unification.
+## Backward compatibility and release boundary
 
-The audit is not required to make all three conform to one mandatory profile. Its purpose is to identify the smallest semantics that genuinely survive implementation differences and to document where semantics must remain separate.
+Network Control v0.1 is additive under AEP-0009. Existing Environment/Fabric implementations need not claim it, and `resourceKind: network` remains insufficient by itself. Alpha 2, Relational State, and Browser semantics are unchanged.
 
-The audit must explicitly decide:
+No public release version is selected, release-development state remains unchanged, and this AEP does not authorize publication, signing, or attestation.
 
-- resource/path identity and coverage proof;
-- mandatory v0.1 fault family or families;
-- Environment fault identity/target/activation-condition composition and occurrence-based no-early-activation behavior;
-- whether latency is deterministic enough for portable mandatory conformance;
-- whether loss can be specified without probabilistic self-certification;
-- whether disconnect must distinguish new versus established connections;
-- whether DNS belongs in the base profile or a separate capability;
-- whether HTTP abort/delay belongs in a separate application-protocol capability;
-- activation/clearing settlement predicates and bounded failure behavior;
-- reset and snapshot participation;
-- execution-relevant identity inputs;
-- Evidence needed for independent review;
-- required multi-mechanism reference evidence before implementation is called portable.
+## Draft design-blocker disposition
 
-## Draft blockers before Proposed
+The portability audit and this reconciliation resolve the original Draft blockers as explicit formal-review inputs:
 
-AEP-0012 must not advance to `Proposed` until the following are resolved through reviewable evidence:
+- **NC-BR-001 — CLOSED:** one resource is a declared Subject-side → upstream-side controlled TCP path with behavioral path-coverage proof independent of provider identity.
+- **NC-BR-002 — CLOSED:** base vocabulary is baseline forwarding, fresh-connection transport cut, privileged clear, and fresh-connection recovery; other layer/fault families are not aliases.
+- **NC-BR-003 — CLOSED:** Environment owns fault identity/target/condition; occurrence no-early-activation is preserved and activation settlement requires independent post-trigger data-plane proof.
+- **NC-BR-004 — CLOSED:** established connections have no base disposition guarantee; a separate profile is required for such a claim.
+- **NC-BR-005 — CLOSED:** clear does not self-certify recovery; fresh successful exchange proves recovery and the cleared occurrence cannot silently reactivate.
+- **NC-BR-006 — CLOSED:** latency is deferred until a portable clock/tolerance/sampling/noise model exists.
+- **NC-BR-007 — CLOSED:** probabilistic loss is deferred until observation-unit/statistical conformance semantics exist.
+- **NC-BR-008 — CLOSED:** DNS, TLS, HTTP/application, UDP, and TCP path semantics remain layer-distinct.
+- **NC-BR-009 — CLOSED:** reset establishes a verified fault-free baseline; live network/provider internals are not base snapshot/restore state.
+- **NC-BR-010 — CLOSED:** future schedules/control remain evaluator-private and Network Control does not inflate `SecurityAssurance`.
+- **NC-BR-011 — CLOSED:** provider-neutral path/profile/fault/execution inputs bind verification identity; provider handles are diagnostics only.
+- **NC-BR-012 — CLOSED:** future TCK is provider/language-neutral, deterministic-fixture-based, execution-sensitive, negative-adapter-capable, and supported by cross-mechanism AVP evidence where mechanism independence matters.
 
-- **NC-BR-001 — controlled-path boundary:** define the exact portable Subject-side/upstream-side path boundary and how path coverage is proven without provider-native identity becoming protocol identity.
-- **NC-BR-002 — fault vocabulary:** select the smallest mandatory v0.1 semantic fault set and reject false equivalence among packet, transport, DNS, TLS, HTTP, and provider-specific faults.
-- **NC-BR-003 — activation settlement and Environment activation authority:** preserve Environment v0.1 evaluator-controlled fault identity, target, and activation condition; for occurrence-based activation prove no early activation, keep qualifying pre-trigger Subject traffic admissible, and define an observable bounded post-trigger settlement predicate that does not use provider configuration success or arbitrary sleep as conformance proof.
-- **NC-BR-004 — established connections:** define what each selected fault does or does not promise for connections already established at activation time.
-- **NC-BR-005 — recovery settlement:** define what clearing means, preserve the Environment no-later-reactivation-after-clear rule unless separately governed otherwise, and require independent fresh-connection recovery evidence without promising repair of broken connections.
-- **NC-BR-006 — timing/latency:** determine whether latency can be mandatory and portable, including tolerance/error semantics and host scheduling limits.
-- **NC-BR-007 — loss semantics:** determine whether any loss claim can be tested portably without finite-run probabilistic self-certification or provider-specific packet patterns.
-- **NC-BR-008 — DNS/application layering:** decide whether name-resolution and HTTP-level faults are excluded, separate capabilities, or part of a reviewed profile without collapsing layers.
-- **NC-BR-009 — snapshot/reset participation:** define baseline reset and Fabric snapshot participation without pretending live network stacks are portably restorable.
-- **NC-BR-010 — hidden schedule/security boundary:** prove future fault schedules and privileged control material remain evaluator-private and do not widen Subject authority.
-- **NC-BR-011 — execution identity:** define which path/proxy/network configuration inputs are execution-relevant immutable identity versus deployment-private diagnostics.
-- **NC-BR-012 — conformance portability:** define language-neutral case vectors, privileged fixture controls, negative implementations, and the minimum cross-mechanism evidence required before reference implementation work.
+Closure means each design choice is explicit enough for formal review. It does **not** mean the choices are already `Accepted` or cannot be revised by formal Proposed review.
 
-## Alternatives rejected at Draft stage
+## Non-blocking downstream details
 
-The Draft already rejects the following directions:
+Later Spec/Schema/TCK work may define exact capability/profile spelling, JSON fields/media types/limits, provider-neutral endpoint/path declaration syntax, canonical representation for serialized resources, bounded retry/observation parameters, requirement/TCK IDs, language-specific SPI names, and provider diagnostic mappings.
 
-- standardizing a product API as the AVP network profile;
-- treating `resourceKind: network` as a capability claim;
-- one generic untyped `fault` map with provider-defined keys;
-- exact packet traces or kernel qdisc state as portable fault identity;
-- one global `networkDeterministic=true` flag;
-- arbitrary sleeps as activation or recovery correctness proof;
-- provider API success as fault settlement proof;
-- silently treating HTTP abort as transport disconnect;
-- silently treating DNS failure as packet/transport loss;
-- requiring TLS interception for base conformance;
-- assuming a cleared fault repairs already-broken transport/application sessions;
-- exposing future fault schedules through Subject-visible configuration;
-- backend-first implementation followed by retroactive generalization;
-- a generic plugin/provider framework before stable portable semantics and multiple real consumers exist.
+Those details are downstream only while they encode the semantics above. If formal review finds that one would change portable meaning, AEP-0012 must be amended before acceptance.
 
-## Expected authority chain after acceptance
+## Open protocol-review questions
 
-If AEP-0012 eventually becomes `Accepted`, downstream work must proceed in this order:
+Formal review should challenge, rather than assume, these choices:
 
-```text
-Accepted AEP-0012
-  -> Network Control Normative Spec
-  -> Requirement Index
-  -> Schema where serialized portable resources require it
-  -> Provider/language-neutral execution-sensitive TCK
-  -> Backend-neutral conformance harness / immutable local fixture
-  -> Reference implementation mechanism(s)
-  -> Cross-mechanism portability evidence where required
-```
+1. Is controlled TCP + fresh-connection exchange the correct smallest mandatory v0.1 boundary?
+2. Is `transport cut` the clearest mechanism-neutral term?
+3. Is excluding established-connection disposition appropriately conservative?
+4. Is independent fresh-attempt data-plane settlement sufficient without standardizing timeout/error behavior?
+5. Should recovery require a normative minimum/bounded count of successful fresh exchanges, or can TCK encode that predicate without creating new semantics?
+6. Is deferring latency and probabilistic loss the correct v0.1 interoperability tradeoff?
+7. Is the DNS/TLS/HTTP/UDP separation strict enough to prevent provider-layer equivalence?
+8. What is the smallest endpoint/path declaration grammar that proves coverage without exposing private topology?
+9. Should cross-mechanism evidence be required before Accepted, before an official reference implementation claim, or both?
+10. Does Core `QUIESCING` / Environment activation / cleanup composition need any further constraint before normative closure?
 
-Schema and TCK must derive from normative specification semantics. They may not invent missing semantics or use provider behavior as authority.
-
-A common implementation interface may be introduced only after its semantics are defined by the portable authority slice. It must not be one proxy API generalized later.
+These are formal review questions, not unresolved Draft definitions.
 
 ## Governance boundary
 
-This AEP is **Draft**, not Proposed, Accepted, or Final.
+AEP-0012 remains **Draft** pending a separate explicit lifecycle decision.
 
-This Draft authorizes design/review only. It does **not** authorize:
+This reconciliation does not authorize:
 
-- normative Network Control specification/schema/TCK adoption;
-- a Network Control Resource Capability registration;
-- Toxiproxy, `tc/netem`, Envoy, Istio, service-mesh, kernel, cloud, or another provider as protocol authority;
-- backend-first network implementation;
-- a generic network backend/provider/plugin framework;
-- AEP-0009, AEP-0010, AEP-0011, or AEP-0012 lifecycle advancement;
-- selecting an Alpha 3 release version;
-- entering release mode;
-- tag or GitHub Release creation;
-- package-index publication;
-- signing or attestation publication;
-- weakening existing Spec/Schema/TCK/Gate/Evidence requirements.
+- `Draft -> Proposed`, `Proposed -> Accepted`, or `Accepted -> Final` by itself;
+- Network Control normative Spec, requirement index, schema, capability registration, or TCK adoption;
+- backend-neutral harness/fixture implementation;
+- any provider as protocol authority or an official reference implementation;
+- a generic provider/plugin framework;
+- lifecycle advancement of AEP-0009, AEP-0010, or AEP-0011;
+- release selection/mode change, tag, GitHub Release, package publication, signing, or attestation;
+- Gate/Evidence weakening;
+- repository merge without separate authorization.
 
-Merge of the Draft PR remains separately governed and requires explicit authorization under the repository workflow.
+If the accompanying Proposed-readiness audit is review-closed with no semantic blocker, the next governance act is a separately recorded protocol-maintainer decision on whether to advance AEP-0012 from Draft to Proposed for formal protocol review.
+
+## References
+
+- AEP-0009 — `rfcs/AEP-0009-environment-fabric.md`
+- Environment contract — `spec/environment/environment-contract.md`
+- Environment requirement index — `spec/environment/requirement-index.yaml`
+- Environment Fabric contract — `spec/fabric/environment-fabric-contract.md`
+- Network Control portability audit — `docs/design/alpha3-network-control-resource-portability-audit.md`
+- RFC 9293 — TCP
+- Linux `tc-netem` documentation — implementation evidence only
+- Toxiproxy documentation/source — implementation evidence only
+- Envoy HTTP fault-filter documentation — layer-separation evidence only
+- DNS standards/negative-caching semantics — layer-separation evidence only
+
+External standards and implementation documentation constrain interoperability analysis; they do not become AVP normative semantics merely by citation.
