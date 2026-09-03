@@ -185,7 +185,7 @@ class AdminClientTests(unittest.TestCase):
 
 
 class DockerLifecycleTests(unittest.TestCase):
-    def test_start_uses_exact_digest_admin_only_start_then_data_connect(self) -> None:
+    def test_start_uses_exact_digest_admin_only_internal_networks_then_data_connect(self) -> None:
         runner = RecordingRunner()
         docker = DockerCli(runner=runner)
         artifact = ToxiproxyArtifact.reviewed("linux/amd64")
@@ -197,8 +197,30 @@ class DockerLifecycleTests(unittest.TestCase):
         commands = runner.commands
         self.assertEqual(commands[0][1:4], ["pull", "--platform", "linux/amd64"])
         self.assertEqual(commands[0][4], artifact.image_ref)
-        self.assertIn(["docker", "network", "create", "--subnet", topology.admin_subnet, topology.admin_network], commands)
-        self.assertIn(["docker", "network", "create", "--subnet", topology.data_subnet, topology.data_network], commands)
+        self.assertIn(
+            [
+                "docker",
+                "network",
+                "create",
+                "--internal",
+                "--subnet",
+                topology.admin_subnet,
+                topology.admin_network,
+            ],
+            commands,
+        )
+        self.assertIn(
+            [
+                "docker",
+                "network",
+                "create",
+                "--internal",
+                "--subnet",
+                topology.data_subnet,
+                topology.data_network,
+            ],
+            commands,
+        )
 
         run_command = next(command for command in commands if command[1] == "run")
         self.assertIn(artifact.image_ref, run_command)

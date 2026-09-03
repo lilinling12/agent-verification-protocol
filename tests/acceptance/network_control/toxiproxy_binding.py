@@ -290,6 +290,7 @@ class ToxiproxyContainer:
         self.docker.run(
             "network",
             "create",
+            "--internal",
             "--subnet",
             self.topology.admin_subnet,
             self.topology.admin_network,
@@ -298,6 +299,7 @@ class ToxiproxyContainer:
             self.docker.run(
                 "network",
                 "create",
+                "--internal",
                 "--subnet",
                 self.topology.data_subnet,
                 self.topology.data_network,
