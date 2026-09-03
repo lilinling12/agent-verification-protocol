@@ -97,13 +97,15 @@ class DuplicateSynInjectorBoundaryTests(unittest.TestCase):
             },
             raw_artifacts=(("base.raw.json", b"base"),),
         )
-        duplicate = self.document()
-        duplicate.update(
-            {
-                "label": "duplicate-syn-normalization",
-                "rawBytes": b"duplicate",
-            }
-        )
+        duplicate = {
+            "totalInitiations": 1,
+            "expectedTargetInitiations": 1,
+            "alternateTargetInitiations": 0,
+            "rawSynPackets": 2,
+            "retransmittedSynPackets": 1,
+            "label": "duplicate-syn-normalization",
+            "rawBytes": b"duplicate",
+        }
         with (
             patch.object(CaptureQualification, "_execute_materialized", return_value=base),
             patch.object(lab, "_observe", return_value=duplicate),
