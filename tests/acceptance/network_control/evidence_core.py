@@ -1,7 +1,7 @@
-"""Provider-neutral, test-only evidence primitives for Network Control TEL-001.
+"""Provider-neutral, test-only evidence primitives for Network Control evidence work.
 
 The types in this module are project acceptance-evidence plumbing, not proposed
-AVP schema or public runtime API.  Exact retained bytes are content addressed so
+AVP schema or public runtime API. Exact retained bytes are content addressed so
 review can reassess recorded observations without allowing a provider to define
 portable expected outcomes.
 """
@@ -131,7 +131,7 @@ class ExchangeProgram:
 
 @dataclass(frozen=True, slots=True)
 class EvidencePlan:
-    """Immutable, fully materialized TEL-001 evidence input."""
+    """Immutable, fully materialized provider-neutral evidence input."""
 
     design_revision: str
     semantic_baseline_commit: str
@@ -142,6 +142,8 @@ class EvidencePlan:
     upstream_fixture: MaterializedEndpoint
     exchange_program: ExchangeProgram
     observation_budget_ns: int
+    non_target_subject_destination: MaterializedEndpoint | None = None
+    non_target_upstream_fixture: MaterializedEndpoint | None = None
     phase_program: tuple[str, ...] = _DEFAULT_PHASE_PROGRAM
     negative_mode: str | None = None
 
@@ -163,11 +165,35 @@ class EvidencePlan:
         if len(set(self.phase_program)) != len(self.phase_program):
             raise EvidenceMaterializationError("phase identities must be unique")
 
+        control_pair = (
+            self.non_target_subject_destination,
+            self.non_target_upstream_fixture,
+        )
+        if (control_pair[0] is None) != (control_pair[1] is None):
+            raise EvidenceMaterializationError(
+                "non-target control subject destination and upstream fixture must be materialized together"
+            )
+        if control_pair[0] is not None and control_pair[1] is not None:
+            if _same_socket_endpoint(self.subject_destination, control_pair[0]):
+                raise EvidenceMaterializationError(
+                    "non-target subject destination must be distinct from the selected destination"
+                )
+            if _same_socket_endpoint(self.upstream_fixture, control_pair[1]):
+                raise EvidenceMaterializationError(
+                    "non-target upstream fixture must be distinct from the selected fixture"
+                )
+
+    @property
+    def has_non_target_control(self) -> bool:
+        return self.non_target_subject_destination is not None
+
     def exact_bytes(self) -> bytes:
         """Return the project-local exact serialization whose bytes are retained.
 
         This deterministic encoding is an evidence implementation choice. It is
         intentionally not a claim about future normative AVP JSON canonicalization.
+        Existing no-control plans keep their previous byte shape; the optional
+        control binding is emitted only when both control endpoints are present.
         """
 
         document = {
@@ -192,6 +218,12 @@ class EvidencePlan:
             "phaseProgram": list(self.phase_program),
             "negativeMode": self.negative_mode,
         }
+        if self.non_target_subject_destination is not None:
+            assert self.non_target_upstream_fixture is not None
+            document["nonTargetControl"] = {
+                "subjectDestination": _endpoint_document(self.non_target_subject_destination),
+                "upstreamFixture": _endpoint_document(self.non_target_upstream_fixture),
+            }
         return json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
     def seal(self) -> "SealedPlan":
@@ -272,7 +304,7 @@ class AttemptFactory:
 
 
 class ArtifactStore:
-    """Small content-addressed store for exact TEL-001 evidence bytes."""
+    """Small content-addressed store for exact Network Control evidence bytes."""
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
@@ -393,6 +425,10 @@ def _endpoint_document(endpoint: MaterializedEndpoint) -> dict[str, object]:
         "port": endpoint.port,
         "role": endpoint.role,
     }
+
+
+def _same_socket_endpoint(first: MaterializedEndpoint, second: MaterializedEndpoint) -> bool:
+    return first.family == second.family and first.address == second.address and first.port == second.port
 
 
 def _b64(payload: bytes) -> str:
