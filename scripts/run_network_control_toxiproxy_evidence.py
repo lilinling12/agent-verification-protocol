@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import TypeAlias
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
@@ -17,7 +18,14 @@ from acceptance.network_control.evidence_core import ArtifactStore, ExchangeProg
 from acceptance.network_control.toxiproxy_evidence import NegativeMode  # noqa: E402
 from acceptance.network_control.toxiproxy_live_execution import execute_live_matrix  # noqa: E402
 from acceptance.network_control.toxiproxy_live_lab import ToxiproxyLiveLab  # noqa: E402
+from acceptance.network_control.toxiproxy_negative_assemblies import (  # noqa: E402
+    UpstreamHiddenRetryLiveLab,
+)
 from acceptance.network_control.witness_evidence import CaptureAssurance  # noqa: E402
+
+_HIDDEN_RETRY_FRONT = "front-extra-connect"
+_HIDDEN_RETRY_UPSTREAM = "upstream-extra-connect"
+_LabType: TypeAlias = type[ToxiproxyLiveLab]
 
 
 def parser() -> argparse.ArgumentParser:
@@ -37,11 +45,40 @@ def parser() -> argparse.ArgumentParser:
         choices=[mode.value for mode in NegativeMode],
         default=None,
     )
+    value.add_argument(
+        "--hidden-retry-variant",
+        choices=(_HIDDEN_RETRY_FRONT, _HIDDEN_RETRY_UPSTREAM),
+        default=None,
+        help=(
+            "Faulty assembly for HiddenRetry/Fallback only. The default preserves "
+            "the Subject-side extra-connect variant; the upstream variant uses a "
+            "same-Toxiproxy-namespace helper required by TEL-002 readiness."
+        ),
+    )
     value.add_argument("--assert-egress-coverage", action="store_true")
     value.add_argument("--assert-directionality", action="store_true")
     value.add_argument("--assert-offload-normalization", action="store_true")
     value.add_argument("--assert-pre-syn-gap-closed", action="store_true")
     return value
+
+
+def _resolve_hidden_retry_variant(
+    *,
+    negative_mode: str | None,
+    requested: str | None,
+) -> tuple[str | None, _LabType]:
+    hidden_mode = NegativeMode.HIDDEN_RETRY_FALLBACK.value
+    if negative_mode != hidden_mode:
+        if requested is not None:
+            raise ValueError("--hidden-retry-variant is valid only with HiddenRetry/Fallback")
+        return None, ToxiproxyLiveLab
+
+    variant = _HIDDEN_RETRY_FRONT if requested is None else requested
+    if variant == _HIDDEN_RETRY_FRONT:
+        return variant, ToxiproxyLiveLab
+    if variant == _HIDDEN_RETRY_UPSTREAM:
+        return variant, UpstreamHiddenRetryLiveLab
+    raise ValueError(f"unsupported HiddenRetry/Fallback variant: {variant!r}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -59,6 +96,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(
             "live TEL-002 evidence requires all four explicit reviewed capture-assurance assertions"
         )
+    try:
+        hidden_retry_variant, lab_type = _resolve_hidden_retry_variant(
+            negative_mode=args.negative_mode,
+            requested=args.hidden_retry_variant,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     assurance = CaptureAssurance(
         egress_coverage_verified=True,
@@ -74,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         response_suffix=b"\x00END",
     )
     store = ArtifactStore(args.artifact_dir)
-    lab = ToxiproxyLiveLab(
+    lab = lab_type(
         workspace=args.workspace,
         artifact_store=store,
         run_id=args.run_id,
@@ -88,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     output = {
         "runId": args.run_id,
         "negativeMode": args.negative_mode,
+        "hiddenRetryVariant": hidden_retry_variant,
         "assessment": {
             "classification": result.assessment.classification.value,
             "primaryProblem": result.assessment.primary_problem,
