@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from acceptance.network_control.attempt_client import execute_exact_exchange
-from acceptance.network_control.evidence_core import AttemptFactory
+from acceptance.network_control.evidence_core import AttemptFactory, EvidenceMaterializationError
 from acceptance.network_control.fixture import ExactByteFixture
 from test_network_control_evidence_core import plan
 
@@ -28,15 +28,15 @@ class ExactByteFixtureTests(unittest.TestCase):
                 attempt,
                 observation_budget_ns=evidence_plan.observation_budget_ns,
             )
+            event = fixture.wait_for_event(attempt.attempt_id)
             fixture.disarm(attempt.attempt_id)
 
             self.assertTrue(observation.completed)
             self.assertFalse(observation.mismatch_observed)
-            events = fixture.events()
-            self.assertEqual(len(events), 1)
-            self.assertTrue(events[0].request_valid)
-            self.assertTrue(events[0].response_emitted)
-            self.assertEqual(events[0].attempt_id, attempt.attempt_id)
+            self.assertTrue(event.request_valid)
+            self.assertTrue(event.response_emitted)
+            self.assertEqual(event.attempt_id, attempt.attempt_id)
+            self.assertEqual(fixture.events(), (event,))
             self.assertIsNone(fixture.fatal_problem)
 
     def test_stale_request_cannot_satisfy_later_attempt(self) -> None:
@@ -57,14 +57,13 @@ class ExactByteFixtureTests(unittest.TestCase):
                 observation_budget_ns=evidence_plan.observation_budget_ns,
                 request_override=stale.request_bytes,
             )
+            event = fixture.wait_for_event(current.attempt_id)
             fixture.disarm(current.attempt_id)
 
             self.assertFalse(observation.completed)
-            events = fixture.events()
-            self.assertEqual(len(events), 1)
-            self.assertFalse(events[0].request_valid)
-            self.assertFalse(events[0].response_emitted)
-            self.assertEqual(events[0].problem, "request-byte-mismatch")
+            self.assertFalse(event.request_valid)
+            self.assertFalse(event.response_emitted)
+            self.assertEqual(event.problem, "request-byte-mismatch")
 
     def test_trailing_request_bytes_are_rejected(self) -> None:
         with ExactByteFixture() as fixture:
@@ -82,13 +81,22 @@ class ExactByteFixtureTests(unittest.TestCase):
                 observation_budget_ns=evidence_plan.observation_budget_ns,
                 request_override=attempt.request_bytes + b"EXTRA",
             )
+            event = fixture.wait_for_event(attempt.attempt_id)
             fixture.disarm(attempt.attempt_id)
 
             self.assertFalse(observation.completed)
-            events = fixture.events()
-            self.assertEqual(len(events), 1)
-            self.assertEqual(events[0].problem, "request-has-trailing-bytes")
-            self.assertFalse(events[0].response_emitted)
+            self.assertEqual(event.problem, "request-has-trailing-bytes")
+            self.assertFalse(event.response_emitted)
+
+    def test_event_barrier_rejects_invalid_timeout(self) -> None:
+        with ExactByteFixture() as fixture:
+            with self.assertRaises(EvidenceMaterializationError):
+                fixture.wait_for_event("attempt", timeout_s=0)
+
+    def test_event_barrier_is_bounded_when_attempt_has_no_connection(self) -> None:
+        with ExactByteFixture(hygiene_timeout_s=0.05) as fixture:
+            with self.assertRaises(TimeoutError):
+                fixture.wait_for_event("attempt-never-connected")
 
     def test_shutdown_failure_is_diagnostic_and_does_not_retry(self) -> None:
         class ShutdownFailSocket:
