@@ -135,8 +135,10 @@ These checked Browser items therefore record that the reviewed authority, confor
 - [x] close NC-BR-001..NC-BR-012 Draft → Proposed blockers
 - [x] reconcile AEP-0012 and complete Draft → Proposed readiness audit
 - [x] AEP-0012 status advanced to Proposed for formal protocol review
-- [ ] complete formal Proposed protocol review
-- [ ] resolve acceptance blockers and record explicit AEP-0012 Proposed → Accepted decision
+- [x] complete formal Proposed protocol review
+- [ ] resolve NPR-001..NPR-011 acceptance blockers in AEP-0012
+- [ ] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker
+- [ ] record explicit protocol-maintainer AEP-0012 Proposed → Accepted decision
 - [ ] network-control normative specification and requirement index
 - [ ] network-control schema(s) where required by reviewed semantics
 - [ ] execution-sensitive network-control resource TCK
@@ -152,7 +154,11 @@ PR #133 reconciled those portability decisions into AEP-0012 and added the Draft
 
 Exact-main validation on `2632935bef065b4d38e88f6df6b8cf0d620bfb3b` then passed CI #830 (`33667291305`), Relational Parity #223 (`33667290799`), and Browser Reference #96 (`33667291258`). `docs/acceptance/alpha3-network-control-readiness-main-adoption.md` records the reviewed and main-adopted evidence.
 
-The protocol maintainer explicitly authorized AEP-0012 `Draft → Proposed` on 2026-09-03 after preparation review closure. PR #135 carries the lifecycle candidate and decision record. This checked lifecycle item means the branch is eligible for formal Proposed review after separate exact-head review and separately authorized squash adoption into `main`; it does **not** complete formal Proposed review, make AEP-0012 Accepted or normative, authorize Network Control Spec/Schema/TCK/harness/provider/reference implementation, or select/publish a release. Linux `tc/netem`, Toxiproxy, Envoy, Istio/service-mesh mechanisms, kernel/firewall/routing facilities, cloud controls, and other providers remain downstream implementation/portability evidence and must not define portable network semantics by precedent.
+AEP-0012 is **Proposed on `main`, not Accepted**. PR #135 adopted the explicitly authorized `Draft → Proposed` lifecycle transition at exact main commit `45ab60d0f6e6db41da70a9859033efda52564055`. Exact-main CI #839 (`33675390573`), Relational Parity #232 (`33675390473`), and Browser Reference #105 (`33675390466`) all passed on that merge commit.
+
+The formal Proposed protocol review against `main@45ab60d0f6e6db41da70a9859033efda52564055` retains the protocol-first Network Control direction but identifies **NPR-001..NPR-011** acceptance blockers covering endpoint/address-set and DNS boundaries, logical path semantics across terminating and packet-path mechanisms, deterministic exchange grammar, fresh-attempt identity, finite cut observation, settlement sequencing, recovery stability, behavioral bypass proof, target isolation, residual-state noninterference, and required cross-mechanism acceptance evidence. `docs/design/alpha3-network-control-resource-formal-proposed-review.md` records the review findings and `docs/design/alpha3-network-control-resource-proposed-review-blockers.md` is the authoritative blocker ledger for the next Proposed-phase protocol-change work.
+
+Formal review completion does **not** resolve those blockers. The next substantive Network Control milestone is a separate AEP-0012 blocker-resolution protocol PR followed by exact-head acceptance-oriented re-review. AEP-0012 remains Proposed throughout that work unless and until the protocol maintainer separately and explicitly authorizes `Proposed → Accepted`. Network Control normative Spec/Schema/TCK, backend-neutral harness, provider/reference implementation, release selection, publication, signing, and attestation remain unauthorized.
 
 ### Other resource implementations
 - [ ] virtual clock service
