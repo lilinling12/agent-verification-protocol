@@ -34,12 +34,14 @@ _REQUIRED_ATTEMPT_PHASES = (
 class AttemptObservation:
     """Normalized evidence for one certified fresh attempt.
 
-    ``completed`` is the provider-neutral exact-exchange predicate produced by
-    the reviewed exact-byte client. Native socket errors and provider state are
-    intentionally absent from this assessment surface.
+    ``path_id`` binds the observation to the logical path already sealed in the
+    evidence plan. ``completed`` is the provider-neutral exact-exchange predicate
+    produced by the reviewed exact-byte client. Native socket errors and provider
+    state are intentionally absent from this assessment surface.
     """
 
     phase_id: str
+    path_id: str
     attempt_id: str
     completed: bool
     mismatch_observed: bool
@@ -123,6 +125,26 @@ def compare_portable_evidence(
             AssessmentClass.EVIDENCE_INVALID,
             phase_binding_problems[0],
             *phase_binding_problems[1:],
+        )
+
+    path_binding_problems = tuple(
+        f"C1:path-binding:{phase}:{plan.path_id}!={item.path_id}"
+        for phase, item in required.items()
+        if item is not None and item.path_id != plan.path_id
+    )
+    if control is not None:
+        control_path_id = plan.non_target_path_id
+        if control_path_id is None:
+            path_binding_problems += ("C1:path-binding:non-target-control:unmaterialized",)
+        elif control.path_id != control_path_id:
+            path_binding_problems += (
+                f"C1:path-binding:non-target-control:{control_path_id}!={control.path_id}",
+            )
+    if path_binding_problems:
+        return _assessment(
+            AssessmentClass.EVIDENCE_INVALID,
+            path_binding_problems[0],
+            *path_binding_problems[1:],
         )
 
     certified = [item for item in required.values() if item is not None]
@@ -250,6 +272,8 @@ def _attempt_structure_problems(observations: list[AttemptObservation]) -> tuple
     for item in observations:
         if not item.phase_id:
             problems.append("C1:attempt-phase-empty")
+        if not item.path_id:
+            problems.append(f"C1:{item.phase_id or 'unknown'}:path-id-empty")
         if not item.attempt_id:
             problems.append(f"C1:{item.phase_id or 'unknown'}:attempt-id-empty")
         elif item.attempt_id in attempt_ids:
