@@ -31,7 +31,11 @@ No generic provider base class, provider registry, backend SPI, public API, Sche
 
 ## 3. Same-role/namespace helper
 
-When the existing phase runner selects `HiddenRetry/Fallback` for `subject-active-cut`, the upstream variant performs the normal certified Subject exchange with the base `extra_connect` disabled. Before the certified attempt returns — while front and both upstream AF_PACKET witnesses remain armed — it runs one bounded helper with:
+When the existing phase runner selects `HiddenRetry/Fallback` for `subject-active-cut`, the base certified-attempt lifecycle first arms all three transport witnesses and the exact-byte fixture. The upstream variant then runs one bounded faulty helper **before the ordinary Subject exchange starts** and invokes that exchange with the base front-side `extra_connect` disabled.
+
+This ordering keeps the injected initiation unambiguously inside the governed certified-attempt window. It does not rely on the collector's terminal-drain tail to manufacture a post-adjudication retry.
+
+The helper runs with:
 
 ```text
 --network container:<exact Toxiproxy container>
@@ -55,7 +59,7 @@ The certified attempt already arms:
 - `W-upstream-data` in the Toxiproxy namespace for the data source address;
 - `W-upstream-admin` in the same namespace for the admin source address.
 
-The helper executes only after those witnesses are ready and before they are closed. Main PR #151's bounded terminal drain is therefore also applied when the attempt seals.
+The helper executes only after those witnesses are ready and before the Subject exchange and terminal observation boundary. Main PR #151's bounded terminal drain still applies when the attempt later seals.
 
 For the upstream negative, expected evidence is:
 
@@ -79,6 +83,8 @@ The selector is rejected for unrelated negative modes.
 
 For the upstream variant the live lab retains an additional project-local phase evidence marker containing the exact attempt, source address, destination endpoint, Toxiproxy namespace container identity, and pinned helper image provenance. This marker is diagnostic provenance; the transport witness still owns the initiation count.
 
+Attempt-local variant provenance is cleared on both successful consumption and exceptional attempt exit so a failed negative cannot contaminate a later attempt.
+
 ## 6. Failure and lifecycle policy
 
 The injected helper is bounded by the existing evaluator `_run_bounded` process limit and uses a finite socket timeout. A helper execution failure is an execution/infrastructure failure; it is not converted into a C10 PASS or assumed retry evidence.
@@ -93,11 +99,13 @@ Ordinary CI must verify without requiring Docker that:
 2. it is read-only, capability-dropped, has no `NET_RAW`, and has no Docker socket;
 3. it uses the exact pinned helper image;
 4. it explicitly binds the data-plane source address and exact fixture endpoint;
-5. the upstream variant suppresses the base front extra-connect;
-6. injection occurs before the overridden exchange method returns, therefore inside the existing witness window;
-7. variant provenance is retained as phase evidence;
-8. CLI default preserves the front variant and explicit upstream selection chooses only the test-only upstream assembly;
-9. variant selection is rejected for unrelated negative modes.
+5. the upstream helper executes after witness/fixture admission but before the ordinary Subject exchange;
+6. the upstream variant suppresses the base front extra-connect;
+7. failed attempts cannot leak a variant marker into later evidence;
+8. variant provenance is retained as phase evidence;
+9. the unchanged provider-neutral comparator rejects `front=1 / upstream=2` through C10;
+10. CLI default preserves the front variant and explicit upstream selection chooses only the test-only upstream assembly;
+11. variant selection is rejected for unrelated negative modes.
 
 The privileged TEL-RB-003 workflow must later execute **both** variants and require the same C10 rejection before TEL-003 evidence can be considered complete.
 
