@@ -9,8 +9,19 @@ from pathlib import Path
 from types import MethodType, SimpleNamespace
 from unittest.mock import patch
 
-from acceptance.network_control.evidence_core import ArtifactStore, MaterializedEndpoint
-from acceptance.network_control.portable_comparator import AttemptObservation
+from acceptance.network_control.evidence_core import (
+    ArtifactStore,
+    AssessmentClass,
+    EvidencePlan,
+    ExchangeProgram,
+    InitiationFacts,
+    MaterializedEndpoint,
+)
+from acceptance.network_control.portable_comparator import (
+    AttemptObservation,
+    PortableEvidenceObservations,
+    compare_portable_evidence,
+)
 from acceptance.network_control.toxiproxy_binding import DockerCli, ToxiproxyRunTopology
 from acceptance.network_control.toxiproxy_evidence import PhaseExecution
 from acceptance.network_control.toxiproxy_live_lab import LabHelperArtifact, ToxiproxyLiveLab
@@ -18,10 +29,35 @@ from acceptance.network_control.toxiproxy_negative_assemblies import UpstreamHid
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "run_network_control_toxiproxy_evidence.py"
+_BASELINE = "bc01bc028e8bd37dbff324fb98d4b980aecbf5be"
 
 
 def endpoint(address: str, port: int) -> MaterializedEndpoint:
     return MaterializedEndpoint("ipv4", address, port, "upstream-fixture")
+
+
+def initiation(channel: str, total: int = 1) -> InitiationFacts:
+    return InitiationFacts(
+        channel=channel,
+        total_initiations=total,
+        expected_target_initiations=total,
+        alternate_target_initiations=0,
+        raw_syn_packets=total,
+        retransmitted_syn_packets=0,
+    )
+
+
+def attempt(phase: str, *, completed: bool, upstream_total: int = 1) -> AttemptObservation:
+    return AttemptObservation(
+        phase_id=phase,
+        path_id="selected-path",
+        attempt_id=f"attempt-{phase}",
+        completed=completed,
+        mismatch_observed=False,
+        observation_budget_expired=not completed,
+        front_initiations=initiation("W-front"),
+        upstream_initiations=initiation("W-upstream", upstream_total),
+    )
 
 
 class UpstreamFaultCommandTests(unittest.TestCase):
@@ -72,14 +108,14 @@ class UpstreamFaultCommandTests(unittest.TestCase):
             return {"completed": False}
 
         lab._run_bounded = MethodType(run_bounded, lab)  # type: ignore[method-assign]
-        attempt = {"attemptId": "attempt-1", "phaseId": "subject-active-cut"}
+        attempt_document = {"attemptId": "attempt-1", "phaseId": "subject-active-cut"}
         visible = MaterializedEndpoint("ipv4", lab.topology.data_address, 41001, "subject-destination")
 
         with patch.object(ToxiproxyLiveLab, "_execute_role_exchange", new=base_exchange):
             result = lab._execute_role_exchange(  # noqa: SLF001
                 container_name="subject",
                 endpoint=visible,
-                attempt_document=attempt,
+                attempt_document=attempt_document,
                 extra_connect=True,
             )
 
@@ -101,14 +137,7 @@ class UpstreamFaultCommandTests(unittest.TestCase):
                 "variant": "same-namespace-upstream-extra-connect",
                 "attemptId": "attempt-1",
             }
-            observation = AttemptObservation(
-                phase_id="subject-active-cut",
-                path_id="selected-path",
-                attempt_id="attempt-1",
-                completed=False,
-                mismatch_observed=False,
-                observation_budget_expired=True,
-            )
+            observation = attempt("subject-active-cut", completed=False, upstream_total=2)
             base = PhaseExecution(observation=observation)
             with patch.object(ToxiproxyLiveLab, "certified_attempt", return_value=base):
                 result = lab.certified_attempt("subject-active-cut", False, None)
@@ -125,6 +154,51 @@ class UpstreamFaultCommandTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "boom"):
                 lab.certified_attempt("subject-active-cut", False, None)
         self.assertIsNone(lab._upstream_negative_attempt)  # noqa: SLF001
+
+
+class UpstreamComparatorRegressionTests(unittest.TestCase):
+    def test_same_comparator_rejects_upstream_only_extra_initiation_as_c10(self) -> None:
+        plan = EvidencePlan(
+            design_revision="TEL-002-v0.1",
+            semantic_baseline_commit=_BASELINE,
+            semantic_baseline_path="rfcs/AEP-0012-network-control-resource-profile.md",
+            run_id="hidden-retry-upstream-comparator",
+            path_id="selected-path",
+            subject_destination=MaterializedEndpoint(
+                "ipv4", "172.30.80.2", 41001, "subject-destination"
+            ),
+            upstream_fixture=MaterializedEndpoint(
+                "ipv4", "172.30.80.3", 42001, "upstream-fixture"
+            ),
+            exchange_program=ExchangeProgram(
+                "hidden-retry-regression",
+                b"REQ",
+                b"END",
+                b"RESP",
+                b"END",
+            ),
+            observation_budget_ns=1_000_000_000,
+        )
+        observations = PortableEvidenceObservations(
+            baseline=attempt("baseline", completed=True),
+            pre_trigger=attempt("pre-trigger", completed=True),
+            activation_settlement=attempt("activation-settlement", completed=False),
+            subject_active_cut=attempt(
+                "subject-active-cut",
+                completed=False,
+                upstream_total=2,
+            ),
+            recovery_1=attempt("recovery-1", completed=True),
+            recovery_2=attempt("recovery-2", completed=True),
+            stability=attempt("stability", completed=True),
+            cleanup_noninterference_ok=True,
+            security_projection_ok=True,
+        )
+
+        assessment = compare_portable_evidence(plan.seal(), observations)
+
+        self.assertEqual(assessment.classification, AssessmentClass.SEMANTIC_VIOLATION)
+        self.assertTrue((assessment.primary_problem or "").startswith("C10:subject-active-cut:"))
 
 
 class HiddenRetryCliVariantTests(unittest.TestCase):
