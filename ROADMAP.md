@@ -108,7 +108,7 @@ PostgreSQL, MySQL/InnoDB, and their paired canonical-parity verifier remain impl
 - [x] browser normative specification and requirement index
 - [x] browser schema(s) for serialized state/projection resources where required
 - [x] execution-sensitive browser resource TCK
-- [x] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by reviewed semantics
+- [x] backend-neutral browser conformance harness + immutable local-browser fixture + privileged fixture-control seam if required by reviewed protocol semantics
 - [x] Playwright browser runtime against the portable TCK
 
 AEP-0011 is **Accepted, not Final**, by explicit protocol-maintainer decision on 2026-08-31, recorded in `docs/acceptance/alpha3-aep-0011-accepted-decision.md`. Acceptance authorized downstream Browser closure in the order `Spec -> requirement index -> Schema -> provider/language-neutral execution-sensitive TCK -> backend-neutral harness -> reference implementation`; main adoption does not authorize AEP Final, provider-native semantics as protocol authority, release selection, publication, signing, attestation, or partial Browser support.
