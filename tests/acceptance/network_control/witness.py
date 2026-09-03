@@ -166,10 +166,20 @@ class LinuxSynWitness:
         self._ready.set()
         capture = self._socket
         assert capture is not None
-        while not self._stop.is_set():
+        # ``close()`` marks the evaluator's terminal boundary, but that signal can
+        # race with a SYN that the kernel has already queued for this AF_PACKET
+        # socket. Exiting merely because ``_stop`` is set can therefore undercount
+        # a real initiation. After the terminal signal, keep consuming frames until
+        # the first bounded receive inactivity timeout. This is a conservative
+        # terminal drain: any late SYN from the isolated attempt role is retained
+        # rather than hidden, while continuously arriving traffic still fails
+        # closed through the bounded join in ``close()``.
+        while True:
             try:
                 frame, address = capture.recvfrom(65535)
             except TimeoutError:
+                if self._stop.is_set():
+                    break
                 continue
             except OSError:
                 if not self._stop.is_set():
