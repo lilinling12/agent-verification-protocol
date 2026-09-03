@@ -66,6 +66,34 @@ class ExactByteFixtureTests(unittest.TestCase):
             self.assertFalse(events[0].response_emitted)
             self.assertEqual(events[0].problem, "request-byte-mismatch")
 
+    def test_trailing_request_bytes_are_rejected(self) -> None:
+        with ExactByteFixture() as fixture:
+            evidence_plan = dataclasses.replace(
+                plan(),
+                subject_destination=dataclasses.replace(fixture.endpoint, role="subject-destination"),
+                upstream_fixture=fixture.endpoint,
+                observation_budget_ns=300_000_000,
+            )
+            attempt = AttemptFactory(b"T" * 32).issue(
+                evidence_plan,
+                phase_id="baseline",
+                ordinal=0,
+            )
+            fixture.arm(attempt)
+            observation = execute_exact_exchange(
+                evidence_plan.subject_destination,
+                attempt,
+                observation_budget_ns=evidence_plan.observation_budget_ns,
+                request_override=attempt.request_bytes + b"EXTRA",
+            )
+            fixture.disarm(attempt.attempt_id)
+
+            self.assertFalse(observation.completed)
+            events = fixture.events()
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0].problem, "request-has-trailing-bytes")
+            self.assertFalse(events[0].response_emitted)
+
     def test_attempt_client_does_not_retry_failed_connect(self) -> None:
         class CountingSocket:
             instances = 0

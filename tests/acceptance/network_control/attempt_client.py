@@ -86,6 +86,9 @@ def execute_exact_exchange(
                 return _observation(attempt, started, response, mismatch, False, native_error)
             view = view[sent:]
 
+        # EOF frames the request exactly: the fixture must observe no trailing
+        # request bytes before it is allowed to emit the expected response.
+        sock.shutdown(socket.SHUT_WR)
         selector.modify(sock, selectors.EVENT_READ)
         expected = attempt.expected_response_bytes
         while len(response) < len(expected):
@@ -96,6 +99,9 @@ def execute_exact_exchange(
                 chunk = sock.recv(len(expected) - len(response))
             except BlockingIOError:
                 continue
+            except OSError as exc:
+                native_error = f"{type(exc).__name__}:{getattr(exc, 'errno', None)}"
+                break
             if not chunk:
                 break
             response.extend(chunk)

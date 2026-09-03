@@ -201,11 +201,16 @@ class ExactByteFixture:
                 problem = "connection-without-armed-attempt"
                 return
             received, problem = _receive_exact_request(connection, len(attempt.request_bytes))
-            if problem is None and received == attempt.request_bytes:
+            if problem is None and received != attempt.request_bytes:
+                problem = "request-byte-mismatch"
+            if problem is None:
+                trailing = connection.recv(1)
+                if trailing:
+                    received += trailing
+                    problem = "request-has-trailing-bytes"
+            if problem is None:
                 connection.sendall(attempt.expected_response_bytes)
                 response_emitted = True
-            elif problem is None:
-                problem = "request-byte-mismatch"
         except (OSError, TimeoutError) as exc:
             problem = f"fixture-io:{type(exc).__name__}"
         finally:
