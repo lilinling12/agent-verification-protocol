@@ -71,6 +71,7 @@ class ExactByteFixture:
         self._stop = threading.Event()
         self._ready = threading.Event()
         self._lock = threading.Lock()
+        self._event_condition = threading.Condition(self._lock)
         self._armed: AttemptMaterial | None = None
         self._events: list[FixtureExchangeEvent] = []
         self._connections: set[threading.Thread] = set()
@@ -137,6 +138,50 @@ class ExactByteFixture:
     def events(self) -> tuple[FixtureExchangeEvent, ...]:
         with self._lock:
             return tuple(self._events)
+
+    def wait_for_event(
+        self,
+        attempt_id: str,
+        *,
+        timeout_s: float | None = None,
+    ) -> FixtureExchangeEvent:
+        """Wait until the fixture publishes evidence for one admitted attempt.
+
+        This is a bounded thread-synchronization barrier for test/evidence
+        publication only. It does not establish Network Control settlement and
+        must not be used as a substitute for the independent transport witness.
+        """
+
+        if not attempt_id:
+            raise EvidenceMaterializationError("fixture event attempt id must be non-empty")
+        timeout = self._hygiene_timeout_s if timeout_s is None else timeout_s
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise EvidenceMaterializationError("fixture event timeout must be positive and finite")
+
+        def _event() -> FixtureExchangeEvent | None:
+            return next((event for event in self._events if event.attempt_id == attempt_id), None)
+
+        with self._event_condition:
+            event = _event()
+            if event is not None:
+                return event
+            settled = self._event_condition.wait_for(
+                lambda: _event() is not None or self._fatal_problem is not None,
+                timeout=float(timeout),
+            )
+            event = _event()
+            if event is not None:
+                return event
+            if self._fatal_problem is not None:
+                raise RuntimeError(f"fixture became unhealthy before event publication: {self._fatal_problem}")
+            if not settled:
+                raise TimeoutError(f"fixture did not publish event for attempt {attempt_id!r}")
+            raise RuntimeError("fixture event barrier settled without event or fatal problem")
 
     def stop(self) -> None:
         self._stop.set()
@@ -224,15 +269,17 @@ class ExactByteFixture:
                 response_emitted=response_emitted,
                 problem=problem,
             )
-            with self._lock:
+            with self._event_condition:
                 self._events.append(event)
                 self._connections.discard(threading.current_thread())
+                self._event_condition.notify_all()
             connection.close()
 
     def _set_fatal(self, problem: str) -> None:
-        with self._lock:
+        with self._event_condition:
             if self._fatal_problem is None:
                 self._fatal_problem = problem
+            self._event_condition.notify_all()
 
 
 def _receive_exact_request(connection: socket.socket, length: int) -> tuple[bytes, str | None]:
