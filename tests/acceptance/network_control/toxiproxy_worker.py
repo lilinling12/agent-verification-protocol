@@ -174,7 +174,7 @@ def _witness_worker(stdin: TextIO, stdout: TextIO) -> int:
 
 def _inventory_worker(stdout: TextIO) -> int:
     addresses = []
-    for interface_name, interface_index in socket.if_nameindex():
+    for interface_index, interface_name in socket.if_nameindex():
         address = _ipv4_for_interface(interface_name)
         if address is not None:
             addresses.append(
@@ -192,7 +192,7 @@ def _inventory_worker(stdout: TextIO) -> int:
 def _interface_for_ipv4(address: str) -> str:
     matches = [
         interface_name
-        for interface_name, _index in socket.if_nameindex()
+        for _index, interface_name in socket.if_nameindex()
         if _ipv4_for_interface(interface_name) == address
     ]
     if len(matches) != 1:
