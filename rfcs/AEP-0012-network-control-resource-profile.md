@@ -122,7 +122,7 @@ The logical path is not one provider-native connection object. Both of these top
 - a non-terminating packet/routing/firewall-style control path; and
 - a terminating/intercepting TCP mechanism that accepts a Subject-side connection and creates or manages distinct upstream transport state.
 
-Portable conformance compares declared-boundary behavior, not native topology equality.
+Portable conformance compares declared-boundary behavior, not native topology equality. Provider-internal transport state does not authorize hidden retry, reconnect, alternate destination, or alternate-path fallback inside one certified attempt.
 
 Portable resource identity does not use Linux interface/qdisc/filter handles, proxy listener/toxic IDs, service-mesh resource names, cloud rule IDs, socket descriptors, process IDs, ephemeral ports, sequence numbers, or equivalent mechanism-native objects.
 
@@ -175,10 +175,11 @@ For one attempt:
 - automatic destination-address fallback is prohibited;
 - automatic Subject/client reconnect is prohibited;
 - application retry is prohibited;
-- a terminating intermediary may create internal upstream transport state as implementation detail, but that does not create another Subject attempt;
+- for a terminating/intercepting topology, the certified attempt permits exactly one corresponding upstream connection initiation to the bound upstream fixture endpoint;
+- provider/intermediary upstream reconnect, retry, alternate-endpoint selection, or alternate-path fallback is prohibited within that certified attempt;
 - any evaluator-intended retry/fallback receives a new attempt identity, a fresh challenge, and an independent result.
 
-An implementation that cannot suppress or expose hidden Subject-side retry/fallback cannot claim base v0.1 for that operation.
+An implementation that cannot suppress or detect hidden retry/fallback at either the Subject-facing or terminating-intermediary boundary cannot claim base v0.1 for that operation.
 
 ### Deterministic exact-byte exchange
 
@@ -187,9 +188,10 @@ The evaluator-controlled fixture deterministically maps the attempt's valid requ
 A baseline/recovery attempt completes successfully only when:
 
 1. a fresh Subject-facing TCP connection is established to the selected materialized destination;
-2. the exact request bytes are emitted once;
-3. the exact expected response byte sequence is received in order before the evaluator-owned observation budget expires; and
-4. no byte mismatch occurs before the expected sequence is complete.
+2. where a terminating topology is used, exactly one corresponding upstream connection initiation targets the bound upstream fixture endpoint;
+3. the exact request bytes are emitted once;
+4. the exact expected response byte sequence is received in order before the evaluator-owned observation budget expires; and
+5. no byte mismatch occurs before the expected sequence is complete.
 
 TCP read/write call boundaries and TCP segment boundaries are irrelevant. HTTP, TLS, DNS, provider framing, native exception classes, FIN/RST identity, packet counts, and native error codes do not define exchange completion.
 
@@ -425,7 +427,7 @@ A minimal mandatory execution flow must prove:
 4. the Environment activation condition is reached;
 5. activation settles through a privileged independent certified cut probe;
 6. the distinct Subject-side post-settlement certified attempt cannot complete within its governed observation budget;
-7. hidden reuse/retry/fallback cannot convert the selected path into success;
+7. hidden reuse/retry/fallback at Subject-facing or terminating-intermediary boundaries cannot convert the selected path into success;
 8. bypass is detected;
 9. narrow target isolation is preserved against a materialized non-target control where applicable;
 10. clear is issued through privileged authority;
@@ -443,7 +445,7 @@ Required negative directions include:
 - `FalseRecoveryAdapter`;
 - `ScheduleLeakAdapter`;
 - a stale-connection/pooling reuse negative mode;
-- a hidden retry/address-fallback negative mode;
+- a hidden Subject or terminating-intermediary retry/address-fallback negative mode;
 - a target-scope collateral-fault negative mode; and
 - a residual-fault cleanup negative mode.
 
@@ -462,7 +464,7 @@ The evidence must exercise, at minimum:
 
 - materialized endpoint/path binding;
 - exact exchange/challenge identity;
-- fresh-attempt identity and hidden retry/fallback rejection;
+- fresh-attempt identity and hidden retry/fallback rejection at both portable boundaries where applicable;
 - qualifying pre-trigger/no-early-activation behavior;
 - finite evaluator-owned cut observation;
 - activation-settlement sequencing;
@@ -504,7 +506,7 @@ The reconciled design rejects:
 - DNS failure as generic network loss;
 - unresolved hostname/multi-address fallback inside one certified base attempt;
 - connection pooling/stale-socket reuse as a fresh attempt;
-- hidden automatic retry/reconnect as part of one certified attempt;
+- hidden automatic Subject or intermediary retry/reconnect as part of one certified attempt;
 - provider-native timeout or arbitrary sleep as the portable cut predicate;
 - one transient recovery success as sufficient recovery settlement;
 - indiscriminate Environment-wide cut as evidence of a narrow target;
@@ -549,7 +551,7 @@ Formal Proposed review identified NPR-001..NPR-011. This candidate resolves thei
 - **NPR-001 — SEMANTICALLY CLOSED:** base attempts bind literal materialized TCP endpoint identity; DNS/multi-address selection is pre-execution and hidden fallback is prohibited.
 - **NPR-002 — SEMANTICALLY CLOSED:** the controlled path is a logical exchange path supporting terminating and non-terminating mechanisms without native-connection identity.
 - **NPR-003 — SEMANTICALLY CLOSED:** exact request/expected-response bytes, exchange-program identity, and attempt-unique challenge define deterministic completion.
-- **NPR-004 — SEMANTICALLY CLOSED:** one attempt has one Subject-facing fresh connection initiation; pooling/reuse/retry/address fallback cannot hide inside the attempt.
+- **NPR-004 — SEMANTICALLY CLOSED:** one attempt has one Subject-facing fresh connection initiation and, for terminating topology, one corresponding upstream initiation; pooling/reuse/retry/address or alternate-path fallback cannot hide inside the attempt.
 - **NPR-005 — SEMANTICALLY CLOSED:** every attempt binds a finite evaluator-owned monotonic observation budget; provider timeouts/arbitrary sleeps are not authority.
 - **NPR-006 — SEMANTICALLY CLOSED:** activation settlement is privileged post-trigger verification traffic and precedes a distinct Subject-side certified active-cut attempt.
 - **NPR-007 — SEMANTICALLY CLOSED:** recovery settlement is exactly two consecutive privileged fresh successful probes plus a distinct post-recovery stability witness.
