@@ -38,7 +38,7 @@ A user-space TCP proxy commonly terminates a Subject-side TCP connection and cre
 
 ### Resolution
 
-The controlled path is defined as a provider-neutral logical certified exchange path between declared Subject-visible and evaluator-controlled fixture boundaries. Terminating and non-terminating mechanism classes are both admissible when they satisfy equivalent observable baseline/cut/recovery/target/path-coverage behavior. Native socket/connection identity remains non-portable.
+The controlled path is a provider-neutral logical certified exchange path between declared Subject-visible and evaluator-controlled fixture boundaries. Terminating and non-terminating mechanism classes are both admissible when they satisfy equivalent observable baseline/cut/recovery/target/path-coverage behavior. A terminating/intercepting topology has one Subject-facing connection initiation and exactly one corresponding upstream connection initiation to the bound fixture endpoint per certified attempt. Native socket/connection identity remains non-portable; hidden upstream retry/reconnect, alternate endpoint, or alternate-path fallback inside the same attempt is prohibited.
 
 **NPR-002: SEMANTICALLY CLOSED.**
 
@@ -50,7 +50,7 @@ TCP supplies an ordered byte stream rather than protocol-owned request/response 
 
 ### Resolution
 
-Every certified attempt binds exact non-empty request bytes, exact expected-response bytes, immutable exchange-program identity, and an evaluator-generated attempt-unique challenge. Success requires one fresh connection, one request emission, receipt of the exact expected byte sequence in order within the governed observation budget, and no mismatch before completion. TCP segmentation/read boundaries and HTTP/application framing are non-semantic.
+Every certified attempt binds exact non-empty request bytes, exact expected-response bytes, immutable exchange-program identity, and an evaluator-generated attempt-unique challenge. Success requires one fresh Subject-facing connection, one corresponding upstream initiation where terminating topology applies, one request emission, receipt of the exact expected byte sequence in order within the governed observation budget, and no mismatch before completion. TCP segmentation/read boundaries and HTTP/application framing are non-semantic.
 
 **NPR-003: SEMANTICALLY CLOSED.**
 
@@ -62,7 +62,9 @@ Connection pooling, stale socket reuse, proxy retries, reconnect loops, multiple
 
 ### Resolution
 
-One portable attempt has one evaluator-assigned attempt identity and exactly one Subject-facing connection initiation to the selected materialized destination. Pre-existing connection reuse, pooling, automatic alternate-address fallback, automatic Subject reconnect, and application retry are prohibited within one certified attempt. Evaluator-intended retries use new attempt identities and challenges. Intermediary-internal upstream transport remains implementation detail within the logical path.
+One portable attempt has one evaluator-assigned attempt identity and exactly one Subject-facing connection initiation to the selected materialized destination. Pre-existing connection reuse, pooling, automatic alternate-address fallback, automatic Subject reconnect, and application retry are prohibited within one certified attempt. For terminating/intercepting topology, exactly one corresponding upstream initiation to the bound fixture endpoint is permitted; intermediary upstream retry/reconnect, alternate-endpoint selection, or alternate-path fallback is also prohibited. Evaluator-intended retries use new attempt identities and challenges.
+
+An implementation that cannot suppress or detect hidden retry/fallback at either portable boundary cannot claim the v0.1 certified-attempt semantic.
 
 **NPR-004: SEMANTICALLY CLOSED.**
 
@@ -151,7 +153,7 @@ AEP-0012 now makes the gate mandatory: before acceptance-oriented re-review can 
 1. a user-space terminating/intercepting TCP control class; and
 2. a non-terminating packet-path kernel/routing/firewall-style control class.
 
-The matrix must exercise endpoint/path binding, exact exchange/challenge identity, fresh-attempt/no-fallback semantics, pre-trigger/no-early-activation behavior, finite evaluator-owned cut observation, settlement sequencing, distinct Subject active cut, bypass detection, target isolation where materialized, clear, deterministic two-probe recovery, post-recovery no-reactivation witness, reset/cleanup noninterference, and schedule/control secrecy with Validity/Task-Verdict separation.
+The matrix must exercise endpoint/path binding, exact exchange/challenge identity, fresh-attempt/no-fallback semantics at both portable boundaries where applicable, pre-trigger/no-early-activation behavior, finite evaluator-owned cut observation, settlement sequencing, distinct Subject active cut, bypass detection, target isolation where materialized, clear, deterministic two-probe recovery, post-recovery no-reactivation witness, reset/cleanup noninterference, and schedule/control secrecy with Validity/Task-Verdict separation.
 
 This is an AVP acceptance-evidence gate, not a universal requirement that every third-party conformer implement two providers.
 
