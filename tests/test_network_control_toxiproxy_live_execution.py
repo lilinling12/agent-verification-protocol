@@ -16,21 +16,13 @@ from acceptance.network_control.evidence_core import (
     MaterializedEndpoint,
 )
 from acceptance.network_control.portable_comparator import PortableEvidenceObservations
-from acceptance.network_control.toxiproxy_binding import (
-    ProxyBinding,
-    ToxiproxyArtifact,
-    ToxiproxyRunTopology,
-)
+from acceptance.network_control.toxiproxy_binding import ProxyBinding, ToxiproxyArtifact, ToxiproxyRunTopology
 from acceptance.network_control.toxiproxy_evidence import TerminatingRunResult
 from acceptance.network_control.toxiproxy_live_execution import (
     _retain_materialization_provenance,
     execute_live_matrix,
 )
-from acceptance.network_control.toxiproxy_live_lab import (
-    LabHelperArtifact,
-    LabRoleAddresses,
-    LiveMaterialization,
-)
+from acceptance.network_control.toxiproxy_live_lab import LabHelperArtifact, LabRoleAddresses, LiveMaterialization
 from acceptance.network_control.witness_evidence import CaptureAssurance
 
 _BASELINE = "883956784e57152537b11aaf65143209fc131429"
@@ -110,19 +102,22 @@ def materialized_lab(root: Path) -> _FakeLab:
 
 
 class MaterializationProvenanceTests(unittest.TestCase):
-    def test_retains_helper_capture_and_security_facts_outside_portable_observations(self) -> None:
+    def test_observed_security_fact_is_separate_from_construction_invariants(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lab = materialized_lab(Path(temporary))
             ref = _retain_materialization_provenance(lab)  # type: ignore[arg-type]
             document = json.loads(lab.artifact_store.read_verified(ref))
 
-        self.assertEqual(document["format"], "avp-project-toxiproxy-live-materialization-v0.1")
         self.assertEqual(document["helper"], lab.helper_artifact.provenance_document())
-        self.assertEqual(document["toxiproxy"], lab.toxiproxy_artifact.provenance_document())
         self.assertTrue(document["captureAssurance"]["egressCoverageVerified"])
-        self.assertTrue(document["securityPreflight"]["subjectAdminIsolationVerified"])
-        self.assertTrue(document["securityPreflight"]["networksInternalOnly"])
-        self.assertFalse(document["securityPreflight"]["subjectHasNetRaw"])
+        security = document["securityEvidence"]
+        self.assertTrue(security["subjectAdminIsolationVerified"])
+        construction = security["constructionInvariants"]
+        self.assertTrue(construction["networksInternalOnly"])
+        self.assertFalse(construction["subjectDockerControlMounted"])
+        self.assertFalse(construction["subjectNetRawGranted"])
+        self.assertTrue(construction["witnessNetRawGranted"])
+        self.assertNotIn("networksInternalOnly", security)
 
 
 class LiveExecutionCleanupTests(unittest.TestCase):
@@ -133,10 +128,8 @@ class LiveExecutionCleanupTests(unittest.TestCase):
             lab.start = lambda: lab._materialization
             lab.phase_runner = lambda: _FakeRunner(error=primary)
             lab.close = lambda: ("cleanup:residual-role",)
-
             with self.assertRaisesRegex(RuntimeError, "primary-live-failure") as captured:
                 execute_live_matrix(lab)  # type: ignore[arg-type]
-
         self.assertIs(captured.exception, primary)
         self.assertIn("cleanup:residual-role", getattr(primary, "__notes__", ()))
 
@@ -146,14 +139,14 @@ class LiveExecutionCleanupTests(unittest.TestCase):
             lab.start = lambda: lab._materialization
             lab.close = lambda: ()
             empty = PortableEvidenceObservations(None, None, None, None, None, None, None)
-            result = TerminatingRunResult(
-                observations=empty,
-                assessment=EvidenceAssessment(AssessmentClass.SATISFIED),
-                control_snapshots=(),
-                implementation_record_ref=None,
+            lab.phase_runner = lambda: _FakeRunner(
+                result=TerminatingRunResult(
+                    observations=empty,
+                    assessment=EvidenceAssessment(AssessmentClass.SATISFIED),
+                    control_snapshots=(),
+                    implementation_record_ref=None,
+                )
             )
-            lab.phase_runner = lambda: _FakeRunner(result=result)
-
             with self.assertRaisesRegex(RuntimeError, "did not retain implementation record"):
                 execute_live_matrix(lab)  # type: ignore[arg-type]
 

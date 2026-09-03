@@ -41,7 +41,7 @@ def execute_live_matrix(
 
     primary: BaseException | None = None
     try:
-        materialization = lab.start()
+        lab.start()
         provenance_ref = _retain_materialization_provenance(lab)
         result = lab.phase_runner().execute(negative_mode=negative_mode)
         if result.implementation_record_ref is None:
@@ -61,6 +61,8 @@ def execute_live_matrix(
 
 
 def _retain_materialization_provenance(lab: ToxiproxyLiveLab) -> ArtifactRef:
+    """Retain observed preflight evidence separately from construction invariants."""
+
     materialization = lab._require_materialization()
     assurance = lab.capture_assurance
     document = {
@@ -91,12 +93,18 @@ def _retain_materialization_provenance(lab: ToxiproxyLiveLab) -> ArtifactRef:
             "subjectAddress": lab.addresses.subject,
             "privilegedProbeAddress": lab.addresses.privileged_probe,
         },
-        "securityPreflight": {
+        "securityEvidence": {
+            # This value is produced by an actual Subject-role reachability probe.
             "subjectAdminIsolationVerified": lab._admin_isolation_verified,
-            "networksInternalOnly": True,
-            "subjectHasDockerControl": False,
-            "subjectHasNetRaw": False,
-            "witnessNetRawOnly": True,
+            # The remaining values describe the reviewed Docker construction
+            # performed by this implementation. They are not presented as
+            # independently observed runtime facts.
+            "constructionInvariants": {
+                "networksInternalOnly": True,
+                "subjectDockerControlMounted": False,
+                "subjectNetRawGranted": False,
+                "witnessNetRawGranted": True,
+            },
         },
     }
     payload = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
