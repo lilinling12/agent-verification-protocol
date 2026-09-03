@@ -28,14 +28,6 @@ _REQUIRED_ATTEMPT_PHASES = (
     "recovery-2",
     "stability",
 )
-_SUCCESS_PHASES = (
-    "baseline",
-    "pre-trigger",
-    "recovery-1",
-    "recovery-2",
-    "stability",
-)
-_CUT_PHASES = ("activation-settlement", "subject-active-cut")
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +108,22 @@ def compare_portable_evidence(
         return _assessment(AssessmentClass.EVIDENCE_INVALID, "C6:missing-observation:non-target-control")
     if not plan.has_non_target_control and control is not None:
         return _assessment(AssessmentClass.EVIDENCE_INVALID, "C1:unexpected-observation:non-target-control")
+
+    phase_binding_problems = tuple(
+        f"C1:phase-binding:{expected}!={item.phase_id}"
+        for expected, item in required.items()
+        if item is not None and item.phase_id != expected
+    )
+    if control is not None and control.phase_id != "non-target-control":
+        phase_binding_problems += (
+            f"C1:phase-binding:non-target-control!={control.phase_id}",
+        )
+    if phase_binding_problems:
+        return _assessment(
+            AssessmentClass.EVIDENCE_INVALID,
+            phase_binding_problems[0],
+            *phase_binding_problems[1:],
+        )
 
     certified = [item for item in required.values() if item is not None]
     if control is not None:
