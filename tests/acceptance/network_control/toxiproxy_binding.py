@@ -28,6 +28,7 @@ _TOXIPROXY_PLATFORM_DIGESTS = {
     "linux/arm64": "sha256:5ab4b4e8f476fd5452eb9584a608dd7cf8c11135878a8f7953722a9fcb9b3d87",
 }
 _RUN_TOKEN_RE = re.compile(r"[^a-z0-9-]+")
+_RUN_SUBNET_SLOTS = 64 * 256
 
 
 class ToxiproxyPrerequisiteError(RuntimeError):
@@ -98,16 +99,24 @@ class ToxiproxyRunTopology:
         normalized = _RUN_TOKEN_RE.sub("-", run_id.lower()).strip("-")[:24] or "run"
         suffix = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:8]
         token = f"{normalized}-{suffix}"
-        # Distinct RFC1918 /28s are derived from the run identity. Docker will fail
-        # closed if either subnet overlaps an existing local network.
-        octet = 16 + (int(suffix[:2], 16) % 200)
+
+        # Keep admin and data networks in disjoint private-address pools while
+        # deriving a 14-bit run slot from the run identity. This gives 16,384
+        # deterministic /28 slots per plane, dramatically reducing accidental
+        # cross-run subnet contention without introducing a mutable allocator.
+        # Docker still fails closed if a slot overlaps unrelated local networks.
+        slot = int(suffix[:4], 16) % _RUN_SUBNET_SLOTS
+        pool_offset = slot // 256
+        third_octet = slot % 256
+        admin_second_octet = 64 + pool_offset
+        data_second_octet = 128 + pool_offset
         return cls(
             run_token=token,
             admin_network=f"avp-nc-admin-{token}",
             data_network=f"avp-nc-data-{token}",
             container_name=f"avp-nc-toxiproxy-{token}",
-            admin_address=f"172.29.{octet}.2",
-            data_address=f"172.30.{octet}.2",
+            admin_address=f"10.{admin_second_octet}.{third_octet}.2",
+            data_address=f"10.{data_second_octet}.{third_octet}.2",
         )
 
     @property
