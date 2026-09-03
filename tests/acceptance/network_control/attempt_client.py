@@ -88,7 +88,11 @@ def execute_exact_exchange(
 
         # EOF frames the request exactly: the fixture must observe no trailing
         # request bytes before it is allowed to emit the expected response.
-        sock.shutdown(socket.SHUT_WR)
+        try:
+            sock.shutdown(socket.SHUT_WR)
+        except OSError as exc:
+            native_error = f"{type(exc).__name__}:{getattr(exc, 'errno', None)}"
+            return _observation(attempt, started, response, mismatch, False, native_error)
         selector.modify(sock, selectors.EVENT_READ)
         expected = attempt.expected_response_bytes
         while len(response) < len(expected):

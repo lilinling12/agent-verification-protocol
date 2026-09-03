@@ -121,7 +121,9 @@ def _parse_ipv4_syn(frame: bytes, offset: int) -> ParsedSyn | None:
     if protocol != _IPPROTO_TCP:
         return None
     flags_fragment = struct.unpack_from("!H", frame, offset + 6)[0]
-    if flags_fragment & 0x1FFF:
+    # Any fragmentation is outside the trustworthy TEL-001 normalization path.
+    # Reject both non-zero offsets and the first fragment carrying MF=1.
+    if flags_fragment & 0x3FFF:
         raise PacketParseError("fragmented-initial-ipv4-tcp-syn")
     source = str(ipaddress.ip_address(frame[offset + 12 : offset + 16]))
     destination = str(ipaddress.ip_address(frame[offset + 16 : offset + 20]))

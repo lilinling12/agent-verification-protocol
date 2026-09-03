@@ -11,7 +11,11 @@ from pathlib import Path
 from unittest import mock
 
 from acceptance.network_control.evidence_core import ArtifactStore, AssessmentClass, assess_initiation_integrity
-from acceptance.network_control.tcp_packets import build_synthetic_syn_frame, parse_initial_syn
+from acceptance.network_control.tcp_packets import (
+    PacketParseError,
+    build_synthetic_syn_frame,
+    parse_initial_syn,
+)
 from acceptance.network_control.witness import LinuxSynWitness, WitnessPrerequisiteError
 from acceptance.network_control.witness_evidence import (
     CaptureAssurance,
@@ -58,6 +62,21 @@ class PacketParsingTests(unittest.TestCase):
             self.assertEqual(parsed.source_address, source)
             self.assertEqual(parsed.destination_address, target)
             self.assertEqual(parsed.sequence, 12345)
+
+    def test_ipv4_first_fragment_with_more_fragments_fails_closed(self) -> None:
+        frame = bytearray(
+            build_synthetic_syn_frame(
+                source_address="10.1.0.2",
+                destination_address="10.1.0.3",
+                source_port=30001,
+                destination_port=443,
+                sequence=12345,
+            )
+        )
+        # Ethernet is 14 bytes; IPv4 flags/fragment field begins at bytes 20-21.
+        frame[20:22] = (0x2000).to_bytes(2, "big")  # MF=1, fragment offset=0
+        with self.assertRaises(PacketParseError):
+            parse_initial_syn(bytes(frame))
 
 
 class WitnessNormalizationTests(unittest.TestCase):

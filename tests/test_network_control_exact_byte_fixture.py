@@ -74,11 +74,7 @@ class ExactByteFixtureTests(unittest.TestCase):
                 upstream_fixture=fixture.endpoint,
                 observation_budget_ns=300_000_000,
             )
-            attempt = AttemptFactory(b"T" * 32).issue(
-                evidence_plan,
-                phase_id="baseline",
-                ordinal=0,
-            )
+            attempt = AttemptFactory(b"T" * 32).issue(evidence_plan, phase_id="baseline", ordinal=0)
             fixture.arm(attempt)
             observation = execute_exact_exchange(
                 evidence_plan.subject_destination,
@@ -93,6 +89,63 @@ class ExactByteFixtureTests(unittest.TestCase):
             self.assertEqual(len(events), 1)
             self.assertEqual(events[0].problem, "request-has-trailing-bytes")
             self.assertFalse(events[0].response_emitted)
+
+    def test_shutdown_failure_is_diagnostic_and_does_not_retry(self) -> None:
+        class ShutdownFailSocket:
+            connect_calls = 0
+
+            def __init__(self, family: int, kind: int) -> None:
+                del family, kind
+
+            def setblocking(self, flag: bool) -> None:
+                del flag
+
+            def fileno(self) -> int:
+                return 10001
+
+            def connect_ex(self, address: object) -> int:
+                del address
+                ShutdownFailSocket.connect_calls += 1
+                return 0
+
+            def send(self, view: memoryview) -> int:
+                return len(view)
+
+            def shutdown(self, how: int) -> None:
+                del how
+                raise OSError(errno.ENOTCONN, "not connected")
+
+            def close(self) -> None:
+                return
+
+        class ReadySelector:
+            def register(self, fileobj: object, events: int) -> None:
+                del fileobj, events
+
+            def modify(self, fileobj: object, events: int) -> None:
+                del fileobj, events
+
+            def select(self, timeout: float | None = None) -> list[tuple[object, int]]:
+                del timeout
+                return [(object(), 2)]
+
+            def close(self) -> None:
+                return
+
+        attempt = AttemptFactory(b"D" * 32).issue(plan(), phase_id="baseline", ordinal=0)
+        with mock.patch(
+            "acceptance.network_control.attempt_client.selectors.DefaultSelector",
+            ReadySelector,
+        ):
+            observation = execute_exact_exchange(
+                plan().subject_destination,
+                attempt,
+                observation_budget_ns=100_000_000,
+                socket_factory=ShutdownFailSocket,
+            )
+        self.assertFalse(observation.completed)
+        self.assertIn("OSError", observation.native_error or "")
+        self.assertEqual(ShutdownFailSocket.connect_calls, 1)
 
     def test_attempt_client_does_not_retry_failed_connect(self) -> None:
         class CountingSocket:
