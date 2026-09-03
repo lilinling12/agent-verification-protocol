@@ -132,14 +132,18 @@ class UpstreamFaultCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             lab = self.lab()
             lab.artifact_store = ArtifactStore(Path(temporary))  # type: ignore[attr-defined]
-            lab._upstream_negative_attempt = {  # type: ignore[attr-defined]
-                "format": "avp-project-hidden-retry-upstream-negative-v0.1",
-                "variant": "same-namespace-upstream-extra-connect",
-                "attemptId": "attempt-1",
-            }
             observation = attempt("subject-active-cut", completed=False, upstream_total=2)
             base = PhaseExecution(observation=observation)
-            with patch.object(ToxiproxyLiveLab, "certified_attempt", return_value=base):
+
+            def base_attempt(_self: ToxiproxyLiveLab, *_args: object) -> PhaseExecution:
+                lab._upstream_negative_attempt = {  # noqa: SLF001
+                    "format": "avp-project-hidden-retry-upstream-negative-v0.1",
+                    "variant": "same-namespace-upstream-extra-connect",
+                    "attemptId": "attempt-1",
+                }
+                return base
+
+            with patch.object(ToxiproxyLiveLab, "certified_attempt", new=base_attempt):
                 result = lab.certified_attempt("subject-active-cut", False, None)
 
             self.assertEqual(len(result.evidence_refs), 1)
