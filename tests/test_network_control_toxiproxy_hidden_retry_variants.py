@@ -9,20 +9,11 @@ from pathlib import Path
 from types import MethodType, SimpleNamespace
 from unittest.mock import patch
 
-from acceptance.network_control.evidence_core import (
-    ArtifactStore,
-    MaterializedEndpoint,
-)
+from acceptance.network_control.evidence_core import ArtifactStore, MaterializedEndpoint
 from acceptance.network_control.portable_comparator import AttemptObservation
-from acceptance.network_control.toxiproxy_binding import (
-    DockerCli,
-    ToxiproxyRunTopology,
-)
+from acceptance.network_control.toxiproxy_binding import DockerCli, ToxiproxyRunTopology
 from acceptance.network_control.toxiproxy_evidence import PhaseExecution
-from acceptance.network_control.toxiproxy_live_lab import (
-    LabHelperArtifact,
-    ToxiproxyLiveLab,
-)
+from acceptance.network_control.toxiproxy_live_lab import LabHelperArtifact, ToxiproxyLiveLab
 from acceptance.network_control.toxiproxy_negative_assemblies import UpstreamHiddenRetryLiveLab
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +30,7 @@ class UpstreamFaultCommandTests(unittest.TestCase):
         lab.topology = ToxiproxyRunTopology.for_run("upstream-hidden-retry")  # type: ignore[attr-defined]
         lab.helper_artifact = LabHelperArtifact.reviewed_amd64()  # type: ignore[attr-defined]
         lab.docker = DockerCli(executable="docker")  # type: ignore[attr-defined]
+        lab._upstream_negative_attempt = None  # type: ignore[attr-defined]
         return lab
 
     def test_helper_shares_toxiproxy_namespace_and_has_no_packet_capability(self) -> None:
@@ -61,28 +53,29 @@ class UpstreamFaultCommandTests(unittest.TestCase):
         self.assertIn("s.bind", script)
         self.assertIn("connect_ex", script)
 
-    def test_upstream_variant_suppresses_front_extra_connect_and_injects_inside_window(self) -> None:
+    def test_upstream_fault_executes_before_subject_exchange_and_suppresses_front_fault(self) -> None:
         lab = self.lab()
         fixture = endpoint(lab.topology.data_address.rsplit(".", 1)[0] + ".3", 42001)
         lab._materialization = SimpleNamespace(  # type: ignore[attr-defined]
             selected_binding=SimpleNamespace(upstream=fixture)
         )
-        commands: list[list[str]] = []
+        ordering: list[str] = []
 
         def run_bounded(self: UpstreamHiddenRetryLiveLab, command: list[str], **_kwargs: object) -> object:
-            del self
-            commands.append(command)
+            del self, command
+            ordering.append("upstream-helper")
             return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+        def base_exchange(_self: ToxiproxyLiveLab, **kwargs: object) -> dict[str, object]:
+            ordering.append("subject-exchange")
+            self.assertFalse(bool(kwargs["extra_connect"]))
+            return {"completed": False}
 
         lab._run_bounded = MethodType(run_bounded, lab)  # type: ignore[method-assign]
         attempt = {"attemptId": "attempt-1", "phaseId": "subject-active-cut"}
         visible = MaterializedEndpoint("ipv4", lab.topology.data_address, 41001, "subject-destination")
 
-        with patch.object(
-            ToxiproxyLiveLab,
-            "_execute_role_exchange",
-            return_value={"completed": False},
-        ) as parent:
+        with patch.object(ToxiproxyLiveLab, "_execute_role_exchange", new=base_exchange):
             result = lab._execute_role_exchange(  # noqa: SLF001
                 container_name="subject",
                 endpoint=visible,
@@ -91,13 +84,7 @@ class UpstreamFaultCommandTests(unittest.TestCase):
             )
 
         self.assertEqual(result, {"completed": False})
-        parent.assert_called_once_with(
-            container_name="subject",
-            endpoint=visible,
-            attempt_document=attempt,
-            extra_connect=False,
-        )
-        self.assertEqual(len(commands), 1)
+        self.assertEqual(ordering, ["upstream-helper", "subject-exchange"])
         self.assertIsNotNone(lab._upstream_negative_attempt)  # noqa: SLF001
         assert lab._upstream_negative_attempt is not None  # noqa: SLF001
         self.assertEqual(
@@ -130,6 +117,14 @@ class UpstreamFaultCommandTests(unittest.TestCase):
             payload = lab.artifact_store.read_verified(result.evidence_refs[0])
             self.assertIn(b"same-namespace-upstream-extra-connect", payload)
             self.assertIsNone(lab._upstream_negative_attempt)  # noqa: SLF001
+
+    def test_failed_attempt_cannot_leak_variant_marker_into_next_attempt(self) -> None:
+        lab = self.lab()
+        lab._upstream_negative_attempt = {"attemptId": "stale"}  # type: ignore[attr-defined]
+        with patch.object(ToxiproxyLiveLab, "certified_attempt", side_effect=RuntimeError("boom")):
+            with self.assertRaisesRegex(RuntimeError, "boom"):
+                lab.certified_attempt("subject-active-cut", False, None)
+        self.assertIsNone(lab._upstream_negative_attempt)  # noqa: SLF001
 
 
 class HiddenRetryCliVariantTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 """Required faulty assemblies for TEL-002 terminating evidence negatives.
 
-This module is intentionally narrow.  It does not define a provider interface or
-an alternate Network Control backend.  It materializes the second
+This module is intentionally narrow. It does not define a provider interface or
+an alternate Network Control backend. It materializes the second
 HiddenRetry/Fallback negative required by the terminating-lab readiness audit:
 a one-shot helper in the Toxiproxy network namespace creates an additional
 fixture-bound upstream TCP initiation while the certified attempt witnesses are
@@ -25,7 +25,7 @@ class UpstreamHiddenRetryLiveLab(ToxiproxyLiveLab):
     """TEL-002 lab with the required same-namespace upstream retry negative.
 
     The existing phase runner still selects ``HiddenRetry/Fallback`` and the
-    existing provider-neutral comparator still owns C10.  Only the faulty
+    existing provider-neutral comparator still owns C10. Only the faulty
     assembly changes: instead of asking the Subject exchange worker for a second
     front-side connect, this subclass injects one direct upstream initiation
     from the Toxiproxy network namespace while all certified-attempt witnesses
@@ -42,7 +42,15 @@ class UpstreamHiddenRetryLiveLab(ToxiproxyLiveLab):
         privileged: bool,
         negative_mode: NegativeMode | None,
     ) -> PhaseExecution:
-        execution = super().certified_attempt(phase_id, privileged, negative_mode)
+        # A failed attempt must never leave variant provenance available for a
+        # later attempt. The marker is attempt-local evidence only.
+        self._upstream_negative_attempt = None
+        try:
+            execution = super().certified_attempt(phase_id, privileged, negative_mode)
+        except BaseException:
+            self._upstream_negative_attempt = None
+            raise
+
         marker = self._upstream_negative_attempt
         self._upstream_negative_attempt = None
         if marker is None:
@@ -65,18 +73,19 @@ class UpstreamHiddenRetryLiveLab(ToxiproxyLiveLab):
         attempt_document: dict[str, object],
         extra_connect: bool,
     ) -> dict[str, object]:
-        # ``extra_connect`` is set only for the existing HiddenRetry/Fallback
-        # subject-active-cut assembly.  Suppress the base front-side fault and
-        # replace it with the independently required upstream-side fault.
-        exchange = super()._execute_role_exchange(
-            container_name=container_name,
-            endpoint=endpoint,
-            attempt_document=attempt_document,
-            extra_connect=False,
-        )
         if not extra_connect:
-            return exchange
+            return super()._execute_role_exchange(
+                container_name=container_name,
+                endpoint=endpoint,
+                attempt_document=attempt_document,
+                extra_connect=False,
+            )
 
+        # At this point the base certified-attempt lifecycle has already armed
+        # all three transport witnesses and the fixture. Inject the faulty
+        # upstream initiation *before* the ordinary Subject exchange starts so
+        # the fault is unambiguously inside the governed attempt window, rather
+        # than in the collector's terminal-drain tail.
         materialization = self._require_materialization()
         upstream = materialization.selected_binding.upstream
         attempt_id = str(attempt_document["attemptId"])
@@ -97,7 +106,16 @@ class UpstreamHiddenRetryLiveLab(ToxiproxyLiveLab):
             },
             "helperImage": self.helper_artifact.provenance_document(),
         }
-        return exchange
+
+        # Suppress the main-adopted front-side extra-connect. This run must test
+        # the upstream-only variant so C10 rejection can be attributed to the
+        # independent upstream witness rather than a simultaneous front fault.
+        return super()._execute_role_exchange(
+            container_name=container_name,
+            endpoint=endpoint,
+            attempt_document=attempt_document,
+            extra_connect=False,
+        )
 
     def _upstream_fault_command(
         self,
