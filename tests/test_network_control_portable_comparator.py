@@ -7,6 +7,7 @@ import unittest
 
 from acceptance.network_control.evidence_core import (
     AssessmentClass,
+    AttemptFactory,
     EvidenceMaterializationError,
     EvidencePlan,
     ExchangeProgram,
@@ -19,8 +20,10 @@ from acceptance.network_control.portable_comparator import (
     compare_portable_evidence,
 )
 
-_BASELINE = "4b2bdef29773737c6a734f0385cf91997c64375d"
+_BASELINE = "44f5e4884835fbb7e5c7d98960d7cbd6cce6f798"
 _AEP_PATH = "rfcs/AEP-0012-network-control-resource-profile.md"
+_SELECTED_PATH = "selected-path"
+_CONTROL_PATH = "selected-path::non-target-control"
 
 
 def endpoint(address: str, port: int, role: str) -> MaterializedEndpoint:
@@ -44,7 +47,7 @@ def plan(*, with_control: bool = True) -> EvidencePlan:
         semantic_baseline_commit=_BASELINE,
         semantic_baseline_path=_AEP_PATH,
         run_id="run-comparator-001",
-        path_id="selected-path",
+        path_id=_SELECTED_PATH,
         subject_destination=endpoint("127.0.0.1", 42001, "subject-destination"),
         upstream_fixture=endpoint("127.0.0.1", 42002, "upstream-fixture"),
         exchange_program=ExchangeProgram(
@@ -59,8 +62,14 @@ def plan(*, with_control: bool = True) -> EvidencePlan:
     )
 
 
-def facts(channel: str, *, total: int = 1, expected: int = 1, alternate: int = 0,
-          validity: tuple[str, ...] = ()) -> InitiationFacts:
+def facts(
+    channel: str,
+    *,
+    total: int = 1,
+    expected: int = 1,
+    alternate: int = 0,
+    validity: tuple[str, ...] = (),
+) -> InitiationFacts:
     return InitiationFacts(
         channel=channel,
         total_initiations=total,
@@ -73,8 +82,10 @@ def facts(channel: str, *, total: int = 1, expected: int = 1, alternate: int = 0
 
 
 def attempt(phase: str, *, completed: bool, ordinal: int) -> AttemptObservation:
+    path_id = _CONTROL_PATH if phase == "non-target-control" else _SELECTED_PATH
     return AttemptObservation(
         phase_id=phase,
+        path_id=path_id,
         attempt_id=f"attempt-{ordinal}-{phase}",
         completed=completed,
         mismatch_observed=False,
@@ -116,12 +127,29 @@ class EvidencePlanControlBindingTests(unittest.TestCase):
                 non_target_upstream_fixture=plan().upstream_fixture,
             )
 
-    def test_control_binding_changes_sealed_identity_without_changing_no_control_shape(self) -> None:
+    def test_control_binding_seals_distinct_logical_path_identity(self) -> None:
         without_control = plan(with_control=False).seal()
         with_control = plan(with_control=True).seal()
+        self.assertIsNone(without_control.plan.non_target_path_id)
+        self.assertEqual(with_control.plan.non_target_path_id, _CONTROL_PATH)
         self.assertNotEqual(without_control.ref.sha256, with_control.ref.sha256)
         self.assertNotIn(b"nonTargetControl", without_control.exact_bytes)
-        self.assertIn(b"nonTargetControl", with_control.exact_bytes)
+        self.assertIn(b'"pathId":"selected-path::non-target-control"', with_control.exact_bytes)
+
+    def test_attempt_factory_binds_control_attempt_to_control_path(self) -> None:
+        evidence_plan = plan()
+        factory = AttemptFactory(b"P" * 32)
+        selected = factory.issue(evidence_plan, phase_id="baseline", ordinal=1)
+        control = factory.issue(evidence_plan, phase_id="non-target-control", ordinal=2)
+        self.assertEqual(selected.path_id, _SELECTED_PATH)
+        self.assertEqual(control.path_id, _CONTROL_PATH)
+        self.assertNotEqual(selected.challenge, control.challenge)
+        self.assertNotEqual(selected.attempt_id, control.attempt_id)
+
+    def test_control_attempt_requires_materialized_control_path(self) -> None:
+        factory = AttemptFactory(b"Q" * 32)
+        with self.assertRaises(EvidenceMaterializationError):
+            factory.issue(plan(with_control=False), phase_id="non-target-control", ordinal=1)
 
 
 class PortableComparatorTests(unittest.TestCase):
@@ -151,7 +179,27 @@ class PortableComparatorTests(unittest.TestCase):
             dataclasses.replace(evidence, baseline=wrong),
         )
         self.assertEqual(assessment.classification, AssessmentClass.EVIDENCE_INVALID)
-        self.assertIn("phase", assessment.primary_problem or "")
+        self.assertIn("phase-binding", assessment.primary_problem or "")
+
+    def test_selected_path_identity_drift_fails_closed(self) -> None:
+        evidence = positive_observations()
+        wrong = dataclasses.replace(evidence.baseline, path_id="other-selected-path")
+        assessment = compare_portable_evidence(
+            plan().seal(),
+            dataclasses.replace(evidence, baseline=wrong),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.EVIDENCE_INVALID)
+        self.assertIn("path-binding:baseline", assessment.primary_problem or "")
+
+    def test_control_path_identity_drift_fails_closed(self) -> None:
+        evidence = positive_observations()
+        wrong = dataclasses.replace(evidence.non_target_control, path_id=_SELECTED_PATH)
+        assessment = compare_portable_evidence(
+            plan().seal(),
+            dataclasses.replace(evidence, non_target_control=wrong),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.EVIDENCE_INVALID)
+        self.assertIn("path-binding:non-target-control", assessment.primary_problem or "")
 
     def test_attempt_identity_reuse_fails_closed(self) -> None:
         evidence = positive_observations()

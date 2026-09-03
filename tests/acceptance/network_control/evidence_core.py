@@ -25,6 +25,7 @@ from pathlib import Path
 _HEX_COMMIT_RE = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _CHALLENGE_DOMAIN = b"avp.network.npr011.challenge.v1\x00"
 _PLAN_FORMAT = "avp-project-network-evidence-plan-v0.1"
+_CONTROL_PATH_SUFFIX = "::non-target-control"
 _DEFAULT_PHASE_PROGRAM = (
     "baseline",
     "pre-trigger",
@@ -187,6 +188,20 @@ class EvidencePlan:
     def has_non_target_control(self) -> bool:
         return self.non_target_subject_destination is not None
 
+    @property
+    def non_target_path_id(self) -> str | None:
+        """Return the evaluator-derived logical identity of the optional control path.
+
+        Base v0.1 materializes at most one non-target control path. Its evidence
+        identity is derived from the selected logical path rather than from a
+        provider object name, keeping the control attempt distinct without
+        introducing a provider-owned identity surface.
+        """
+
+        if not self.has_non_target_control:
+            return None
+        return f"{self.path_id}{_CONTROL_PATH_SUFFIX}"
+
     def exact_bytes(self) -> bytes:
         """Return the project-local exact serialization whose bytes are retained.
 
@@ -220,7 +235,9 @@ class EvidencePlan:
         }
         if self.non_target_subject_destination is not None:
             assert self.non_target_upstream_fixture is not None
+            assert self.non_target_path_id is not None
             document["nonTargetControl"] = {
+                "pathId": self.non_target_path_id,
                 "subjectDestination": _endpoint_document(self.non_target_subject_destination),
                 "upstreamFixture": _endpoint_document(self.non_target_upstream_fixture),
             }
@@ -276,7 +293,16 @@ class AttemptFactory:
             raise EvidenceMaterializationError(f"phase {phase_id!r} is not in the sealed program")
         if isinstance(ordinal, bool) or not isinstance(ordinal, int) or ordinal < 0:
             raise EvidenceMaterializationError("attempt ordinal must be a non-negative integer")
-        context = (plan.run_id, phase_id, ordinal, plan.path_id, plan.exchange_program.program_id)
+
+        path_id = plan.path_id
+        if phase_id == "non-target-control":
+            path_id = plan.non_target_path_id or ""
+            if not path_id:
+                raise EvidenceMaterializationError(
+                    "non-target control attempt requires a materialized non-target control path"
+                )
+
+        context = (plan.run_id, phase_id, ordinal, path_id, plan.exchange_program.program_id)
         with self._lock:
             if context in self._issued_contexts:
                 raise EvidenceMaterializationError("attempt context cannot be reused")
@@ -292,7 +318,7 @@ class AttemptFactory:
             run_id=plan.run_id,
             phase_id=phase_id,
             ordinal=ordinal,
-            path_id=plan.path_id,
+            path_id=path_id,
             attempt_id=attempt_id,
             challenge=challenge,
             challenge_sha256=hashlib.sha256(challenge).hexdigest(),
