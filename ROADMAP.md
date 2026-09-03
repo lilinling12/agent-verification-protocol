@@ -136,15 +136,19 @@ These checked Browser items therefore record that the reviewed authority, confor
 - [x] reconcile AEP-0012 and complete Draft → Proposed readiness audit
 - [x] AEP-0012 status advanced to Proposed for formal protocol review
 - [x] complete formal Proposed protocol review
-- [ ] resolve NPR-001..NPR-011 acceptance blockers in AEP-0012
-- [ ] complete acceptance-oriented exact-head protocol re-review with no remaining semantic blocker
+- [x] resolve NPR-001..NPR-010 and close NPR-011 protocol meaning in AEP-0012
+- [x] adopt cross-mechanism research provenance and non-normative NPR-011 evidence architecture baseline
+- [ ] close provider-neutral NPR-011 Evidence Plan / Result / Fixture / Comparator detailed design
+- [ ] produce terminating/intercepting-class NPR-011 acceptance evidence against the reviewed architecture
+- [ ] produce non-terminating packet-path NPR-011 acceptance evidence against the same portable predicates
+- [ ] execute and retain cross-mechanism NPR-011 portability acceptance evidence
+- [ ] complete acceptance-oriented exact-head protocol re-review with no remaining semantic/evidence blocker
 - [ ] record explicit protocol-maintainer AEP-0012 Proposed → Accepted decision
 - [ ] network-control normative specification and requirement index
 - [ ] network-control schema(s) where required by reviewed semantics
 - [ ] execution-sensitive network-control resource TCK
 - [ ] backend-neutral network-control conformance harness + immutable local network fixture + privileged fixture-control seam if required by reviewed semantics
 - [ ] controlled network-fault reference implementation against the portable TCK
-- [ ] cross-mechanism portability acceptance evidence if required by reviewed protocol semantics
 
 The Network Control Resource work must preserve AEP-0009's backend-first prohibition. `resourceKind: network` is only coarse Fabric classification; it does not define controlled-path coverage, fault vocabulary, activation/clearing settlement, recovery, timing, DNS, application-layer faults, snapshot participation, or Subject-visible control semantics. PR #130 adopted the reviewed AEP-0012 Draft problem/scope and standards/interoperability baseline into `main` at exact commit `7f7f613c50520efb2b553d65d4bb85c0e777dc40`; exact-main CI #823 (`33609386257`), Relational Parity #216 (`33609386265`), and Browser Reference #89 (`33609386244`) all passed.
 
@@ -156,9 +160,15 @@ Exact-main validation on `2632935bef065b4d38e88f6df6b8cf0d620bfb3b` then passed 
 
 AEP-0012 is **Proposed on `main`, not Accepted**. PR #135 adopted the explicitly authorized `Draft → Proposed` lifecycle transition at exact main commit `45ab60d0f6e6db41da70a9859033efda52564055`. Exact-main CI #839 (`33675390573`), Relational Parity #232 (`33675390473`), and Browser Reference #105 (`33675390466`) all passed on that merge commit.
 
-The formal Proposed protocol review against `main@45ab60d0f6e6db41da70a9859033efda52564055` retains the protocol-first Network Control direction but identifies **NPR-001..NPR-011** acceptance blockers covering endpoint/address-set and DNS boundaries, logical path semantics across terminating and packet-path mechanisms, deterministic exchange grammar, fresh-attempt identity, finite cut observation, settlement sequencing, recovery stability, behavioral bypass proof, target isolation, residual-state noninterference, and required cross-mechanism acceptance evidence. `docs/design/alpha3-network-control-resource-formal-proposed-review.md` records the review findings and `docs/design/alpha3-network-control-resource-proposed-review-blockers.md` is the authoritative blocker ledger for the next Proposed-phase protocol-change work.
+PR #136 adopted the formal Proposed protocol review into `main` at exact commit `6770f15fa96ff4e74a773277484d500d85148019`. The review identified NPR-001..NPR-011 and preserved AEP-0012 as Proposed without changing protocol semantics. Exact-main CI #842 (`33705184045`), Relational Parity #235 (`33705183980`), and Browser Reference #108 (`33705183968`) all passed on that merge commit.
 
-Formal review completion does **not** resolve those blockers. The next substantive Network Control milestone is a separate AEP-0012 blocker-resolution protocol PR followed by exact-head acceptance-oriented re-review. AEP-0012 remains Proposed throughout that work unless and until the protocol maintainer separately and explicitly authorizes `Proposed → Accepted`. Network Control normative Spec/Schema/TCK, backend-neutral harness, provider/reference implementation, release selection, publication, signing, and attestation remain unauthorized.
+PR #137 then incorporated the reviewed blocker-resolution decisions into AEP-0012 and was adopted into `main` at exact commit `2c2ba9ef9c069edcd2a43ca10d3a4fc86a42f529`. NPR-001..NPR-010 are protocol-semantically closed; NPR-011 protocol meaning is also closed, while its actual cross-mechanism acceptance evidence remains an explicit pre-Accepted gate. Exact-main CI #847 (`33707974046`), Relational Parity #240 (`33707974014`), and Browser Reference #113 (`33707974044`) all passed.
+
+PR #138 subsequently adopted the research provenance and reviewed non-normative NPR-011 cross-mechanism evidence architecture into `main` at exact commit `d0d1c6756a24824d58b57a2e6089d5aceef7867a`. That baseline selects materially independent terminating/intercepting and non-terminating packet-path evidence classes while keeping provider/runtime mechanisms non-authoritative, preserving Subject/Evaluator/privileged-Control separation, and deliberately deferring any generic Network backend/plugin abstraction. Exact-main CI #849 (`33711556474`), Relational Parity #242 (`33711556430`), and Browser Reference #115 (`33711556561`) all passed.
+
+The current next substantive milestone is therefore the provider-neutral NPR-011 Evidence Plan / Result / Fixture / Comparator detailed-design closure, followed by separately reviewed evidence labs and the retained cross-mechanism matrix. Only after that actual evidence is coherent may acceptance-oriented exact-head protocol re-review close. AEP-0012 remains Proposed throughout this work unless and until the protocol maintainer separately and explicitly authorizes `Proposed → Accepted`.
+
+Network Control normative Spec/requirement-index/Schema/TCK, backend-neutral conformance harness, controlled network-fault reference implementation, AEP Final transition, release selection, publication, signing, and attestation remain unauthorized. The selected Toxiproxy and Linux netns/veth/nftables mechanisms are AVP project acceptance-evidence mechanisms only; they do not become mandatory third-party implementation technology or protocol authority.
 
 ### Other resource implementations
 - [ ] virtual clock service
