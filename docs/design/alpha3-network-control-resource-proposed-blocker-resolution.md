@@ -36,7 +36,7 @@ These standards constrain AVP's own semantic design. They do not become AVP auth
 The blocker decisions follow these rules:
 
 1. **Materialize before execution.** Anything that can change which network path or completion predicate is being certified must be explicit and immutable before the governed attempt.
-2. **One portable attempt, one Subject-facing connection initiation.** Hidden retries, pooling reuse, address racing, and fallback are not part of one certified v0.1 attempt.
+2. **One portable attempt, one Subject-facing connection initiation.** Hidden retries, pooling reuse, address racing, and fallback are not part of one certified v0.1 attempt. A terminating/intercepting topology also gets only one corresponding upstream connection initiation to its bound fixture endpoint.
 3. **Logical path, not native connection identity.** A terminating proxy and a non-terminating packet-path mechanism can satisfy the same portable claim when the declared end-to-end boundaries and observed behavior are equivalent.
 4. **Exact bytes, not packet/message folklore.** A certified exchange is defined by exact materialized request/expected-response bytes and an attempt-unique challenge, not by TCP segment boundaries or HTTP semantics.
 5. **Finite evaluator observation, not provider timeout.** Completion/non-completion is decided by evaluator-owned monotonic observation against an immutable finite budget.
@@ -81,9 +81,9 @@ It is not one provider-native socket, 5-tuple, proxy object, qdisc/filter handle
 Two mechanism topologies are admissible to the same base claim:
 
 1. a non-terminating path-control mechanism in which the Subject-facing TCP connection reaches the upstream fixture through packet/routing/firewall control; and
-2. a terminating/intercepting mechanism in which the Subject-facing TCP connection terminates at an intermediary that creates or manages a separate upstream transport connection.
+2. a terminating/intercepting mechanism in which the Subject-facing TCP connection terminates at an intermediary that creates one corresponding upstream transport connection to the bound fixture endpoint for that certified attempt.
 
-A terminating mechanism may therefore contain multiple native connections internally, but they are implementation detail. Portable conformance requires equivalent observable baseline, active-cut, clear/recovery, target-scope, and path-coverage behavior at the declared AVP boundaries.
+A terminating mechanism may therefore contain distinct Subject-facing and upstream native connections, but those native identities are implementation detail. It may not perform hidden upstream retry, reconnect, alternate-endpoint selection, or alternate-path fallback within the same certified attempt. Portable conformance requires equivalent observable baseline, active-cut, clear/recovery, target-scope, and path-coverage behavior at the declared AVP boundaries.
 
 Native peer/socket identity, source ephemeral port, sequence numbers, connection IDs, or intermediary topology do not become portable outcome identity.
 
@@ -108,9 +108,10 @@ The fixture contract is deterministic: for a valid request challenge it emits th
 A baseline/recovery attempt **completes successfully** only when:
 
 1. a fresh Subject-facing TCP connection is established to the selected materialized destination;
-2. the exact request bytes are emitted once;
-3. the exact expected response byte sequence is received in order before the evaluator-owned observation budget expires; and
-4. no mismatch occurs before the expected byte sequence is complete.
+2. where a terminating topology is used, exactly one corresponding upstream connection initiation targets the bound fixture endpoint;
+3. the exact request bytes are emitted once;
+4. the exact expected response byte sequence is received in order before the evaluator-owned observation budget expires; and
+5. no mismatch occurs before the expected byte sequence is complete.
 
 TCP read/write call boundaries and TCP segment boundaries are irrelevant. Completion does not depend on native exception class, FIN/RST identity, packet counts, or provider-specific framing.
 
@@ -129,10 +130,11 @@ For one attempt:
 - automatic destination-address fallback is prohibited;
 - automatic Subject/client reconnect is prohibited;
 - application retry is prohibited;
-- an intermediary may create internal upstream transport state only as part of the same logical path attempt, and that internal state does not create an additional Subject attempt;
+- a terminating/intercepting intermediary may perform exactly one corresponding upstream connection initiation to the bound upstream fixture endpoint;
+- intermediary upstream reconnect, retry, alternate-endpoint selection, or alternate-path fallback is prohibited within the same certified attempt;
 - any retry/fallback that the evaluator intentionally performs receives a new `attemptId`, fresh challenge, and independent result.
 
-An implementation that cannot suppress hidden Subject-side retries/fallback for the certified operation cannot claim the base v0.1 attempt semantic for that operation.
+An implementation that cannot suppress or detect hidden retry/fallback at either the Subject-facing or terminating-intermediary boundary cannot claim the base v0.1 attempt semantic for that operation.
 
 Conformance must include behavior that exposes pooling/reuse/fallback violations without branching on provider names.
 
@@ -265,7 +267,7 @@ The evidence matrix must exercise, at minimum:
 
 - materialized endpoint/path binding;
 - exact exchange/challenge identity;
-- fresh-attempt identity and hidden retry/fallback rejection;
+- fresh-attempt identity and hidden retry/fallback rejection at both portable boundaries where applicable;
 - qualifying pre-trigger traffic and occurrence no-early-activation;
 - finite evaluator-owned cut observation;
 - activation-settlement sequencing;
