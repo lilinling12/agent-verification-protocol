@@ -1,0 +1,160 @@
+name: Network Control Packet-Path Privileged Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/network-control-packet-path-privileged-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-control-packet-path-privileged-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  packet-path-evidence:
+    name: PTL-002 / Linux netns+nftables / amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout trusted exact-main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require default-branch exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "privileged packet-path evidence may run only from main" >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
+            echo "checkout does not match exact workflow SHA" >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/ci.txt
+
+      - name: Install constrained repository environment
+        run: python -m pip install -c constraints/ci.txt -e '.[dev]'
+
+      - name: Verify resolved dependency set
+        run: python -m pip check
+
+      - name: Record runner and Linux network provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p privileged-evidence/runner
+          git rev-parse HEAD | tee privileged-evidence/runner/repository-sha.txt
+          uname -a | tee privileged-evidence/runner/uname.txt
+          cat /etc/os-release | tee privileged-evidence/runner/os-release.txt
+          ip -Version | tee privileged-evidence/runner/ip-version.txt
+          nft --version | tee privileged-evidence/runner/nft-version.txt
+          setpriv --version | tee privileged-evidence/runner/setpriv-version.txt
+          dpkg-query -W -f='${Package}\t${Version}\n' iproute2 nftables util-linux \
+            | tee privileged-evidence/runner/packages.tsv
+          python --version 2>&1 | tee privileged-evidence/runner/python-version.txt
+          command -v python | tee privileged-evidence/runner/python-path.txt
+
+      - name: Execute same-run packet-path qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p privileged-evidence/qualification
+          PYTHON_BIN="$(command -v python)"
+          QUALIFICATION_RUN_ID="ptl002-qualification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '%s' "${QUALIFICATION_RUN_ID}" > privileged-evidence/qualification/run-id.txt
+          sudo "${PYTHON_BIN}" scripts/qualify_network_control_packet_path.py \
+            --run-id "${QUALIFICATION_RUN_ID}" \
+            --semantic-baseline-commit "${GITHUB_SHA}" \
+            --output privileged-evidence/qualification/qualification.json
+
+      - name: Execute positive and required negative packet-path matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_BIN="$(command -v python)"
+          QUALIFICATION_RUN_ID="$(cat privileged-evidence/qualification/run-id.txt)"
+          mkdir -p privileged-evidence/matrix
+
+          run_case() {
+            local slug="$1"
+            local dir="privileged-evidence/matrix/${slug}"
+            local case_run_id="ptl002-${slug}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            mkdir -p "${dir}/artifacts"
+            sudo "${PYTHON_BIN}" scripts/run_network_control_packet_path_evidence.py \
+              --case "${slug}" \
+              --run-id "${case_run_id}" \
+              --qualification-run-id "${QUALIFICATION_RUN_ID}" \
+              --qualification privileged-evidence/qualification/qualification.json \
+              --semantic-baseline-commit "${GITHUB_SHA}" \
+              --artifact-dir "${dir}/artifacts" \
+              | tee "${dir}/result.json"
+          }
+
+          run_case positive
+          run_case bypass-fault
+          run_case early-activation
+          run_case false-settled
+          run_case false-recovery
+          run_case schedule-leak
+          run_case hidden-retry-fallback
+          run_case collateral-target
+          run_case residual-cleanup
+
+      - name: Build and verify execution manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          tests = root / 'tests'
+          if str(tests) not in sys.path:
+              sys.path.insert(0, str(tests))
+
+          from acceptance.network_control.packet_path.evidence_lane import (
+              build_execution_manifest,
+              verify_execution_manifest,
+          )
+
+          evidence = root / 'privileged-evidence'
+          evidence.mkdir(parents=True, exist_ok=True)
+          exact = build_execution_manifest(
+              root=evidence,
+              repository=os.environ['GITHUB_REPOSITORY'],
+              commit=os.environ['GITHUB_SHA'],
+              run_id=os.environ['GITHUB_RUN_ID'],
+              run_attempt=os.environ['GITHUB_RUN_ATTEMPT'],
+              workflow=os.environ['GITHUB_WORKFLOW'],
+          )
+          verify_execution_manifest(root=evidence, exact_bytes=exact)
+          (evidence / 'MANIFEST.json').write_bytes(exact)
+          print(exact.decode('utf-8'))
+          PY
+
+      - name: Upload packet-path privileged evidence bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: avp-network-control-ptl002-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: privileged-evidence/
+          if-no-files-found: error
+          retention-days: 90
