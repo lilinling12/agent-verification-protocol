@@ -36,6 +36,8 @@ def endpoint(address: str, port: int, role: str) -> MaterializedEndpoint:
 
 
 def plan(*, with_control: bool = True) -> EvidencePlan:
+    """Build the terminating/intercepting comparator fixture topology."""
+
     kwargs: dict[str, object] = {}
     if with_control:
         kwargs.update(
@@ -50,6 +52,37 @@ def plan(*, with_control: bool = True) -> EvidencePlan:
         path_id=_SELECTED_PATH,
         subject_destination=endpoint("127.0.0.1", 42001, "subject-destination"),
         upstream_fixture=endpoint("127.0.0.1", 42002, "upstream-fixture"),
+        exchange_program=ExchangeProgram(
+            program_id="exact-byte-v0.1",
+            request_prefix=b"REQ\x00",
+            request_suffix=b"\x00END",
+            response_prefix=b"RESP\x00",
+            response_suffix=b"\x00END",
+        ),
+        observation_budget_ns=1_000_000_000,
+        **kwargs,
+    )
+
+
+def packet_path_plan(*, with_control: bool = True) -> EvidencePlan:
+    """Build a non-terminating path where the Subject target is the fixture itself."""
+
+    selected = endpoint("127.0.0.1", 42101, "selected-fixture")
+    kwargs: dict[str, object] = {}
+    if with_control:
+        control = endpoint("127.0.0.1", 42102, "control-fixture")
+        kwargs.update(
+            non_target_subject_destination=control,
+            non_target_upstream_fixture=control,
+        )
+    return EvidencePlan(
+        design_revision="NPR-011-portable-comparator-v0.1",
+        semantic_baseline_commit=_BASELINE,
+        semantic_baseline_path=_AEP_PATH,
+        run_id="run-comparator-packet-path-001",
+        path_id=_SELECTED_PATH,
+        subject_destination=selected,
+        upstream_fixture=selected,
         exchange_program=ExchangeProgram(
             program_id="exact-byte-v0.1",
             request_prefix=b"REQ\x00",
@@ -81,8 +114,16 @@ def facts(
     )
 
 
-def attempt(phase: str, *, completed: bool, ordinal: int) -> AttemptObservation:
+def attempt(
+    phase: str,
+    *,
+    completed: bool,
+    ordinal: int,
+    upstream: InitiationFacts | None = None,
+    include_upstream: bool = True,
+) -> AttemptObservation:
     path_id = _CONTROL_PATH if phase == "non-target-control" else _SELECTED_PATH
+    upstream_facts = upstream if upstream is not None else facts("W-upstream")
     return AttemptObservation(
         phase_id=phase,
         path_id=path_id,
@@ -91,7 +132,7 @@ def attempt(phase: str, *, completed: bool, ordinal: int) -> AttemptObservation:
         mismatch_observed=False,
         observation_budget_expired=not completed,
         front_initiations=facts("W-front"),
-        upstream_initiations=facts("W-upstream"),
+        upstream_initiations=upstream_facts if include_upstream else None,
     )
 
 
@@ -107,6 +148,36 @@ def positive_observations(*, with_control: bool = True) -> PortableEvidenceObser
         recovery_1=attempt("recovery-1", completed=True, ordinal=6),
         recovery_2=attempt("recovery-2", completed=True, ordinal=7),
         stability=attempt("stability", completed=True, ordinal=8),
+        cleanup_noninterference_ok=True,
+        security_projection_ok=True,
+    )
+
+
+def packet_path_attempt(phase: str, *, completed: bool, ordinal: int) -> AttemptObservation:
+    return attempt(
+        phase,
+        completed=completed,
+        ordinal=ordinal,
+        include_upstream=False,
+    )
+
+
+def packet_path_positive_observations(*, with_control: bool = True) -> PortableEvidenceObservations:
+    return PortableEvidenceObservations(
+        baseline=packet_path_attempt("baseline", completed=True, ordinal=1),
+        pre_trigger=packet_path_attempt("pre-trigger", completed=True, ordinal=2),
+        activation_settlement=packet_path_attempt(
+            "activation-settlement", completed=False, ordinal=3
+        ),
+        subject_active_cut=packet_path_attempt("subject-active-cut", completed=False, ordinal=4),
+        non_target_control=(
+            packet_path_attempt("non-target-control", completed=True, ordinal=5)
+            if with_control
+            else None
+        ),
+        recovery_1=packet_path_attempt("recovery-1", completed=True, ordinal=6),
+        recovery_2=packet_path_attempt("recovery-2", completed=True, ordinal=7),
+        stability=packet_path_attempt("stability", completed=True, ordinal=8),
         cleanup_noninterference_ok=True,
         security_projection_ok=True,
     )
@@ -157,6 +228,71 @@ class PortableComparatorTests(unittest.TestCase):
         assessment = compare_portable_evidence(plan().seal(), positive_observations())
         self.assertEqual(assessment.classification, AssessmentClass.SATISFIED)
         self.assertIsNone(assessment.primary_problem)
+
+    def test_packet_path_positive_requires_only_subject_initiation(self) -> None:
+        assessment = compare_portable_evidence(
+            packet_path_plan().seal(),
+            packet_path_positive_observations(),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.SATISFIED)
+        self.assertIsNone(assessment.primary_problem)
+
+    def test_packet_path_subject_retry_localizes_c10(self) -> None:
+        evidence = packet_path_positive_observations()
+        retry = dataclasses.replace(
+            evidence.subject_active_cut,
+            front_initiations=facts("W-front", total=2, expected=2),
+        )
+        assessment = compare_portable_evidence(
+            packet_path_plan().seal(),
+            dataclasses.replace(evidence, subject_active_cut=retry),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.SEMANTIC_VIOLATION)
+        self.assertIn("C10:subject-active-cut", assessment.primary_problem or "")
+        self.assertIn("W-front:total-initiations=2", assessment.primary_problem or "")
+
+    def test_packet_path_alternate_target_localizes_c10(self) -> None:
+        evidence = packet_path_positive_observations()
+        fallback = dataclasses.replace(
+            evidence.subject_active_cut,
+            front_initiations=facts("W-front", alternate=1),
+        )
+        assessment = compare_portable_evidence(
+            packet_path_plan().seal(),
+            dataclasses.replace(evidence, subject_active_cut=fallback),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.SEMANTIC_VIOLATION)
+        self.assertIn("C10:subject-active-cut", assessment.primary_problem or "")
+        self.assertIn("alternate-target-initiations=1", assessment.primary_problem or "")
+
+    def test_packet_path_rejects_fabricated_distinct_upstream_channel(self) -> None:
+        evidence = packet_path_positive_observations()
+        fabricated = dataclasses.replace(
+            evidence.baseline,
+            upstream_initiations=facts("W-upstream"),
+        )
+        assessment = compare_portable_evidence(
+            packet_path_plan().seal(),
+            dataclasses.replace(evidence, baseline=fabricated),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.EVIDENCE_INVALID)
+        self.assertIn(
+            "unexpected-distinct-upstream-initiation-observation",
+            assessment.primary_problem or "",
+        )
+
+    def test_terminating_path_requires_distinct_upstream_channel(self) -> None:
+        evidence = positive_observations()
+        missing = dataclasses.replace(evidence.baseline, upstream_initiations=None)
+        assessment = compare_portable_evidence(
+            plan().seal(),
+            dataclasses.replace(evidence, baseline=missing),
+        )
+        self.assertEqual(assessment.classification, AssessmentClass.EVIDENCE_INVALID)
+        self.assertIn(
+            "distinct-upstream-initiation-observation-missing",
+            assessment.primary_problem or "",
+        )
 
     def test_optional_control_is_not_required_when_plan_does_not_bind_one(self) -> None:
         assessment = compare_portable_evidence(
