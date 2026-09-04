@@ -20,6 +20,7 @@ class RecordingLinuxRunner:
     def __init__(self, *, fail_contains: tuple[str, ...] | None = None) -> None:
         self.commands: list[list[str]] = []
         self.namespaces: set[str] = set()
+        self.host_links: set[str] = set()
         self.fail_contains = fail_contains
 
     def __call__(self, command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -31,10 +32,28 @@ class RecordingLinuxRunner:
         if command[:3] == ["ip", "netns", "list"]:
             output = "".join(f"{name}\n" for name in sorted(self.namespaces))
             return subprocess.CompletedProcess(command, 0, output, "")
+        if command[:4] == ["ip", "-o", "link", "show"]:
+            output = "".join(
+                f"{index}: {name}: <BROADCAST> mtu 1500\n"
+                for index, name in enumerate(sorted(self.host_links), start=1)
+            )
+            return subprocess.CompletedProcess(command, 0, output, "")
         if command[:3] == ["ip", "netns", "add"] and len(command) == 4:
+            if command[3] in self.namespaces:
+                return subprocess.CompletedProcess(command, 1, "", "namespace exists")
             self.namespaces.add(command[3])
         if command[:3] == ["ip", "netns", "del"] and len(command) == 4:
             self.namespaces.discard(command[3])
+        if command[:3] == ["ip", "link", "add"] and "peer" in command:
+            left = command[3]
+            right = command[-1]
+            if left in self.host_links or right in self.host_links:
+                return subprocess.CompletedProcess(command, 1, "", "link exists")
+            self.host_links.update((left, right))
+        if command[:4] == ["ip", "link", "set", command[3]] and "netns" in command:
+            self.host_links.discard(command[3])
+        if command[:3] == ["ip", "link", "del"] and len(command) == 4:
+            self.host_links.discard(command[3])
         return subprocess.CompletedProcess(command, 0, "ok", "")
 
 
@@ -140,6 +159,34 @@ class PacketPathControllerTests(unittest.TestCase):
         self.assertNotIn("sh", command)
         self.assertNotIn("sudo", command)
 
+    def test_preexisting_namespace_collision_is_never_deleted(self) -> None:
+        self.runner.namespaces.add(self.topology.subject_namespace)
+
+        with self.assertRaisesRegex(PacketPathControlError, "refusing ownership"):
+            self.controller.setup()
+
+        self.assertIn(self.topology.subject_namespace, self.runner.namespaces)
+        self.assertFalse(
+            any(
+                command == ["ip", "netns", "del", self.topology.subject_namespace]
+                for command in self.runner.commands
+            )
+        )
+
+    def test_preexisting_host_link_collision_is_never_deleted(self) -> None:
+        self.runner.host_links.add(self.topology.subject_interface)
+
+        with self.assertRaisesRegex(PacketPathControlError, "refusing ownership"):
+            self.controller.setup()
+
+        self.assertIn(self.topology.subject_interface, self.runner.host_links)
+        self.assertFalse(
+            any(
+                command == ["ip", "link", "del", self.topology.subject_interface]
+                for command in self.runner.commands
+            )
+        )
+
     def test_partial_setup_failure_triggers_bounded_cleanup(self) -> None:
         runner = RecordingLinuxRunner(fail_contains=("link", "add"))
         controller = PacketPathController(
@@ -154,6 +201,55 @@ class PacketPathControllerTests(unittest.TestCase):
         deletes = [command for command in runner.commands if command[:3] == ["ip", "netns", "del"]]
         self.assertLessEqual(len(deletes), 3)
 
+    def test_host_veth_created_before_move_is_removed_on_partial_failure(self) -> None:
+        runner = RecordingLinuxRunner(
+            fail_contains=(self.topology.subject_interface, "netns", self.topology.subject_namespace)
+        )
+        controller = PacketPathController(
+            topology=self.topology,
+            cli=BoundedLinuxCli(runner=runner),
+        )
+
+        with self.assertRaises(PacketPathControlError):
+            controller.setup()
+
+        self.assertEqual(runner.namespaces, set())
+        self.assertEqual(runner.host_links, set())
+        self.assertTrue(
+            any(
+                command[:3] == ["ip", "link", "del"]
+                and command[3] in {
+                    self.topology.subject_interface,
+                    self.topology.router_subject_interface,
+                }
+                for command in runner.commands
+            )
+        )
+
+    def test_cleanup_failure_does_not_replace_primary_setup_failure(self) -> None:
+        class PrimaryAndCleanupFailureRunner(RecordingLinuxRunner):
+            def __call__(self, command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+                if command[:3] == ["ip", "netns", "del"]:
+                    self.commands.append(list(command))
+                    return subprocess.CompletedProcess(command, 1, "", "cleanup failure")
+                if _contains_sequence(command, ("link", "add")):
+                    self.commands.append(list(command))
+                    return subprocess.CompletedProcess(command, 1, "", "primary failure")
+                return super().__call__(command, **kwargs)
+
+        runner = PrimaryAndCleanupFailureRunner()
+        controller = PacketPathController(
+            topology=self.topology,
+            cli=BoundedLinuxCli(runner=runner),
+        )
+
+        with self.assertRaises(PacketPathControlError) as captured:
+            controller.setup()
+
+        self.assertIn("primary failure", str(captured.exception))
+        self.assertTrue(getattr(captured.exception, "__notes__", ()))
+        self.assertIn("cleanup problems", captured.exception.__notes__[0])
+
     def test_cleanup_is_idempotent_and_never_flushes_host_ruleset(self) -> None:
         self.controller.setup()
         first = self.controller.cleanup()
@@ -164,11 +260,9 @@ class PacketPathControllerTests(unittest.TestCase):
         self.assertEqual(first, ())
         self.assertEqual(second, ())
         self.assertEqual(self.controller.residual_resources(), ())
-        second_cleanup_commands = self.runner.commands[command_count:after_second_cleanup]
-        self.assertEqual(
-            second_cleanup_commands,
-            [["ip", "netns", "list"], ["ip", "netns", "list"]],
-        )
+        self.assertEqual(self.runner.namespaces, set())
+        self.assertEqual(self.runner.host_links, set())
+        self.assertEqual(command_count, after_second_cleanup)
         self.assertFalse(any(command[:2] == ["nft", "flush"] for command in self.runner.commands))
 
     def test_fault_lifecycle_fails_closed(self) -> None:
