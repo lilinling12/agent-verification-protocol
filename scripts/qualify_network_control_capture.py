@@ -14,9 +14,7 @@ TESTS = ROOT / "tests"
 if str(TESTS) not in sys.path:
     sys.path.insert(0, str(TESTS))
 
-from acceptance.network_control.capture_qualification_retransmission import (  # noqa: E402
-    RetransmissionQualifiedCaptureQualification,
-)
+from acceptance.network_control.verified_live_labs import VerifiedCaptureQualification  # noqa: E402
 
 
 def parser() -> argparse.ArgumentParser:
@@ -32,7 +30,7 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     args.artifact_dir.mkdir(parents=True, exist_ok=True)
-    result = RetransmissionQualifiedCaptureQualification(
+    result = VerifiedCaptureQualification(
         workspace=args.workspace,
         run_id=args.run_id,
     ).execute()

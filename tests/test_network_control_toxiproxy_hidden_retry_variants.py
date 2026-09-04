@@ -26,6 +26,10 @@ from acceptance.network_control.toxiproxy_binding import DockerCli, ToxiproxyRun
 from acceptance.network_control.toxiproxy_evidence import PhaseExecution
 from acceptance.network_control.toxiproxy_live_lab import LabHelperArtifact, ToxiproxyLiveLab
 from acceptance.network_control.toxiproxy_negative_assemblies import UpstreamHiddenRetryLiveLab
+from acceptance.network_control.verified_live_labs import (
+    VerifiedToxiproxyLiveLab,
+    VerifiedUpstreamHiddenRetryLiveLab,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "run_network_control_toxiproxy_evidence.py"
@@ -221,7 +225,8 @@ class HiddenRetryCliVariantTests(unittest.TestCase):
             requested=None,
         )
         self.assertEqual(variant, "front-extra-connect")
-        self.assertIs(lab_type, ToxiproxyLiveLab)
+        self.assertIs(lab_type, VerifiedToxiproxyLiveLab)
+        self.assertTrue(issubclass(lab_type, ToxiproxyLiveLab))
 
     def test_upstream_variant_selects_same_namespace_faulty_lab(self) -> None:
         variant, lab_type = self.module._resolve_hidden_retry_variant(  # noqa: SLF001
@@ -229,7 +234,8 @@ class HiddenRetryCliVariantTests(unittest.TestCase):
             requested="upstream-extra-connect",
         )
         self.assertEqual(variant, "upstream-extra-connect")
-        self.assertIs(lab_type, UpstreamHiddenRetryLiveLab)
+        self.assertIs(lab_type, VerifiedUpstreamHiddenRetryLiveLab)
+        self.assertTrue(issubclass(lab_type, UpstreamHiddenRetryLiveLab))
 
     def test_variant_is_rejected_for_unrelated_negative_mode(self) -> None:
         with self.assertRaises(ValueError):
