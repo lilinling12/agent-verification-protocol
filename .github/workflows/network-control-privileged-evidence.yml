@@ -1,0 +1,224 @@
+name: Network Control Privileged Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/network-control-privileged-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-control-privileged-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  terminating-evidence:
+    name: TEL-003 / Toxiproxy / Linux amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout trusted exact-main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require default-branch execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "privileged Network Control evidence may run only from main" >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
+            echo "checkout does not match exact workflow SHA" >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/ci.txt
+
+      - name: Install constrained repository environment
+        run: python -m pip install -c constraints/ci.txt -e '.[dev]'
+
+      - name: Verify resolved dependency set
+        run: python -m pip check
+
+      - name: Record runner and Docker provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p privileged-evidence/runner
+          uname -a | tee privileged-evidence/runner/uname.txt
+          docker version | tee privileged-evidence/runner/docker-version.txt
+          docker info --format '{{json .}}' | tee privileged-evidence/runner/docker-info.json
+          git rev-parse HEAD | tee privileged-evidence/runner/repository-sha.txt
+
+      - name: Qualify AF_PACKET capture boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/qualify_network_control_capture.py \
+            --run-id "tel003-qualification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --artifact-dir privileged-evidence/qualification
+
+      - name: Verify qualification assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('privileged-evidence/qualification/qualification.json')
+          document = json.loads(path.read_text(encoding='utf-8'))
+          expected = {
+              'egressCoverageVerified': True,
+              'directionalityVerified': True,
+              'offloadNormalizationVerified': True,
+              'preSynConnectGapClosed': True,
+          }
+          if document.get('captureAssurance') != expected:
+              raise SystemExit(f'capture qualification assertions are not exact: {document.get("captureAssurance")!r}')
+          if document.get('format') != 'avp-project-network-capture-qualification-v0.3':
+              raise SystemExit(f'capture qualification format is not strengthened v0.3: {document.get("format")!r}')
+          probe = document.get('normalizationProbe') or {}
+          if probe.get('injectedCopies') != 2:
+              raise SystemExit(f'duplicate-SYN normalization probe is missing: {probe!r}')
+          canaries = {item.get('label'): item for item in document.get('canaries', []) if isinstance(item, dict)}
+          duplicate = canaries.get('duplicate-syn-normalization')
+          if not duplicate:
+              raise SystemExit('duplicate-SYN normalization canary is missing')
+          raw = duplicate.get('rawSynPackets')
+          retransmitted = duplicate.get('retransmittedSynPackets')
+          if duplicate.get('totalInitiations') != 1 or not isinstance(raw, int) or raw < 2 or retransmitted != raw - 1:
+              raise SystemExit(f'duplicate-SYN normalization evidence is not exact: {duplicate!r}')
+          print('capture qualification assertions verified')
+          PY
+
+      - name: Execute positive and required negative terminating matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p privileged-evidence/matrix
+
+          run_case() {
+            local slug="$1"
+            local mode="$2"
+            local expected_class="$3"
+            local expected_prefix="$4"
+            local hidden_retry_variant="${5:-}"
+            local dir="privileged-evidence/matrix/${slug}"
+            mkdir -p "${dir}"
+            local args=(
+              python scripts/run_network_control_toxiproxy_evidence.py
+              --run-id "tel003-${slug}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+              --semantic-baseline-commit "${GITHUB_SHA}"
+              --artifact-dir "${dir}/artifacts"
+              --assert-egress-coverage
+              --assert-directionality
+              --assert-offload-normalization
+              --assert-pre-syn-gap-closed
+            )
+            if [[ -n "${mode}" ]]; then
+              args+=(--negative-mode "${mode}")
+            fi
+            if [[ -n "${hidden_retry_variant}" ]]; then
+              args+=(--hidden-retry-variant "${hidden_retry_variant}")
+            fi
+            "${args[@]}" | tee "${dir}/result.json"
+            python - "${dir}/result.json" "${expected_class}" "${expected_prefix}" "${hidden_retry_variant}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          expected_class = sys.argv[2]
+          expected_prefix = sys.argv[3]
+          expected_variant = sys.argv[4]
+          document = json.loads(path.read_text(encoding='utf-8'))
+          assessment = document['assessment']
+          actual_class = assessment['classification']
+          problem = assessment.get('primaryProblem') or ''
+          if actual_class != expected_class:
+              raise SystemExit(
+                  f'{path}: classification {actual_class!r} != expected {expected_class!r}'
+              )
+          if expected_prefix and not problem.startswith(expected_prefix):
+              raise SystemExit(
+                  f'{path}: primary problem {problem!r} does not start with {expected_prefix!r}'
+              )
+          if expected_variant and document.get('hiddenRetryVariant') != expected_variant:
+              raise SystemExit(
+                  f'{path}: HiddenRetry variant {document.get("hiddenRetryVariant")!r} '
+                  f'!= expected {expected_variant!r}'
+              )
+          print(f'{path}: expected assessment observed')
+          PY
+          }
+
+          run_case positive '' SATISFIED ''
+          run_case bypass-fault BypassFault SEMANTIC_VIOLATION 'C4:'
+          run_case early-activation EarlyActivation SEMANTIC_VIOLATION 'C3:'
+          run_case false-settled FalseSettled EVIDENCE_INVALID 'C1:missing-observation'
+          run_case false-recovery FalseRecovery EVIDENCE_INVALID 'C1:missing-observation'
+          run_case schedule-leak ScheduleLeak SEMANTIC_VIOLATION 'C12:'
+          run_case hidden-retry-front 'HiddenRetry/Fallback' SEMANTIC_VIOLATION 'C10:' front-extra-connect
+          run_case hidden-retry-upstream 'HiddenRetry/Fallback' SEMANTIC_VIOLATION 'C10:' upstream-extra-connect
+          run_case collateral-target CollateralTarget SEMANTIC_VIOLATION 'C6:'
+          run_case residual-cleanup ResidualStateCleanupFailure SEMANTIC_VIOLATION 'C11:'
+
+      - name: Build execution manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('privileged-evidence')
+          root.mkdir(parents=True, exist_ok=True)
+          files = []
+          for path in sorted(item for item in root.rglob('*') if item.is_file()):
+              if path.name == 'MANIFEST.json':
+                  continue
+              payload = path.read_bytes()
+              files.append({
+                  'path': path.relative_to(root).as_posix(),
+                  'sha256': hashlib.sha256(payload).hexdigest(),
+                  'size': len(payload),
+              })
+          document = {
+              'format': 'avp-project-tel003-github-evidence-manifest-v0.1',
+              'repository': os.environ['GITHUB_REPOSITORY'],
+              'commit': os.environ['GITHUB_SHA'],
+              'runId': os.environ['GITHUB_RUN_ID'],
+              'runAttempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'workflow': os.environ['GITHUB_WORKFLOW'],
+              'files': files,
+          }
+          exact = json.dumps(document, sort_keys=True, separators=(',', ':')).encode('utf-8')
+          (root / 'MANIFEST.json').write_bytes(exact)
+          print(exact.decode('utf-8'))
+          PY
+
+      - name: Upload privileged evidence bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: avp-network-control-tel003-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: privileged-evidence/
+          if-no-files-found: error
+          retention-days: 90
