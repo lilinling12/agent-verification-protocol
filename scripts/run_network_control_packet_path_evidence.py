@@ -26,6 +26,19 @@ from acceptance.network_control.packet_path.live_evidence import (  # noqa: E402
     PacketPathLiveEvidenceLab,
 )
 
+_ENVIRONMENT_ALLOWLIST = frozenset(
+    {
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "PYTHONIOENCODING",
+        "PYTHONPATH",
+        "PYTHONUTF8",
+        "VIRTUAL_ENV",
+    }
+)
+
 
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(
@@ -59,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.qualification.is_file():
         raise SystemExit("--qualification must name a retained same-run qualification file")
 
+    # All GitHub identity needed by the run is already supplied as explicit CLI
+    # data. Strip runner-only environment before any Subject/evaluator child is
+    # created so Actions/runtime variables cannot cross the Subject boundary.
+    _sanitize_process_environment()
     case = lane_case(args.case)
     qualification = verify_github_qualification(
         args.qualification.read_bytes(),
@@ -112,6 +129,16 @@ def main(argv: list[str] | None = None) -> int:
     }
     print(json.dumps(output, sort_keys=True, separators=(",", ":")))
     return 0
+
+
+def _sanitize_process_environment() -> None:
+    retained = {
+        key: value
+        for key, value in os.environ.items()
+        if key in _ENVIRONMENT_ALLOWLIST
+    }
+    os.environ.clear()
+    os.environ.update(retained)
 
 
 if __name__ == "__main__":
