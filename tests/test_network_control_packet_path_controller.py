@@ -17,10 +17,13 @@ from acceptance.network_control.packet_path.topology import PacketPathRunTopolog
 
 
 class RecordingLinuxRunner:
+    """Stateful Linux CLI test double with the veth lifetime semantics we rely on."""
+
     def __init__(self, *, fail_contains: tuple[str, ...] | None = None) -> None:
         self.commands: list[list[str]] = []
         self.namespaces: set[str] = set()
         self.host_links: set[str] = set()
+        self.veth_peers: dict[str, str] = {}
         self.fail_contains = fail_contains
 
     def __call__(self, command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -50,11 +53,23 @@ class RecordingLinuxRunner:
             if left in self.host_links or right in self.host_links:
                 return subprocess.CompletedProcess(command, 1, "", "link exists")
             self.host_links.update((left, right))
+            self.veth_peers[left] = right
+            self.veth_peers[right] = left
         if command[:4] == ["ip", "link", "set", command[3]] and "netns" in command:
             self.host_links.discard(command[3])
         if command[:3] == ["ip", "link", "del"] and len(command) == 4:
-            self.host_links.discard(command[3])
+            self._delete_veth_pair(command[3])
         return subprocess.CompletedProcess(command, 0, "ok", "")
+
+    def _delete_veth_pair(self, interface: str) -> None:
+        """Model Linux veth deletion: deleting either endpoint destroys its peer."""
+
+        peer = self.veth_peers.pop(interface, None)
+        self.host_links.discard(interface)
+        if peer is None:
+            return
+        self.veth_peers.pop(peer, None)
+        self.host_links.discard(peer)
 
 
 def _contains_sequence(command: list[str], sequence: tuple[str, ...]) -> bool:
