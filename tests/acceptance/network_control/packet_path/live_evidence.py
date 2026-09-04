@@ -32,7 +32,6 @@ from ..evidence_core import (
     ExchangeProgram,
 )
 from ..witness_evidence import CaptureAssurance
-from .controller import PacketPathFaultMode
 from .evidence_lane import parse_front_initiations
 from .execution import (
     PacketPathActor,
@@ -45,7 +44,6 @@ from .local_qualification import (
     PacketPathLocalQualificationError,
 )
 from .negative_assemblies import (
-    CleanupBehavior,
     PacketPathNegativeAssembly,
     PacketPathNegativeMode,
 )
@@ -174,7 +172,7 @@ class PacketPathLiveEvidenceLab(PacketPathLocalQualification):
         sealed = self.plan.seal()
         sealed_plan_ref = self.artifact_store.put_bytes(
             sealed.exact_bytes,
-            logical_role="packet-path-sealed-evidence-plan",
+            logical_role=sealed.ref.logical_role,
         )
         if sealed_plan_ref != sealed.ref:
             raise EvidenceMaterializationError(
