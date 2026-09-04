@@ -14,7 +14,9 @@ from .evidence_core import (
     AssessmentClass,
     EvidenceAssessment,
     EvidenceMaterializationError,
+    EvidencePlan,
     InitiationFacts,
+    MaterializedEndpoint,
     SealedPlan,
     assess_initiation_integrity,
 )
@@ -177,8 +179,7 @@ def compare_portable_evidence(
     # mechanism classes without imposing terminating connection semantics on the
     # non-terminating packet-path class.
     initiation_assessments = tuple(
-        (item.phase_id, _assess_attempt_initiations(plan, item))
-        for item in certified
+        (item.phase_id, _assess_attempt_initiations(plan, item)) for item in certified
     )
     witness_invalid = tuple(
         f"C10:{phase}:{problem}"
@@ -262,7 +263,10 @@ def compare_portable_evidence(
     return EvidenceAssessment(AssessmentClass.SATISFIED)
 
 
-def _assess_attempt_initiations(plan: object, observation: AttemptObservation) -> EvidenceAssessment:
+def _assess_attempt_initiations(
+    plan: EvidencePlan,
+    observation: AttemptObservation,
+) -> EvidenceAssessment:
     """Apply C10 cardinality according to the sealed path's endpoint topology."""
 
     requires_upstream = _requires_distinct_upstream_initiation(plan, observation.path_id)
@@ -283,30 +287,26 @@ def _assess_attempt_initiations(plan: object, observation: AttemptObservation) -
     return _assess_single_initiation(observation.front_initiations)
 
 
-def _requires_distinct_upstream_initiation(plan: object, path_id: str) -> bool:
+def _requires_distinct_upstream_initiation(plan: EvidencePlan, path_id: str) -> bool:
     """Derive the AEP-0012 upstream obligation without provider-name branching."""
 
-    selected_path_id = getattr(plan, "path_id")
-    if path_id == selected_path_id:
-        subject = getattr(plan, "subject_destination")
-        upstream = getattr(plan, "upstream_fixture")
-    else:
-        control_path_id = getattr(plan, "non_target_path_id")
-        if path_id != control_path_id:
-            raise AssertionError(f"path binding must be validated before C10 assessment: {path_id!r}")
-        subject = getattr(plan, "non_target_subject_destination")
-        upstream = getattr(plan, "non_target_upstream_fixture")
-        if subject is None or upstream is None:
-            raise AssertionError("control path binding must be materialized before C10 assessment")
+    if path_id == plan.path_id:
+        return not _same_socket_endpoint(plan.subject_destination, plan.upstream_fixture)
 
+    if path_id != plan.non_target_path_id:
+        raise AssertionError(f"path binding must be validated before C10 assessment: {path_id!r}")
+    subject = plan.non_target_subject_destination
+    upstream = plan.non_target_upstream_fixture
+    if subject is None or upstream is None:
+        raise AssertionError("control path binding must be materialized before C10 assessment")
     return not _same_socket_endpoint(subject, upstream)
 
 
-def _same_socket_endpoint(first: object, second: object) -> bool:
+def _same_socket_endpoint(first: MaterializedEndpoint, second: MaterializedEndpoint) -> bool:
     return (
-        getattr(first, "family") == getattr(second, "family")
-        and getattr(first, "address") == getattr(second, "address")
-        and getattr(first, "port") == getattr(second, "port")
+        first.family == second.family
+        and first.address == second.address
+        and first.port == second.port
     )
 
 
