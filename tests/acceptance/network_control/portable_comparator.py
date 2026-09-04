@@ -38,6 +38,13 @@ class AttemptObservation:
     evidence plan. ``completed`` is the provider-neutral exact-exchange predicate
     produced by the reviewed exact-byte client. Native socket errors and provider
     state are intentionally absent from this assessment surface.
+
+    ``upstream_initiations`` is required only when the sealed path materializes a
+    distinct Subject-visible destination and upstream fixture endpoint. That is
+    the AEP-0012 terminating/intercepting topology obligation. A non-terminating
+    packet path binds the same transport endpoint at both plan positions and must
+    not fabricate a second connection-initiation obligation merely to fit the
+    terminating evidence shape.
     """
 
     phase_id: str
@@ -47,7 +54,7 @@ class AttemptObservation:
     mismatch_observed: bool
     observation_budget_expired: bool
     front_initiations: InitiationFacts
-    upstream_initiations: InitiationFacts
+    upstream_initiations: InitiationFacts | None
     validity_problems: tuple[str, ...] = ()
 
 
@@ -165,8 +172,12 @@ def compare_portable_evidence(
 
     # A witness ambiguity invalidates C10 evidence before any semantic verdict,
     # even if another retained observation would otherwise show a violation.
+    # The distinct-upstream obligation comes from the sealed endpoint topology,
+    # never from a provider name. This preserves one comparator across the two
+    # mechanism classes without imposing terminating connection semantics on the
+    # non-terminating packet-path class.
     initiation_assessments = tuple(
-        (item.phase_id, assess_initiation_integrity(item.front_initiations, item.upstream_initiations))
+        (item.phase_id, _assess_attempt_initiations(plan, item))
         for item in certified
     )
     witness_invalid = tuple(
@@ -247,6 +258,80 @@ def compare_portable_evidence(
             AssessmentClass.SEMANTIC_VIOLATION,
             semantic_problems[0],
             *semantic_problems[1:],
+        )
+    return EvidenceAssessment(AssessmentClass.SATISFIED)
+
+
+def _assess_attempt_initiations(plan: object, observation: AttemptObservation) -> EvidenceAssessment:
+    """Apply C10 cardinality according to the sealed path's endpoint topology."""
+
+    requires_upstream = _requires_distinct_upstream_initiation(plan, observation.path_id)
+    upstream = observation.upstream_initiations
+    if requires_upstream:
+        if upstream is None:
+            return _assessment(
+                AssessmentClass.EVIDENCE_INVALID,
+                "witness-invalid:distinct-upstream-initiation-observation-missing",
+            )
+        return assess_initiation_integrity(observation.front_initiations, upstream)
+
+    if upstream is not None:
+        return _assessment(
+            AssessmentClass.EVIDENCE_INVALID,
+            "witness-invalid:unexpected-distinct-upstream-initiation-observation",
+        )
+    return _assess_single_initiation(observation.front_initiations)
+
+
+def _requires_distinct_upstream_initiation(plan: object, path_id: str) -> bool:
+    """Derive the AEP-0012 upstream obligation without provider-name branching."""
+
+    selected_path_id = getattr(plan, "path_id")
+    if path_id == selected_path_id:
+        subject = getattr(plan, "subject_destination")
+        upstream = getattr(plan, "upstream_fixture")
+    else:
+        control_path_id = getattr(plan, "non_target_path_id")
+        if path_id != control_path_id:
+            raise AssertionError(f"path binding must be validated before C10 assessment: {path_id!r}")
+        subject = getattr(plan, "non_target_subject_destination")
+        upstream = getattr(plan, "non_target_upstream_fixture")
+        if subject is None or upstream is None:
+            raise AssertionError("control path binding must be materialized before C10 assessment")
+
+    return not _same_socket_endpoint(subject, upstream)
+
+
+def _same_socket_endpoint(first: object, second: object) -> bool:
+    return (
+        getattr(first, "family") == getattr(second, "family")
+        and getattr(first, "address") == getattr(second, "address")
+        and getattr(first, "port") == getattr(second, "port")
+    )
+
+
+def _assess_single_initiation(facts: InitiationFacts) -> EvidenceAssessment:
+    """Evaluate the universal Subject-side one-initiation obligation."""
+
+    if facts.validity_problems:
+        return _assessment(
+            AssessmentClass.EVIDENCE_INVALID,
+            f"witness-invalid:{facts.validity_problems[0]}",
+            *(f"witness-invalid:{problem}" for problem in facts.validity_problems[1:]),
+        )
+
+    failures: list[str] = []
+    if facts.total_initiations != 1:
+        failures.append(f"{facts.channel}:total-initiations={facts.total_initiations}")
+    if facts.expected_target_initiations != 1:
+        failures.append(f"{facts.channel}:expected-target-initiations={facts.expected_target_initiations}")
+    if facts.alternate_target_initiations != 0:
+        failures.append(f"{facts.channel}:alternate-target-initiations={facts.alternate_target_initiations}")
+    if failures:
+        return _assessment(
+            AssessmentClass.SEMANTIC_VIOLATION,
+            failures[0],
+            *failures[1:],
         )
     return EvidenceAssessment(AssessmentClass.SATISFIED)
 
