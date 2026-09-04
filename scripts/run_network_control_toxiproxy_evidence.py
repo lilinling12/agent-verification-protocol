@@ -18,8 +18,9 @@ from acceptance.network_control.evidence_core import ArtifactStore, ExchangeProg
 from acceptance.network_control.toxiproxy_evidence import NegativeMode  # noqa: E402
 from acceptance.network_control.toxiproxy_live_execution import execute_live_matrix  # noqa: E402
 from acceptance.network_control.toxiproxy_live_lab import ToxiproxyLiveLab  # noqa: E402
-from acceptance.network_control.toxiproxy_negative_assemblies import (  # noqa: E402
-    UpstreamHiddenRetryLiveLab,
+from acceptance.network_control.verified_live_labs import (  # noqa: E402
+    VerifiedToxiproxyLiveLab,
+    VerifiedUpstreamHiddenRetryLiveLab,
 )
 from acceptance.network_control.witness_evidence import CaptureAssurance  # noqa: E402
 
@@ -71,13 +72,13 @@ def _resolve_hidden_retry_variant(
     if negative_mode != hidden_mode:
         if requested is not None:
             raise ValueError("--hidden-retry-variant is valid only with HiddenRetry/Fallback")
-        return None, ToxiproxyLiveLab
+        return None, VerifiedToxiproxyLiveLab
 
     variant = _HIDDEN_RETRY_FRONT if requested is None else requested
     if variant == _HIDDEN_RETRY_FRONT:
-        return variant, ToxiproxyLiveLab
+        return variant, VerifiedToxiproxyLiveLab
     if variant == _HIDDEN_RETRY_UPSTREAM:
-        return variant, UpstreamHiddenRetryLiveLab
+        return variant, VerifiedUpstreamHiddenRetryLiveLab
     raise ValueError(f"unsupported HiddenRetry/Fallback variant: {variant!r}")
 
 
