@@ -8,6 +8,7 @@ from dataclasses import replace
 from acceptance.network_control.evidence_core import (
     EvidenceMaterializationError,
     ExchangeProgram,
+    MaterializedEndpoint,
 )
 from acceptance.network_control.packet_path.execution import (
     PacketPathActor,
@@ -163,9 +164,15 @@ class PacketPathExecutionTests(unittest.TestCase):
             )
 
     def test_execution_rejects_terminating_style_upstream_binding(self) -> None:
+        terminating_upstream = MaterializedEndpoint(
+            family="ipv4",
+            address=self.topology.fixture_address,
+            port=self.topology.unused_fault_port,
+            role="upstream-fixture",
+        )
         terminating_like = replace(
             self.plan,
-            upstream_fixture=self.topology.control_endpoint,
+            upstream_fixture=terminating_upstream,
         )
 
         with self.assertRaises(EvidenceMaterializationError):
