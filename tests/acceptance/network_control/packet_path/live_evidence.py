@@ -32,6 +32,7 @@ from ..evidence_core import (
     ExchangeProgram,
 )
 from ..witness_evidence import CaptureAssurance
+from .controller import PacketPathController
 from .evidence_lane import parse_front_initiations
 from .execution import (
     PacketPathActor,
@@ -126,7 +127,7 @@ class PacketPathLiveEvidenceLab(PacketPathLocalQualification):
         # case plan. The controller and process plumbing remain the same concrete
         # packet-path implementation.
         self.topology = PacketPathRunTopology.for_run(run_id)
-        self.controller = type(self.controller)(topology=self.topology, cli=self.cli)
+        self.controller = PacketPathController(topology=self.topology, cli=self.cli)
         negative = (
             None
             if negative_mode is None
@@ -155,7 +156,6 @@ class PacketPathLiveEvidenceLab(PacketPathLocalQualification):
             evidence_plan=self.plan,
             negative=negative,
         )
-        self._negative = negative
 
     def execute_evidence(self) -> PacketPathLiveExecutionResult:
         """Execute one finite case, retain facts, and delegate assessment unchanged."""
@@ -238,21 +238,20 @@ class PacketPathLiveEvidenceLab(PacketPathLocalQualification):
                     cleanup_noninterference_ok = not residual
                     continue
                 if step.is_attempt:
+                    # A deliberate ScheduleLeak is observed while the Subject
+                    # namespace/process boundary still exists. The execution-plan
+                    # environment field, not the negative-mode name, drives this
+                    # observation.
+                    if step.subject_environment:
+                        security_projection_ok = self._observe_security_projection(
+                            step.subject_environment
+                        )
                     attempts.append(self._execute_attempt(step))
                     continue
                 raise AssertionError(f"unhandled packet-path execution step: {step.step_id.value}")
 
             if cleanup_noninterference_ok is None:
                 raise AssertionError("packet-path execution omitted cleanup sentinel")
-
-            # ScheduleLeak must be a real Subject-visible projection mutation. The
-            # execution plan places it on pre-trigger; independently execute the
-            # read-only Subject security probe with that exact environment so C12
-            # is based on observed visibility rather than mode-name branching.
-            if self._negative is not None and self._negative.subject_environment_overrides():
-                security_projection_ok = self._observe_security_projection(
-                    self._negative.subject_environment_overrides()
-                )
             if security_projection_ok is None:
                 raise AssertionError("packet-path execution omitted Subject security observation")
 
