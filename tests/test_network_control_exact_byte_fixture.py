@@ -65,7 +65,7 @@ class ExactByteFixtureTests(unittest.TestCase):
             self.assertFalse(event.response_emitted)
             self.assertEqual(event.problem, "request-byte-mismatch")
 
-    def test_trailing_request_bytes_are_rejected(self) -> None:
+    def test_trailing_request_bytes_are_retained_as_fixture_integrity_failure(self) -> None:
         with ExactByteFixture() as fixture:
             evidence_plan = dataclasses.replace(
                 plan(),
@@ -84,9 +84,15 @@ class ExactByteFixtureTests(unittest.TestCase):
             event = fixture.wait_for_event(attempt.attempt_id)
             fixture.disarm(attempt.attempt_id)
 
-            self.assertFalse(observation.completed)
+            # The deterministic fixture follows the reviewed contract by emitting
+            # the exact response after validating the exact request-length prefix.
+            # Extra request bytes are then retained as independent fixture
+            # integrity evidence and must invalidate a certified live attempt.
+            self.assertTrue(observation.completed)
             self.assertEqual(event.problem, "request-has-trailing-bytes")
-            self.assertFalse(event.response_emitted)
+            self.assertFalse(event.request_valid)
+            self.assertTrue(event.response_emitted)
+            self.assertEqual(event.received_size, len(attempt.request_bytes) + 1)
 
     def test_event_barrier_rejects_invalid_timeout(self) -> None:
         with ExactByteFixture() as fixture:
@@ -98,12 +104,14 @@ class ExactByteFixtureTests(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 fixture.wait_for_event("attempt-never-connected")
 
-    def test_shutdown_failure_is_diagnostic_and_does_not_retry(self) -> None:
-        class ShutdownFailSocket:
+    def test_exact_exchange_does_not_require_tcp_half_close(self) -> None:
+        class NoHalfCloseSocket:
             connect_calls = 0
+            shutdown_calls = 0
 
             def __init__(self, family: int, kind: int) -> None:
                 del family, kind
+                self.response = memoryview(b"RESP")
 
             def setblocking(self, flag: bool) -> None:
                 del flag
@@ -113,7 +121,7 @@ class ExactByteFixtureTests(unittest.TestCase):
 
             def connect_ex(self, address: object) -> int:
                 del address
-                ShutdownFailSocket.connect_calls += 1
+                NoHalfCloseSocket.connect_calls += 1
                 return 0
 
             def send(self, view: memoryview) -> int:
@@ -121,7 +129,13 @@ class ExactByteFixtureTests(unittest.TestCase):
 
             def shutdown(self, how: int) -> None:
                 del how
-                raise OSError(errno.ENOTCONN, "not connected")
+                NoHalfCloseSocket.shutdown_calls += 1
+                raise AssertionError("exact exchange must not require pre-response half-close")
+
+            def recv(self, length: int) -> bytes:
+                chunk = bytes(self.response[:length])
+                self.response = self.response[len(chunk) :]
+                return chunk
 
             def close(self) -> None:
                 return
@@ -135,25 +149,40 @@ class ExactByteFixtureTests(unittest.TestCase):
 
             def select(self, timeout: float | None = None) -> list[tuple[object, int]]:
                 del timeout
-                return [(object(), 2)]
+                return [(object(), 3)]
 
             def close(self) -> None:
                 return
 
-        attempt = AttemptFactory(b"D" * 32).issue(plan(), phase_id="baseline", ordinal=0)
+        evidence_plan = dataclasses.replace(
+            plan(),
+            exchange_program=dataclasses.replace(
+                plan().exchange_program,
+                response_prefix=b"RESP",
+                response_suffix=b"",
+            ),
+        )
+        attempt = AttemptFactory(b"D" * 32).issue(evidence_plan, phase_id="baseline", ordinal=0)
+        # Replace the challenge-bearing expected response with the deterministic
+        # fake socket payload while retaining the same single-initiation path.
+        attempt = dataclasses.replace(
+            attempt,
+            expected_response_bytes=b"RESP",
+            response_sha256=__import__("hashlib").sha256(b"RESP").hexdigest(),
+        )
         with mock.patch(
             "acceptance.network_control.attempt_client.selectors.DefaultSelector",
             ReadySelector,
         ):
             observation = execute_exact_exchange(
-                plan().subject_destination,
+                evidence_plan.subject_destination,
                 attempt,
                 observation_budget_ns=100_000_000,
-                socket_factory=ShutdownFailSocket,
+                socket_factory=NoHalfCloseSocket,
             )
-        self.assertFalse(observation.completed)
-        self.assertIn("OSError", observation.native_error or "")
-        self.assertEqual(ShutdownFailSocket.connect_calls, 1)
+        self.assertTrue(observation.completed)
+        self.assertEqual(NoHalfCloseSocket.connect_calls, 1)
+        self.assertEqual(NoHalfCloseSocket.shutdown_calls, 0)
 
     def test_attempt_client_does_not_retry_failed_connect(self) -> None:
         class CountingSocket:

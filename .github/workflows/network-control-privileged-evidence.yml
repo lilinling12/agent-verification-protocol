@@ -105,6 +105,72 @@ jobs:
           print('capture qualification assertions verified')
           PY
 
+      - name: Qualify pinned Toxiproxy transport boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p privileged-evidence/transport-qualification
+          python scripts/qualify_network_control_toxiproxy_transport.py \
+            --run-id "tel003-transport-qualification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --semantic-baseline-commit "${GITHUB_SHA}" \
+            --artifact-dir privileged-evidence/transport-qualification/artifacts \
+            --output privileged-evidence/transport-qualification/qualification.json \
+            --assert-egress-coverage \
+            --assert-directionality \
+            --assert-offload-normalization \
+            --assert-pre-syn-gap-closed
+
+      - name: Verify Toxiproxy transport qualification assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('privileged-evidence/transport-qualification/qualification.json')
+          document = json.loads(path.read_text(encoding='utf-8'))
+          if document.get('format') != 'avp-project-toxiproxy-transport-qualification-v0.1':
+              raise SystemExit(f'Toxiproxy transport qualification format is not exact: {document.get("format")!r}')
+
+          def require_initiations(label, attempt):
+              for channel in ('frontInitiations', 'upstreamInitiations'):
+                  facts = attempt.get(channel) or {}
+                  if (
+                      facts.get('totalInitiations') != 1
+                      or facts.get('expectedTargetInitiations') != 1
+                      or facts.get('alternateTargetInitiations') != 0
+                      or facts.get('validityProblems') != []
+                  ):
+                      raise SystemExit(f'{label} {channel} is not exact: {facts!r}')
+
+          def roles(attempt):
+              return {item.get('logicalRole') for item in attempt.get('evidenceRefs', []) if isinstance(item, dict)}
+
+          baseline = document.get('baseline') or {}
+          active = document.get('activeCut') or {}
+          recovery = document.get('recovery') or {}
+          if baseline.get('completed') is not True or baseline.get('mismatchObserved') is not False or baseline.get('observationBudgetExpired') is not False:
+              raise SystemExit(f'pass-through transport qualification is not exact: {baseline!r}')
+          if active.get('completed') is not False or active.get('mismatchObserved') is not False or active.get('observationBudgetExpired') is not True:
+              raise SystemExit(f'timeout-cut transport qualification is not exact: {active!r}')
+          if recovery.get('completed') is not True or recovery.get('mismatchObserved') is not False or recovery.get('observationBudgetExpired') is not False:
+              raise SystemExit(f'recovery transport qualification is not exact: {recovery!r}')
+          for label, attempt in (('baseline', baseline), ('activeCut', active), ('recovery', recovery)):
+              if attempt.get('validityProblems') != []:
+                  raise SystemExit(f'{label} transport qualification evidence is invalid: {attempt!r}')
+              require_initiations(label, attempt)
+              if f'exchange-diagnostic-{attempt.get("phaseId")}' not in roles(attempt):
+                  raise SystemExit(f'{label} exchange diagnostic is not retained: {roles(attempt)!r}')
+          for label, attempt in (('baseline', baseline), ('recovery', recovery)):
+              if f'fixture-exchange-{attempt.get("phaseId")}' not in roles(attempt):
+                  raise SystemExit(f'{label} exact fixture evidence is not retained: {roles(attempt)!r}')
+          cleanup = document.get('cleanup') or {}
+          if cleanup != {'ok': True, 'problems': []}:
+              raise SystemExit(f'Toxiproxy transport qualification cleanup is not exact: {cleanup!r}')
+          print('Toxiproxy transport qualification assertions verified')
+          PY
+
       - name: Execute positive and required negative terminating matrix
         shell: bash
         run: |
