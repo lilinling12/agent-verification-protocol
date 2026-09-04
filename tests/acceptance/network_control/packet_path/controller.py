@@ -97,7 +97,13 @@ class BoundedLinuxCli:
 
 
 class PacketPathController:
-    """Concrete run-owned netns/veth/router/nftables lifecycle."""
+    """Concrete run-owned netns/veth/router/nftables lifecycle.
+
+    Cleanup authority is derived from resources this controller instance actually
+    created, never merely from deterministic names. This prevents a failed setup
+    from deleting a pre-existing namespace or host interface that happens to
+    collide with the run-derived identity.
+    """
 
     def __init__(
         self,
@@ -110,6 +116,8 @@ class PacketPathController:
         self._topology_ready = False
         self._fault_active = False
         self._nft_table_created = False
+        self._created_namespaces: set[str] = set()
+        self._created_veth_pairs: set[tuple[str, str]] = set()
         self._last_cleanup_problems: tuple[str, ...] = ()
 
     @property
@@ -129,19 +137,32 @@ class PacketPathController:
     def setup(self) -> tuple[CommandResult, ...]:
         """Materialize the isolated three-namespace data plane exactly once."""
 
-        if self._topology_ready:
-            raise PacketPathControlError("packet-path topology is already materialized")
+        if self._topology_ready or self._has_owned_resources():
+            raise PacketPathControlError(
+                "packet-path controller still owns materialized resources; cleanup is required"
+            )
+
+        # Preflight is read-only. If a deterministic identity already exists, the
+        # controller fails closed and never gains authority to delete that object.
+        self._assert_clean_start()
+
         results: list[CommandResult] = []
         try:
             for command in self.setup_commands():
                 result = self.cli.run(command)
                 results.append(result)
-                if self._is_nft_table_create(command):
-                    self._nft_table_created = True
-        except BaseException:
-            # Bounded best-effort teardown is mandatory after partial materialization.
-            self.cleanup()
+                self._record_successful_creation(command)
+        except BaseException as exc:
+            # Teardown is best effort but must never replace the primary setup
+            # failure. Python >=3.11 exception notes retain cleanup diagnostics.
+            cleanup_problems = self.cleanup()
+            if cleanup_problems:
+                exc.add_note(
+                    "packet-path cleanup problems after setup failure: "
+                    + "; ".join(cleanup_problems)
+                )
             raise
+
         self._topology_ready = True
         return tuple(results)
 
@@ -480,22 +501,24 @@ class PacketPathController:
         )
 
     def cleanup(self) -> tuple[str, ...]:
-        """Boundedly remove only state owned by this run.
+        """Boundedly remove only state this controller instance created.
 
-        The method is idempotent when namespace discovery succeeds. It never
-        flushes host-global nftables state and never deletes unrelated namespaces.
+        Discovery or teardown failures are returned as secondary diagnostics and
+        never replace a primary execution failure. No host-global nftables state
+        is flushed and no deterministic-name collision is treated as ownership.
         """
 
-        problems: list[str] = []
-        try:
-            existing = self._namespace_names()
-        except (PacketPathPrerequisiteError, PacketPathControlError) as exc:
-            existing = set(self.topology.namespace_names)
-            problems.append(f"namespace-discovery:{type(exc).__name__}")
+        if not self._has_owned_resources():
+            self._topology_ready = False
+            self._fault_active = False
+            self._last_cleanup_problems = ()
+            return ()
 
+        problems: list[str] = []
         t = self.topology
-        if self._nft_table_created and t.control_namespace in existing:
-            result = self.cli.run(
+
+        if self._nft_table_created and t.control_namespace in self._created_namespaces:
+            result = self._cleanup_run(
                 (
                     "ip",
                     "netns",
@@ -507,50 +530,176 @@ class PacketPathController:
                     "ip",
                     t.nft_table,
                 ),
-                allow_failure=True,
+                problems=problems,
+                label="nft-table-delete",
             )
-            if result.returncode != 0:
-                problems.append(f"nft-table-delete:returncode={result.returncode}")
-            else:
+            if result is not None and result.returncode == 0:
                 self._nft_table_created = False
 
-        teardown_order = (
+        for namespace in (
             t.subject_namespace,
             t.fixture_namespace,
             t.control_namespace,
-        )
-        for namespace in teardown_order:
-            if namespace not in existing:
+        ):
+            if namespace not in self._created_namespaces:
                 continue
-            result = self.cli.run(
+            result = self._cleanup_run(
                 ("ip", "netns", "del", namespace),
-                allow_failure=True,
+                problems=problems,
+                label=f"namespace-delete:{namespace}",
             )
-            if result.returncode != 0:
-                problems.append(f"namespace-delete:{namespace}:returncode={result.returncode}")
+            if result is not None and result.returncode == 0:
+                self._created_namespaces.discard(namespace)
+
+        # A veth pair may still be host-visible if setup failed after `ip link
+        # add` but before either endpoint moved into a namespace. Only pairs
+        # recorded after successful creation are eligible for deletion.
+        try:
+            host_links = self._host_link_names()
+        except (PacketPathPrerequisiteError, PacketPathControlError) as exc:
+            host_links = set()
+            problems.append(f"host-link-discovery:{type(exc).__name__}")
+        else:
+            for pair in tuple(self._created_veth_pairs):
+                present = next((name for name in pair if name in host_links), None)
+                if present is not None:
+                    result = self._cleanup_run(
+                        ("ip", "link", "del", present),
+                        problems=problems,
+                        label=f"host-veth-delete:{present}",
+                    )
+                    if result is not None and result.returncode == 0:
+                        self._created_veth_pairs.discard(pair)
+                elif not self._created_namespaces:
+                    # Namespace deletion destroys any veth endpoints that were
+                    # moved out of the host namespace, so no host-visible pair is
+                    # residual once every owned namespace is gone.
+                    self._created_veth_pairs.discard(pair)
 
         self._topology_ready = False
         self._fault_active = False
-        if t.control_namespace not in self._namespace_names_best_effort():
+        if t.control_namespace not in self._created_namespaces:
             self._nft_table_created = False
         self._last_cleanup_problems = tuple(problems)
         return self._last_cleanup_problems
 
     def residual_resources(self) -> tuple[str, ...]:
-        """Report surviving run-owned namespaces after bounded teardown."""
+        """Report surviving run identities after bounded teardown.
 
-        existing = self._namespace_names()
-        return tuple(
+        A clean-start preflight proves these names were absent before setup, so a
+        surviving target identity after a successful materialization is evidence
+        of residual state rather than name-based cleanup authority.
+        """
+
+        existing_namespaces = self._namespace_names()
+        host_links = self._host_link_names()
+        residual: list[str] = [
             f"namespace:{namespace}"
             for namespace in self.topology.namespace_names
-            if namespace in existing
+            if namespace in existing_namespaces
+        ]
+        residual.extend(
+            f"host-interface:{interface}"
+            for interface in self.topology.interface_names
+            if interface in host_links
         )
 
-    def _namespace_names_best_effort(self) -> set[str]:
+        t = self.topology
+        if t.control_namespace in existing_namespaces:
+            result = self.cli.run(
+                (
+                    "ip",
+                    "netns",
+                    "exec",
+                    t.control_namespace,
+                    "nft",
+                    "list",
+                    "table",
+                    "ip",
+                    t.nft_table,
+                ),
+                allow_failure=True,
+            )
+            if result.returncode == 0:
+                residual.append(f"nft-table:{t.control_namespace}:{t.nft_table}")
+        return tuple(residual)
+
+    def _assert_clean_start(self) -> None:
+        t = self.topology
+        namespace_collisions = sorted(set(t.namespace_names) & self._namespace_names())
+        host_link_collisions = sorted(set(t.interface_names) & self._host_link_names())
+        if namespace_collisions or host_link_collisions:
+            details: list[str] = []
+            if namespace_collisions:
+                details.append("namespaces=" + ",".join(namespace_collisions))
+            if host_link_collisions:
+                details.append("host-interfaces=" + ",".join(host_link_collisions))
+            raise PacketPathControlError(
+                "packet-path clean-start identity collision; refusing ownership: "
+                + "; ".join(details)
+            )
+
+    def _record_successful_creation(self, command: Sequence[str]) -> None:
+        command_tuple = tuple(command)
+        if command_tuple[:3] == ("ip", "netns", "add") and len(command_tuple) == 4:
+            self._created_namespaces.add(command_tuple[3])
+            return
+
+        t = self.topology
+        veth_pairs = {
+            (
+                "ip",
+                "link",
+                "add",
+                t.subject_interface,
+                "type",
+                "veth",
+                "peer",
+                "name",
+                t.router_subject_interface,
+            ): (t.subject_interface, t.router_subject_interface),
+            (
+                "ip",
+                "link",
+                "add",
+                t.router_fixture_interface,
+                "type",
+                "veth",
+                "peer",
+                "name",
+                t.fixture_interface,
+            ): (t.router_fixture_interface, t.fixture_interface),
+        }
+        pair = veth_pairs.get(command_tuple)
+        if pair is not None:
+            self._created_veth_pairs.add(pair)
+            return
+
+        if self._is_nft_table_create(command_tuple):
+            self._nft_table_created = True
+
+    def _cleanup_run(
+        self,
+        command: Sequence[str],
+        *,
+        problems: list[str],
+        label: str,
+    ) -> CommandResult | None:
         try:
-            return self._namespace_names()
-        except (PacketPathPrerequisiteError, PacketPathControlError):
-            return set(self.topology.namespace_names)
+            result = self.cli.run(command, allow_failure=True)
+        except (PacketPathPrerequisiteError, PacketPathControlError) as exc:
+            problems.append(f"{label}:{type(exc).__name__}")
+            return None
+        if result.returncode != 0:
+            problems.append(f"{label}:returncode={result.returncode}")
+        return result
+
+    def _has_owned_resources(self) -> bool:
+        return bool(
+            self._created_namespaces
+            or self._created_veth_pairs
+            or self._nft_table_created
+        )
 
     def _is_nft_table_create(self, command: Sequence[str]) -> bool:
         t = self.topology
@@ -574,4 +723,21 @@ class PacketPathController:
             if not stripped:
                 continue
             names.add(stripped.split()[0])
+        return names
+
+    def _host_link_names(self) -> set[str]:
+        result = self.cli.run(("ip", "-o", "link", "show"))
+        names: set[str] = set()
+        for line in result.stdout.splitlines():
+            parts = line.split(":", 2)
+            if len(parts) < 2:
+                raise PacketPathControlError(
+                    f"cannot parse host interface inventory line: {line!r}"
+                )
+            name = parts[1].strip().split("@", 1)[0]
+            if not name:
+                raise PacketPathControlError(
+                    f"host interface inventory contains an empty name: {line!r}"
+                )
+            names.add(name)
         return names
