@@ -437,7 +437,14 @@ def _exchange_map(observations: Sequence[QualifiedExchangeObservation]) -> dict[
 
 
 def _cut_exchange(observation: ExchangeObservation | None) -> bool:
-    return bool(observation is not None and not observation.completed and not observation.mismatch_observed and observation.observation_budget_expired and observation.native_error is None)
+    # AEP-0012 defines cut by failure to complete the exact exchange after
+    # admission. Early refusal/reset/close/unreachable outcomes are therefore
+    # valid cut observations; the native socket error remains diagnostic only.
+    return bool(
+        observation is not None
+        and not observation.completed
+        and not observation.mismatch_observed
+    )
 
 
 def _successful_exchange(observation: ExchangeObservation | None) -> bool:
