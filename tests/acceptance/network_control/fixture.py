@@ -240,6 +240,7 @@ class ExactByteFixture:
         received = b""
         problem: str | None = None
         response_emitted = False
+        request_bytes_valid = False
         try:
             connection.settimeout(self._hygiene_timeout_s)
             if attempt is None:
@@ -249,13 +250,23 @@ class ExactByteFixture:
             if problem is None and received != attempt.request_bytes:
                 problem = "request-byte-mismatch"
             if problem is None:
+                request_bytes_valid = True
+                # The reviewed fixture contract emits the exact response as soon
+                # as the exact materialized request has been validated. It does
+                # not require a client FIN before response publication.
+                connection.sendall(attempt.expected_response_bytes)
+                response_emitted = True
+
+                # Request-stream hygiene remains independently evidenced after
+                # response publication. The certified client closes immediately
+                # after the exact response, while a faulty assembly that appended
+                # request bytes leaves those bytes available here. This preserves
+                # trailing-byte detection without making TCP half-close behavior
+                # a prerequisite for successful exchange through an intermediary.
                 trailing = connection.recv(1)
                 if trailing:
                     received += trailing
                     problem = "request-has-trailing-bytes"
-            if problem is None:
-                connection.sendall(attempt.expected_response_bytes)
-                response_emitted = True
         except (OSError, TimeoutError) as exc:
             problem = f"fixture-io:{type(exc).__name__}"
         finally:
@@ -265,7 +276,7 @@ class ExactByteFixture:
                 peer=str(peer),
                 received_size=len(received),
                 received_sha256=hashlib.sha256(received).hexdigest(),
-                request_valid=attempt is not None and problem is None,
+                request_valid=request_bytes_valid and problem is None,
                 response_emitted=response_emitted,
                 problem=problem,
             )

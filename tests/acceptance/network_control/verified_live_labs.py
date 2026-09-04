@@ -1,35 +1,34 @@
-"""Narrow trusted live bindings for Network Control evidence execution.
+"""Canonical trusted live bindings for Network Control evidence execution.
 
-These project-local concrete bindings apply reviewed runtime prerequisites to the
-capture-qualification and TEL-002/TEL-003 execution paths. They are deliberately
-not provider abstractions and do not define portable AVP semantics.
+These project-local concrete bindings apply reviewed runtime prerequisites and
+failure-evidence retention to capture qualification and TEL-002/TEL-003 live
+execution. They are deliberately not provider abstractions and do not define
+portable AVP semantics.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from dataclasses import replace
 
 from .capture_qualification_retransmission import RetransmissionQualifiedCaptureQualification
+from .evidence_core import ArtifactRef, MaterializedEndpoint
 from .helper_image_verification import prepare_exact_helper_image
 from .toxiproxy_binding import (
     ToxiproxyAdminClient,
     ToxiproxyControlError,
     ToxiproxyPrerequisiteError,
 )
+from .toxiproxy_evidence import NegativeMode, PhaseExecution
 from .toxiproxy_live_lab import ToxiproxyLiveLab
 from .toxiproxy_negative_assemblies import UpstreamHiddenRetryLiveLab
 
+_INCOMPLETE_FIXTURE_DIAGNOSTIC_TIMEOUT_S = 0.05
+
 
 def parse_reviewed_toxiproxy_version_response(value: str) -> str:
-    """Parse the exact Toxiproxy v2.12.0 ``GET /version`` response contract.
-
-    The pinned upstream implementation returns one JSON object containing only a
-    string ``version`` member. Plain text, malformed JSON, additional fields,
-    missing fields, or non-string values are rejected rather than treated as
-    compatibility aliases. The returned version is still compared against the
-    reviewed artifact version by the trusted live binding.
-    """
+    """Parse the exact Toxiproxy v2.12.0 ``GET /version`` response contract."""
 
     try:
         document = json.loads(value)
@@ -45,6 +44,25 @@ def parse_reviewed_toxiproxy_version_response(value: str) -> str:
     return version
 
 
+def fixture_integrity_problem(document: object) -> str | None:
+    """Return a project-local fixture-integrity problem for a completed exchange."""
+
+    if not isinstance(document, dict):
+        return "fixture-evidence:not-object"
+    event = document.get("event")
+    if not isinstance(event, dict):
+        return "fixture-evidence:event-missing"
+    if event.get("requestValid") is not True:
+        problem = event.get("problem")
+        suffix = problem if isinstance(problem, str) and problem else "request-invalid"
+        return f"fixture-evidence:{suffix}"
+    if event.get("responseEmitted") is not True:
+        return "fixture-evidence:response-not-emitted"
+    if event.get("problem") is not None:
+        return f"fixture-evidence:{event.get('problem')}"
+    return None
+
+
 class VerifiedCaptureQualification(RetransmissionQualifiedCaptureQualification):
     """Capture qualification using the shared exact helper-image boundary."""
 
@@ -56,7 +74,6 @@ class _ReviewedToxiproxyVersionBinding:
     """Apply the exact pinned Toxiproxy v2.12.0 admin-version contract."""
 
     toxiproxy_artifact: object
-    toxiproxy: object
     _role_response_timeout_s: float
 
     def _wait_for_toxiproxy_version(self, admin: ToxiproxyAdminClient) -> None:
@@ -80,18 +97,141 @@ class _ReviewedToxiproxyVersionBinding:
         raise ToxiproxyPrerequisiteError("Toxiproxy admin API did not become ready") from last_problem
 
 
-class VerifiedToxiproxyLiveLab(_ReviewedToxiproxyVersionBinding, ToxiproxyLiveLab):
-    """TEL-002 concrete lab using reviewed helper and admin-version boundaries."""
+class _ReviewedAttemptEvidenceBinding:
+    """Retain concrete exchange diagnostics and enforce fixture integrity."""
+
+    def _execute_role_exchange(
+        self,
+        *,
+        container_name: str,
+        endpoint: MaterializedEndpoint,
+        attempt_document: dict[str, object],
+        extra_connect: bool,
+    ) -> dict[str, object]:
+        exchange = super()._execute_role_exchange(  # type: ignore[misc]
+            container_name=container_name,
+            endpoint=endpoint,
+            attempt_document=attempt_document,
+            extra_connect=extra_connect,
+        )
+        phase_id = str(attempt_document.get("phaseId", "unknown"))
+        attempt_id = str(attempt_document.get("attemptId", ""))
+        if not attempt_id:
+            raise ToxiproxyControlError("exchange diagnostic cannot be bound without attempt identity")
+        ref = self.artifact_store.put_bytes(  # type: ignore[attr-defined]
+            json.dumps(exchange, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+            logical_role=f"exchange-diagnostic-{phase_id}",
+        )
+        pending = getattr(self, "_exchange_diagnostic_refs", None)
+        if pending is None:
+            pending = {}
+            setattr(self, "_exchange_diagnostic_refs", pending)
+        if attempt_id in pending:
+            raise ToxiproxyControlError(f"duplicate exchange diagnostic for attempt {attempt_id!r}")
+        pending[attempt_id] = ref
+        return exchange
+
+    def certified_attempt(
+        self,
+        phase_id: str,
+        privileged: bool,
+        negative_mode: NegativeMode | None,
+    ) -> PhaseExecution:
+        execution = super().certified_attempt(  # type: ignore[misc]
+            phase_id,
+            privileged,
+            negative_mode,
+        )
+        pending: dict[str, ArtifactRef] = getattr(self, "_exchange_diagnostic_refs", {})
+        diagnostic_ref = pending.pop(execution.observation.attempt_id, None)
+        evidence_refs = execution.evidence_refs
+        validity = execution.observation.validity_problems
+        if diagnostic_ref is None:
+            validity += ("exchange-diagnostic:missing",)
+        else:
+            evidence_refs += (diagnostic_ref,)
+
+        if execution.observation.completed:
+            fixture_refs = tuple(
+                ref for ref in evidence_refs if ref.logical_role == f"fixture-exchange-{phase_id}"
+            )
+            if len(fixture_refs) != 1:
+                validity += ("fixture-evidence:completed-exchange-missing-exact-event",)
+            else:
+                try:
+                    document = json.loads(  # type: ignore[attr-defined]
+                        self.artifact_store.read_verified(fixture_refs[0]).decode("utf-8")
+                    )
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    validity += (f"fixture-evidence:unreadable:{type(exc).__name__}",)
+                else:
+                    problem = fixture_integrity_problem(document)
+                    if problem is not None:
+                        validity += (problem,)
+        else:
+            fixture_ref = self._retain_incomplete_fixture_diagnostic(
+                phase_id,
+                execution.observation.attempt_id,
+            )
+            if fixture_ref is not None:
+                evidence_refs += (fixture_ref,)
+
+        if validity == execution.observation.validity_problems and evidence_refs == execution.evidence_refs:
+            return execution
+        return PhaseExecution(
+            observation=replace(execution.observation, validity_problems=validity),
+            evidence_refs=evidence_refs,
+        )
+
+    def _retain_incomplete_fixture_diagnostic(
+        self,
+        phase_id: str,
+        attempt_id: str,
+    ) -> ArtifactRef | None:
+        fixture = (
+            self._control_fixture  # type: ignore[attr-defined]
+            if phase_id == "non-target-control"
+            else self._selected_fixture  # type: ignore[attr-defined]
+        )
+        if fixture is None:
+            return None
+        try:
+            document = fixture.request(
+                {
+                    "op": "event",
+                    "attemptId": attempt_id,
+                    "timeoutS": _INCOMPLETE_FIXTURE_DIAGNOSTIC_TIMEOUT_S,
+                }
+            )
+        except RuntimeError as exc:
+            document = {
+                "attemptId": attempt_id,
+                "status": "unavailable",
+                "errorType": type(exc).__name__,
+            }
+        return self.artifact_store.put_bytes(  # type: ignore[attr-defined]
+            json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+            logical_role=f"fixture-diagnostic-{phase_id}",
+        )
+
+
+class VerifiedToxiproxyLiveLab(
+    _ReviewedAttemptEvidenceBinding,
+    _ReviewedToxiproxyVersionBinding,
+    ToxiproxyLiveLab,
+):
+    """Canonical TEL-002 concrete lab with reviewed runtime/evidence boundaries."""
 
     def _prepare_helper_artifact(self) -> None:
         prepare_exact_helper_image(self.docker, self.helper_artifact)
 
 
 class VerifiedUpstreamHiddenRetryLiveLab(
+    _ReviewedAttemptEvidenceBinding,
     _ReviewedToxiproxyVersionBinding,
     UpstreamHiddenRetryLiveLab,
 ):
-    """Upstream HiddenRetry faulty assembly with reviewed runtime boundaries."""
+    """Canonical upstream HiddenRetry faulty assembly with reviewed boundaries."""
 
     def _prepare_helper_artifact(self) -> None:
         prepare_exact_helper_image(self.docker, self.helper_artifact)

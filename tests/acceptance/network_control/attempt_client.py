@@ -38,6 +38,14 @@ def execute_exact_exchange(
     There is no reconnect, destination fallback, or application retry loop. The
     portable completion decision is bounded with evaluator-owned ``monotonic_ns``;
     any native socket error is retained as diagnostics only.
+
+    Request framing is owned by the evaluator-controlled exact send operation,
+    not by TCP half-close behavior. In particular, this client does not require a
+    pre-response FIN/``SHUT_WR`` boundary: a terminating intermediary may legally
+    translate client EOF into a full upstream close. Fixture-side evidence
+    independently validates the exact admitted request bytes and post-response
+    request hygiene without elevating native FIN/RST behavior into portable
+    Network Control semantics.
     """
 
     if isinstance(observation_budget_ns, bool) or not isinstance(observation_budget_ns, int):
@@ -86,13 +94,6 @@ def execute_exact_exchange(
                 return _observation(attempt, started, response, mismatch, False, native_error)
             view = view[sent:]
 
-        # EOF frames the request exactly: the fixture must observe no trailing
-        # request bytes before it is allowed to emit the expected response.
-        try:
-            sock.shutdown(socket.SHUT_WR)
-        except OSError as exc:
-            native_error = f"{type(exc).__name__}:{getattr(exc, 'errno', None)}"
-            return _observation(attempt, started, response, mismatch, False, native_error)
         selector.modify(sock, selectors.EVENT_READ)
         expected = attempt.expected_response_bytes
         while len(response) < len(expected):
