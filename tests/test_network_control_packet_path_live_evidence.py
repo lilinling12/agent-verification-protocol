@@ -68,6 +68,35 @@ class PacketPathLiveEvidenceBoundaryTests(unittest.TestCase):
                 PacketPathNegativeMode.COLLATERAL_TARGET.value,
             )
 
+    def test_schedule_leak_is_observed_on_pre_trigger_before_attempt_execution(self) -> None:
+        import acceptance.network_control.packet_path.live_evidence as module
+
+        with tempfile.TemporaryDirectory() as temporary:
+            lab = self._lab(
+                temporary,
+                negative_mode=PacketPathNegativeMode.SCHEDULE_LEAK,
+            )
+            pre_trigger = next(
+                step
+                for step in lab.execution.attempt_steps
+                if step.attempt_phase == "pre-trigger"
+            )
+            self.assertEqual(
+                pre_trigger.subject_environment,
+                (("AVP_FUTURE_FAULT_SCHEDULE", "deliberate-negative"),),
+            )
+
+        with open(module.__file__, "r", encoding="utf-8") as handle:
+            source = handle.read()
+        environment_guard = "if step.subject_environment:"
+        security_observation = "security_projection_ok = self._observe_security_projection("
+        attempt_execution = "attempts.append(self._execute_attempt(step))"
+        guard_index = source.index(environment_guard)
+        security_index = source.index(security_observation, guard_index)
+        attempt_index = source.index(attempt_execution, guard_index)
+        self.assertLess(guard_index, security_index)
+        self.assertLess(security_index, attempt_index)
+
     def test_incomplete_capture_assurance_is_rejected_before_execution(self) -> None:
         workspace = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as temporary:
