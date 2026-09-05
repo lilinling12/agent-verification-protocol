@@ -48,6 +48,38 @@ def parser() -> argparse.ArgumentParser:
     return value
 
 
+def _publish_retained_artifacts(root: Path) -> None:
+    """Make one privileged case artifact tree readable for unprivileged retention.
+
+    PTL-002 executes this CLI as the evaluator's privileged control process, while
+    manifest verification and artifact upload intentionally run as the ordinary
+    GitHub runner user. ``ArtifactStore`` uses ``mkstemp`` and therefore creates
+    content-addressed files as owner-only by default. This mechanism-local handoff
+    keeps the shared store contract unchanged, rejects symlink traversal, and
+    exposes retained evidence as read-only bytes after the case has finished.
+    """
+
+    root = Path(root)
+    if not root.exists():
+        return
+    if root.is_symlink():
+        raise RuntimeError("packet-path artifact root must not be a symbolic link")
+
+    entries = sorted(root.rglob("*"), key=lambda path: (len(path.parts), str(path)))
+    for path in entries:
+        if path.is_symlink():
+            raise RuntimeError("packet-path retained evidence must not contain symbolic links")
+
+    root.chmod(0o755)
+    for path in entries:
+        if path.is_dir():
+            path.chmod(0o755)
+        elif path.is_file():
+            path.chmod(0o444)
+        else:
+            raise RuntimeError(f"unsupported packet-path retained evidence entry: {path}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.observation_budget_ms <= 0:
@@ -82,12 +114,25 @@ def main(argv: list[str] | None = None) -> int:
         capture_assurance=qualification.capture_assurance,
         negative_mode=case.negative_mode,
     )
-    result = lab.execute_evidence()
-    assert_expected_assessment(
-        case=case,
-        classification=result.assessment.classification,
-        primary_problem=result.assessment.primary_problem,
-    )
+    try:
+        result = lab.execute_evidence()
+        assert_expected_assessment(
+            case=case,
+            classification=result.assessment.classification,
+            primary_problem=result.assessment.primary_problem,
+        )
+    except BaseException as primary_error:
+        try:
+            _publish_retained_artifacts(args.artifact_dir)
+        except BaseException as publication_error:
+            primary_error.add_note(
+                "retained evidence publication handoff also failed: "
+                f"{type(publication_error).__name__}: {publication_error}"
+            )
+        raise
+    else:
+        _publish_retained_artifacts(args.artifact_dir)
+
     output = {
         "format": "avp-project-network-packet-path-case-result-v0.1",
         "case": case.slug,
