@@ -31,6 +31,8 @@ jobs:
     name: PTL-002 / Linux netns+nftables / amd64
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      PACKET_PATH_WORKSPACE: /tmp/avp-ptl002-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout trusted exact-main revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,6 +83,25 @@ jobs:
           python --version 2>&1 | tee privileged-evidence/runner/python-version.txt
           command -v python | tee privileged-evidence/runner/python-path.txt
 
+      - name: Prepare read-only Subject worker workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- "${PACKET_PATH_WORKSPACE}"
+          install -d -m 0755 "${PACKET_PATH_WORKSPACE}/tests"
+          cp -a tests/acceptance "${PACKET_PATH_WORKSPACE}/tests/acceptance"
+          if find "${PACKET_PATH_WORKSPACE}" -type l -print -quit | grep -q .; then
+            echo "Subject worker staging must not contain symbolic links" >&2
+            exit 1
+          fi
+          chmod -R u=rwX,go=rX "${PACKET_PATH_WORKSPACE}"
+          test -r "${PACKET_PATH_WORKSPACE}/tests/acceptance/network_control/packet_path/worker.py"
+          stat -c '%A %U:%G %n' \
+            "${PACKET_PATH_WORKSPACE}" \
+            "${PACKET_PATH_WORKSPACE}/tests" \
+            "${PACKET_PATH_WORKSPACE}/tests/acceptance" \
+            | tee privileged-evidence/runner/subject-worker-workspace.txt
+
       - name: Execute same-run packet-path qualification
         shell: bash
         run: |
@@ -92,6 +113,7 @@ jobs:
           sudo "${PYTHON_BIN}" scripts/qualify_network_control_packet_path.py \
             --run-id "${QUALIFICATION_RUN_ID}" \
             --semantic-baseline-commit "${GITHUB_SHA}" \
+            --workspace "${PACKET_PATH_WORKSPACE}" \
             --output privileged-evidence/qualification/qualification.json
 
       - name: Execute positive and required negative packet-path matrix
@@ -113,6 +135,7 @@ jobs:
               --qualification-run-id "${QUALIFICATION_RUN_ID}" \
               --qualification privileged-evidence/qualification/qualification.json \
               --semantic-baseline-commit "${GITHUB_SHA}" \
+              --workspace "${PACKET_PATH_WORKSPACE}" \
               --artifact-dir "${dir}/artifacts" \
               | tee "${dir}/result.json"
           }
@@ -126,6 +149,13 @@ jobs:
           run_case hidden-retry-fallback
           run_case collateral-target
           run_case residual-cleanup
+
+      - name: Remove Subject worker workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- "${PACKET_PATH_WORKSPACE}"
 
       - name: Build and verify execution manifest
         if: always()

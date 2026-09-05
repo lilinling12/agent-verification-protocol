@@ -64,6 +64,36 @@ class PacketPathPrivilegedWorkflowTests(unittest.TestCase):
         self.assertLess(self.source.index(ref_guard), self.source.index(qualification))
         self.assertLess(self.source.index(sha_guard), self.source.index(qualification))
 
+    def test_subject_worker_workspace_is_run_scoped_read_only_and_shared(self) -> None:
+        self.assertIn(
+            "PACKET_PATH_WORKSPACE: /tmp/avp-ptl002-${{ github.run_id }}-${{ github.run_attempt }}",
+            self.source,
+        )
+        self.assertIn(
+            'cp -a tests/acceptance "${PACKET_PATH_WORKSPACE}/tests/acceptance"',
+            self.source,
+        )
+        self.assertIn(
+            'find "${PACKET_PATH_WORKSPACE}" -type l -print -quit',
+            self.source,
+        )
+        self.assertIn(
+            'chmod -R u=rwX,go=rX "${PACKET_PATH_WORKSPACE}"',
+            self.source,
+        )
+        self.assertEqual(
+            self.source.count('--workspace "${PACKET_PATH_WORKSPACE}"'),
+            2,
+        )
+        self.assertIn(
+            "- name: Remove Subject worker workspace\n        if: always()",
+            self.source,
+        )
+        self.assertEqual(
+            self.source.count('rm -rf -- "${PACKET_PATH_WORKSPACE}"'),
+            2,
+        )
+
     def test_same_run_qualification_precedes_complete_matrix(self) -> None:
         qualification = (
             'sudo "${PYTHON_BIN}" scripts/qualify_network_control_packet_path.py'
