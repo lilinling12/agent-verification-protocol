@@ -46,6 +46,8 @@ class PacketPathTopologyTests(unittest.TestCase):
 
         self.assertEqual(selected.address, topology.fixture_address)
         self.assertEqual(control.address, topology.fixture_address)
+        self.assertEqual(selected.role, "fixture")
+        self.assertEqual(control.role, "control-fixture")
         self.assertNotEqual(selected.port, control.port)
         self.assertNotIn(
             topology.unused_fault_port,
@@ -71,11 +73,13 @@ class PacketPathTopologyTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.subject_destination, plan.upstream_fixture)
+        self.assertEqual(plan.subject_destination.role, "fixture")
         self.assertEqual(
             plan.non_target_subject_destination,
             plan.non_target_upstream_fixture,
         )
         assert plan.non_target_subject_destination is not None
+        self.assertEqual(plan.non_target_subject_destination.role, "control-fixture")
         self.assertNotEqual(
             (plan.subject_destination.address, plan.subject_destination.port),
             (

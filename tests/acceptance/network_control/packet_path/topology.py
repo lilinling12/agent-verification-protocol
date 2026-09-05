@@ -145,7 +145,7 @@ class PacketPathRunTopology:
             family="ipv4",
             address=self.fixture_address,
             port=self.selected_port,
-            role="selected-fixture",
+            role="fixture",
         )
 
     @property
