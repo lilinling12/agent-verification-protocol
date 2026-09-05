@@ -21,18 +21,8 @@ from acceptance.network_control.packet_path.github_qualification import (  # noq
 from acceptance.network_control.packet_path.local_qualification import (  # noqa: E402
     PacketPathLocalQualification,
 )
-
-_ENVIRONMENT_ALLOWLIST = frozenset(
-    {
-        "HOME",
-        "LANG",
-        "LC_ALL",
-        "PATH",
-        "PYTHONIOENCODING",
-        "PYTHONPATH",
-        "PYTHONUTF8",
-        "VIRTUAL_ENV",
-    }
+from acceptance.network_control.packet_path.process_environment import (  # noqa: E402
+    sanitize_packet_path_process_environment,
 )
 
 
@@ -63,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
             "this command never acquires privilege"
         )
 
-    _sanitize_process_environment()
+    sanitize_packet_path_process_environment(workspace=args.workspace)
     qualification = PacketPathLocalQualification(
         workspace=args.workspace,
         run_id=args.run_id,
@@ -87,18 +77,6 @@ def main(argv: list[str] | None = None) -> int:
     args.output.write_bytes(exact)
     print(exact.decode("utf-8"))
     return 0
-
-
-def _sanitize_process_environment() -> None:
-    """Remove runner-only environment before any Subject/evaluator child exists."""
-
-    retained = {
-        key: value
-        for key, value in os.environ.items()
-        if key in _ENVIRONMENT_ALLOWLIST
-    }
-    os.environ.clear()
-    os.environ.update(retained)
 
 
 if __name__ == "__main__":
