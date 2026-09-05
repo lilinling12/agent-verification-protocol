@@ -36,6 +36,7 @@ class PacketPathPrivilegedWorkflowTests(unittest.TestCase):
             "tests/acceptance/network_control/tcp_packets.py",
             "tests/acceptance/network_control/witness.py",
             "tests/acceptance/network_control/witness_evidence.py",
+            "tests/acceptance/network_control/portable_comparator.py",
             "pyproject.toml",
             "constraints/ci.txt",
         )
