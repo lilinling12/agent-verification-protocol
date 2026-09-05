@@ -23,10 +23,25 @@ class PacketPathPrivilegedWorkflowTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", self.source)
         self.assertNotIn("pull_request:", self.source)
         self.assertNotIn("pull_request_target:", self.source)
-        self.assertIn(
-            "- '.github/workflows/network-control-packet-path-privileged-evidence.yml'",
-            self.source,
+
+    def test_trigger_covers_reviewed_packet_path_execution_inputs(self) -> None:
+        required_paths = (
+            ".github/workflows/network-control-packet-path-privileged-evidence.yml",
+            "scripts/qualify_network_control_packet_path.py",
+            "scripts/run_network_control_packet_path_evidence.py",
+            "tests/acceptance/network_control/packet_path/**",
+            "tests/acceptance/network_control/evidence_core.py",
+            "tests/acceptance/network_control/attempt_client.py",
+            "tests/acceptance/network_control/fixture.py",
+            "tests/acceptance/network_control/tcp_packets.py",
+            "tests/acceptance/network_control/witness.py",
+            "tests/acceptance/network_control/witness_evidence.py",
+            "tests/acceptance/network_control/portable_comparator.py",
+            "pyproject.toml",
+            "constraints/ci.txt",
         )
+        for path in required_paths:
+            self.assertIn(f"- '{path}'", self.source)
 
     def test_permissions_and_checkout_are_read_only(self) -> None:
         self.assertIn("permissions:\n  contents: read", self.source)
@@ -39,16 +54,25 @@ class PacketPathPrivilegedWorkflowTests(unittest.TestCase):
     def test_exact_main_revision_is_enforced_before_privileged_execution(self) -> None:
         ref_guard = 'if [[ "${GITHUB_REF}" != "refs/heads/main" ]]'
         sha_guard = 'if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]'
-        qualification = "scripts/qualify_network_control_packet_path.py"
+        qualification = (
+            'sudo "${PYTHON_BIN}" scripts/qualify_network_control_packet_path.py'
+        )
 
         self.assertIn(ref_guard, self.source)
         self.assertIn(sha_guard, self.source)
+        self.assertIn(qualification, self.source)
         self.assertLess(self.source.index(ref_guard), self.source.index(qualification))
         self.assertLess(self.source.index(sha_guard), self.source.index(qualification))
 
     def test_same_run_qualification_precedes_complete_matrix(self) -> None:
-        qualification = "scripts/qualify_network_control_packet_path.py"
-        runner = "scripts/run_network_control_packet_path_evidence.py"
+        qualification = (
+            'sudo "${PYTHON_BIN}" scripts/qualify_network_control_packet_path.py'
+        )
+        runner = (
+            'sudo "${PYTHON_BIN}" scripts/run_network_control_packet_path_evidence.py'
+        )
+        self.assertIn(qualification, self.source)
+        self.assertIn(runner, self.source)
         self.assertLess(self.source.index(qualification), self.source.index(runner))
 
         expected_cases = (

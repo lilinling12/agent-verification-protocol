@@ -5,6 +5,18 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/network-control-packet-path-privileged-evidence.yml'
+      - 'scripts/qualify_network_control_packet_path.py'
+      - 'scripts/run_network_control_packet_path_evidence.py'
+      - 'tests/acceptance/network_control/packet_path/**'
+      - 'tests/acceptance/network_control/evidence_core.py'
+      - 'tests/acceptance/network_control/attempt_client.py'
+      - 'tests/acceptance/network_control/fixture.py'
+      - 'tests/acceptance/network_control/tcp_packets.py'
+      - 'tests/acceptance/network_control/witness.py'
+      - 'tests/acceptance/network_control/witness_evidence.py'
+      - 'tests/acceptance/network_control/portable_comparator.py'
+      - 'pyproject.toml'
+      - 'constraints/ci.txt'
   workflow_dispatch:
 
 permissions:
