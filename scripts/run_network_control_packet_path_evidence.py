@@ -25,18 +25,8 @@ from acceptance.network_control.packet_path.github_qualification import (  # noq
 from acceptance.network_control.packet_path.live_evidence import (  # noqa: E402
     PacketPathLiveEvidenceLab,
 )
-
-_ENVIRONMENT_ALLOWLIST = frozenset(
-    {
-        "HOME",
-        "LANG",
-        "LC_ALL",
-        "PATH",
-        "PYTHONIOENCODING",
-        "PYTHONPATH",
-        "PYTHONUTF8",
-        "VIRTUAL_ENV",
-    }
+from acceptance.network_control.packet_path.process_environment import (  # noqa: E402
+    sanitize_packet_path_process_environment,
 )
 
 
@@ -74,8 +64,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # All GitHub identity needed by the run is already supplied as explicit CLI
     # data. Strip runner-only environment before any Subject/evaluator child is
-    # created so Actions/runtime variables cannot cross the Subject boundary.
-    _sanitize_process_environment()
+    # created, then bind worker imports to the reviewed workspace tests package.
+    sanitize_packet_path_process_environment(workspace=args.workspace)
     case = lane_case(args.case)
     qualification = verify_github_qualification(
         args.qualification.read_bytes(),
@@ -129,16 +119,6 @@ def main(argv: list[str] | None = None) -> int:
     }
     print(json.dumps(output, sort_keys=True, separators=(",", ":")))
     return 0
-
-
-def _sanitize_process_environment() -> None:
-    retained = {
-        key: value
-        for key, value in os.environ.items()
-        if key in _ENVIRONMENT_ALLOWLIST
-    }
-    os.environ.clear()
-    os.environ.update(retained)
 
 
 if __name__ == "__main__":
