@@ -9,9 +9,11 @@ from pathlib import Path
 
 from acceptance.network_control.cross_mechanism import (
     SemanticBinding,
-    decode_reassessment_archive,
     encode_reassessment_archive,
-    verify_reassessment_record,
+)
+from acceptance.network_control.retained_reassessment import (
+    decode_retained_reassessment_archive,
+    verify_retained_reassessment,
 )
 from acceptance.network_control.evidence_core import EvidenceMaterializationError
 
@@ -36,20 +38,20 @@ _EXPECTED_JSON_SHA256 = "b768f6f6d96327cffa550c0f6db1f0b35ff48696362e4113766cce7
 
 class NetworkControlCrossMechanismTests(unittest.TestCase):
     def _exact_record(self) -> bytes:
-        return decode_reassessment_archive(_ARCHIVE.read_bytes())
+        return decode_retained_reassessment_archive(_ARCHIVE.read_bytes())
 
     def _document(self) -> dict[str, object]:
         return json.loads(self._exact_record())
 
     def test_committed_record_reassesses_with_current_portable_comparator(self) -> None:
-        document = verify_reassessment_record(self._exact_record(), semantic_binding=_BINDING)
+        document = verify_retained_reassessment(self._exact_record(), semantic_binding=_BINDING)
         mechanisms = document["mechanisms"]
         self.assertEqual(len(mechanisms["terminating-intercepting"]["cases"]), 10)
         self.assertEqual(len(mechanisms["packet-path"]["cases"]), 9)
 
     def test_committed_archive_has_locked_exact_identity_and_canonical_encoding(self) -> None:
         archive = _ARCHIVE.read_bytes()
-        exact = decode_reassessment_archive(archive)
+        exact = decode_retained_reassessment_archive(archive)
         self.assertEqual(hashlib.sha256(archive).hexdigest(), _EXPECTED_ARCHIVE_SHA256)
         self.assertEqual(hashlib.sha256(exact).hexdigest(), _EXPECTED_JSON_SHA256)
         self.assertEqual(encode_reassessment_archive(exact), archive)
@@ -61,7 +63,7 @@ class NetworkControlCrossMechanismTests(unittest.TestCase):
         positive["portableObservations"]["attempts"]["subjectActiveCut"]["completed"] = True
 
         with self.assertRaisesRegex(EvidenceMaterializationError, "current comparator differs"):
-            verify_reassessment_record(_canonical(document), semantic_binding=_BINDING)
+            verify_retained_reassessment(_canonical(document), semantic_binding=_BINDING)
 
     def test_missing_required_negative_family_fails_closed(self) -> None:
         document = self._document()
@@ -71,21 +73,28 @@ class NetworkControlCrossMechanismTests(unittest.TestCase):
         ]
 
         with self.assertRaisesRegex(EvidenceMaterializationError, "negative-family coverage drift"):
-            verify_reassessment_record(_canonical(document), semantic_binding=_BINDING)
+            verify_retained_reassessment(_canonical(document), semantic_binding=_BINDING)
 
     def test_semantic_git_blob_drift_fails_closed(self) -> None:
         document = self._document()
         document["mechanisms"]["packet-path"]["source"]["semanticGitBlob"] = "1" * 40
 
         with self.assertRaisesRegex(EvidenceMaterializationError, "semantic Git blob drift"):
-            verify_reassessment_record(_canonical(document), semantic_binding=_BINDING)
+            verify_retained_reassessment(_canonical(document), semantic_binding=_BINDING)
+
+    def test_sealed_plan_source_commit_drift_fails_closed(self) -> None:
+        document = self._document()
+        document["mechanisms"]["packet-path"]["source"]["sourceCommit"] = "1" * 40
+
+        with self.assertRaisesRegex(EvidenceMaterializationError, "sealed-plan/source commit binding drift"):
+            verify_retained_reassessment(_canonical(document), semantic_binding=_BINDING)
 
     def test_noncanonical_json_is_not_accepted_as_exact_reassessment(self) -> None:
         document = self._document()
         pretty = json.dumps(document, indent=2, sort_keys=True).encode("utf-8")
 
         with self.assertRaisesRegex(EvidenceMaterializationError, "not canonical exact bytes"):
-            verify_reassessment_record(pretty, semantic_binding=_BINDING)
+            verify_retained_reassessment(pretty, semantic_binding=_BINDING)
 
 
 def _canonical(document: object) -> bytes:

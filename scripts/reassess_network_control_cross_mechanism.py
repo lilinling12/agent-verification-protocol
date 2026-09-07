@@ -20,8 +20,8 @@ from acceptance.network_control.cross_mechanism import (
     SourceExpectation,
     build_reassessment_record,
     encode_reassessment_archive,
-    verify_reassessment_record,
 )
+from acceptance.network_control.retained_reassessment import verify_retained_reassessment
 
 _REPOSITORY = "lilinling12/agent-verification-protocol"
 _CANDIDATE_PARENT = "0ccac4339ed4c8f773b6413428e3df3b15f6b79e"
@@ -74,6 +74,8 @@ def main() -> int:
     if not args.skip_checkout_binding:
         _verify_checkout_blob(_AEP_PATH, _AEP_GIT_BLOB)
         _verify_checkout_blob(_COMPARATOR_PATH, _COMPARATOR_GIT_BLOB)
+    _verify_source_input(args.terminating_zip)
+    _verify_source_input(args.packet_path_zip)
 
     exact = build_reassessment_record(
         terminating_zip=args.terminating_zip,
@@ -82,7 +84,7 @@ def main() -> int:
         packet_path_expectation=_PACKET_PATH,
         semantic_binding=_BINDING,
     )
-    verify_reassessment_record(exact, semantic_binding=_BINDING)
+    verify_retained_reassessment(exact, semantic_binding=_BINDING)
     archive = encode_reassessment_archive(exact)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(archive)
@@ -102,6 +104,11 @@ def main() -> int:
         )
     )
     return 0
+
+
+def _verify_source_input(path: Path) -> None:
+    if not path.is_file() or path.stat().st_size > 8 * 1024 * 1024:
+        raise RuntimeError(f"source ZIP is missing or exceeds bounded size: {path}")
 
 
 def _verify_checkout_blob(path: str, expected: str) -> None:
