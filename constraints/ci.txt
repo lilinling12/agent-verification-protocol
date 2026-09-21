@@ -4,7 +4,7 @@
 # validating downstream wheel installation because consumers resolve against the
 # compatibility ranges declared in pyproject.toml.
 attrs==26.1.0
-build==1.5.0
+build==1.6.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 mysql-connector-python==26.7.0
@@ -12,10 +12,10 @@ opentelemetry-api==1.44.0
 opentelemetry-sdk==1.44.0
 opentelemetry-semantic-conventions==0.65b0
 packaging==26.3
-playwright==1.62.0
-psycopg==3.3.4
-psycopg-binary==3.3.4
-pyproject-hooks==1.2.0
+playwright==1.63.0
+psycopg==3.3.5
+psycopg-binary==3.3.5
+pyproject-hooks==1.3.3
 PyYAML==6.0.3
 referencing==0.37.0
 rfc8785==0.1.4
